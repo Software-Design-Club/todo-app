@@ -5,6 +5,7 @@ import {
   timestamp,
   uniqueIndex,
   pgEnum,
+  integer,
 } from "drizzle-orm/pg-core";
 
 export const userStatusEnum = pgEnum("status", ["active", "deleted"]);
@@ -25,3 +26,23 @@ export const UsersTable = pgTable(
     };
   }
 );
+
+export const ListsTable = pgTable("lists", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  creatorId: integer("creatorId")
+    .references(() => UsersTable.id)
+    .notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const TodosTable = pgTable("todos", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  listId: integer("listId")
+    .references(() => ListsTable.id)
+    .notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});

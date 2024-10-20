@@ -1,10 +1,6 @@
 import NextAuth from "next-auth";
 import Github from "next-auth/providers/github";
-import { sql } from "@vercel/postgres";
-import { drizzle } from "drizzle-orm/vercel-postgres";
-import { UsersTable } from "./drizzle/schema";
-
-import { eq } from "drizzle-orm";
+import { findOrCreateAccount } from "./app/actions";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Github],
@@ -25,17 +21,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!user.email) {
         return false;
       }
-      const db = await drizzle(sql);
-      const findUser = await db
-        .select()
-        .from(UsersTable)
-        .where(eq(UsersTable.email, user.email));
-
-      if (findUser.length === 0) {
-        await db
-          .insert(UsersTable)
-          .values({ email: user.email, name: user.name || user.email });
-      }
+      findOrCreateAccount({ email: user.email, name: user.name || user.email });
       return true;
     },
   },
