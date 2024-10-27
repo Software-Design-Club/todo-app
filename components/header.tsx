@@ -12,8 +12,14 @@ import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { User } from "next-auth/";
 import { SignOut } from "./sign-out";
+import { auth } from "@/auth";
 
-export default function Header({ user }: { user: User }) {
+export default async function Header() {
+  const session = await auth();
+  const user: User | undefined = session?.user;
+  if (!user) {
+    return null;
+  }
   return (
     <header className="bg-background border-b">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">

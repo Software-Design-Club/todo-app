@@ -33,7 +33,7 @@ export async function findOrCreateAccount(user: User) {
   }
 }
 
-type UsersListTodos = {
+export type UsersListTodos = {
   id: number;
   title: string;
   creatorId: number;
@@ -52,7 +52,7 @@ type UsersListTodos = {
 //   todos: Array<typeof TodosTable>
 // };
 
-export async function getListsWithTodos(user: User) {
+export async function getListsWithTodos(user: User): Promise<UsersListTodos[]> {
   const db = drizzle(sql);
   const [foundUser] = await db
     .select()
