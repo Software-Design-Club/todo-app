@@ -52,27 +52,44 @@ export type UsersListTodos = {
 //   todos: Array<typeof TodosTable>
 // };
 
-export async function getListsWithTodos(user: User): Promise<UsersListTodos[]> {
+export async function getListWithTodos(
+  listId: number
+): Promise<UsersListTodos> {
   const db = drizzle(sql);
-  const [foundUser] = await db
-    .select()
-    .from(UsersTable)
-    .where(eq(UsersTable.email, user.email));
 
   const listsWithTodos = await db
     .select()
     .from(ListsTable)
     .leftJoin(TodosTable, eq(ListsTable.id, TodosTable.listId))
+    .where(eq(ListsTable.id, listId));
+
+  const todos = listsWithTodos
+    .map((listWithTodos) => listWithTodos.todos)
+    .filter((todo) => todo !== null);
+
+  return {
+    id: listsWithTodos[0].lists.id,
+    title: listsWithTodos[0].lists.title,
+    creatorId: listsWithTodos[0].lists.creatorId,
+    createdAt: listsWithTodos[0].lists.createdAt,
+    updatedAt: listsWithTodos[0].lists.updatedAt,
+    todos: todos,
+  };
+}
+
+export async function getLists(userEmail: string) {
+  const db = drizzle(sql);
+  const [foundUser] = await db
+    .select()
+    .from(UsersTable)
+    .where(eq(UsersTable.email, userEmail));
+
+  const lists = await db
+    .select()
+    .from(ListsTable)
     .where(eq(ListsTable.creatorId, foundUser.id));
 
-  const result: UsersListTodos[] = listsWithTodos.map((listWithTodo) => {
-    const list = listWithTodo.lists;
-    const todos = listWithTodo.todos ? [listWithTodo.todos] : [];
-    return { ...list, todos: todos };
-  });
-
-  console.log(result);
-  return result;
+  return lists;
 }
 
 // [
