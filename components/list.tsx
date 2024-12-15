@@ -1,8 +1,7 @@
 import { getListWithTodos } from "@/app/actions";
+import TodoList from "@/components/TodoList";
 
 import React from "react";
-
-
 
 interface ListProps {
   listId: number;
@@ -16,12 +15,8 @@ const List: React.FC<ListProps> = async ({ listId }) => {
 
   return (
     <div>
-      <h2>{listWithTodos.title}</h2>
-      <ul>
-        {listWithTodos.todos.map((todo) => (
-          <li key={todo.id}>{todo.title}</li>
-        ))}
-      </ul>
+      <h2 className="text-2xl font-bold mb-4">{listWithTodos.title}</h2>
+      <TodoList todos={listWithTodos.todos} />
     </div>
   );
 };

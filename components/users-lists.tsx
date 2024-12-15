@@ -15,7 +15,12 @@ const UserLists: React.FC<ListsProps> = async ({ userEmail }) => {
       <ul>
         {lists.map((list) => (
           <li key={list.id}>
-            <Link href={`/lists/${list.id}`}>{list.title}</Link>
+            <Link
+              className="text-blue-500 hover:underline"
+              href={`/lists/${list.id}`}
+            >
+              {list.title}
+            </Link>
           </li>
         ))}
       </ul>

@@ -39,14 +39,10 @@ export type UsersListTodos = {
   creatorId: number;
   createdAt: Date;
   updatedAt: Date;
-  todos: Array<{
-    id: number;
-    title: string;
-    listId: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
+  todos: Array<Todo>;
 };
+
+export type Todo = typeof TodosTable.$inferSelect;
 
 // interface UsersListsTodos  extends typeof ListsTable {
 //   todos: Array<typeof TodosTable>

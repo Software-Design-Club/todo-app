@@ -1,6 +1,6 @@
 "use client";
 
-import { UsersListTodos } from "@/app/actions";
+import { Todo } from "@/app/actions";
 import { useState } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -13,25 +13,19 @@ const todoColumns: ColumnDef<TodoRow>[] = [
   {
     accessorKey: "id",
     header: "ID",
-    cell: ({ row }) => {
-      return <div>{row.getValue("id")}</div>;
-    },
   },
   {
     accessorKey: "title",
     header: "Title",
-    cell: ({ row }) => {
-      return <div>{row.getValue("title")}</div>;
-    },
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
   },
 ];
 
-export default function ReadOnlyTodoList({
-  listWithTodos,
-}: {
-  listWithTodos: UsersListTodos[];
-}) {
-  const [data] = useState(listWithTodos[0].todos);
+export default function TodoList({ todos }: { todos: Todo[] }) {
+  const [data] = useState(todos);
 
   return <DataTable data={data} columns={todoColumns} />;
 }
