@@ -88,21 +88,14 @@ export async function getLists(userEmail: string) {
   return lists;
 }
 
-// [
-//   {
-//     lists: {
-//       id: 1,
-//       title: 'My first list',
-//       creatorId: 2,
-//       createdAt: 2024-10-20T17:02:57.307Z,
-//       updatedAt: 2024-10-20T17:02:57.307Z
-//     },
-//     todos: {
-//       id: 1,
-//       title: 'My first todo',
-//       listId: 1,
-//       createdAt: 2024-10-20T17:02:57.360Z,
-//       updatedAt: 2024-10-20T17:02:57.360Z
-//     }
-//   }
-// ]
+export async function updateTodoStatus(
+  todoId: Todo["id"],
+  newStatus: Todo["status"]
+) {
+  const db = drizzle(sql);
+  await db
+    .update(TodosTable)
+    .set({ status: newStatus })
+    .where(eq(TodosTable.id, todoId));
+  return newStatus;
+}

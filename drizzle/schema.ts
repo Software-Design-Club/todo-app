@@ -37,12 +37,15 @@ export const ListsTable = pgTable("lists", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+
+
 export const todoStatusEnum = pgEnum("todo_status", [
   "not started",
   "in progress",
   "done",
   "deleted",
 ]);
+
 export const TodosTable = pgTable("todos", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),

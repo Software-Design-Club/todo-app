@@ -1,0 +1,3 @@
+- [x] Allow users to update state on Todos table
+- [ ] Handle Unauthenticated User on List Page
+- [ ] 404 for misisng list ID
