@@ -1,3 +1,7 @@
 - [x] Allow users to update state on Todos table
 - [ ] Handle Unauthenticated User on List Page
 - [ ] 404 for misisng list ID
+- [ ] User can add todo
+- [ ] User can edit todo
+- [ ] User "delete" todo
+- [ ] Where to put core business logic?
