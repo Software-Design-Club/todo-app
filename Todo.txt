@@ -1,7 +1,17 @@
+
+Todos:
 - [x] Allow users to update state on Todos table
 - [x] Make list read only unless user is signed in
-- [ ] 404 for misisng list ID
+- [x] 404 for misisng list ID
 - [ ] User can add todo
 - [ ] User can edit todo
 - [ ] User "delete" todo
 - [ ] Where to put core business logic?
+- [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
+      Public lists are visible to everyone.
+
+Notes:
+  - We called `notFound()` in `getListWithTodos` to handle the case where the list ID is not found.
+  - This may lead to a pattern where we always respond to a db returning  null with 404 when we may want to do something else.
+  - Another way to have a custom 404 page at the specific route
+ - Note for next time: list/page.tsx is a server component, AddTodoForm is a client component(it uses useState).

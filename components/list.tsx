@@ -2,7 +2,7 @@ import { getListWithTodos } from "@/app/actions";
 import TodoList from "@/components/TodoList";
 import { auth } from "@/auth";
 import React from "react";
-
+import { AddTodoForm } from "@/components/TodoList";
 interface ListProps {
   listId: number;
 }
@@ -12,6 +12,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   // Get todos for lists
   // Render TodoList
   const listWithTodos = await getListWithTodos(listId);
+
   const session = await auth();
   let editable = false;
   const user = session?.user;
@@ -23,6 +24,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     <div>
       <h2 className="text-2xl font-bold mb-4">{listWithTodos.title}</h2>
       <TodoList todos={listWithTodos.todos} editable={editable} />
+      {editable && <AddTodoForm listId={listId} />}
     </div>
   );
 };

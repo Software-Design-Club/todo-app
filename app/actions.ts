@@ -3,6 +3,9 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { ListsTable, TodosTable, UsersTable } from "../drizzle/schema";
+import { notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 type User = {
   email: string;
@@ -63,6 +66,9 @@ export async function getListWithTodos(
     .map((listWithTodos) => listWithTodos.todos)
     .filter((todo) => todo !== null);
 
+  if (listsWithTodos.length === 0) {
+    notFound();
+  }
   return {
     id: listsWithTodos[0].lists.id,
     title: listsWithTodos[0].lists.title,
@@ -71,6 +77,15 @@ export async function getListWithTodos(
     updatedAt: listsWithTodos[0].lists.updatedAt,
     todos: todos,
   };
+}
+
+export async function createTodo(
+  todo: Pick<Todo, "title" | "status" | "listId">
+) {
+  const db = drizzle(sql);
+  await db.insert(TodosTable).values(todo);
+  revalidatePath(`/lists/${todo.listId}`);
+  redirect(`/lists/${todo.listId}`);
 }
 
 export async function getLists(userEmail: string) {
