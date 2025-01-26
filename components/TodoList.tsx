@@ -14,28 +14,36 @@ import {
 
 import { ChevronDown } from "lucide-react";
 
-const todoColumns: ColumnDef<Todo>[] = [
-  {
-    accessorKey: "id",
-    header: "ID",
-  },
-  {
-    accessorKey: "title",
-    header: "Title",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      return <StatusDropDown todo={row.original} />;
+const todoColumns = (editable: boolean): ColumnDef<Todo>[] => {
+  return [
+    {
+      accessorKey: "id",
+      header: "ID",
     },
-  },
-];
+    {
+      accessorKey: "title",
+      header: "Title",
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        return editable ? <StatusDropDown todo={row.original} /> : row.original.status;
+      },
+    },
+  ];
+};
 
-export default function TodoList({ todos }: { todos: Todo[] }) {
+export default function TodoList({
+  todos,
+  editable = false,
+}: {
+  todos: Todo[];
+  editable?: boolean;
+}) {
   const [data] = useState(todos);
 
-  return <DataTable data={data} columns={todoColumns} />;
+  return <DataTable data={data} columns={todoColumns(editable)} />;
 }
 
 // Dropdown menu of all the possible statuses
