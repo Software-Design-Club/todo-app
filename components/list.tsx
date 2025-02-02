@@ -2,7 +2,7 @@ import { getListWithTodos } from "@/app/actions";
 import TodoList from "@/components/TodoList";
 import { auth } from "@/auth";
 import React from "react";
-import { AddTodoForm } from "@/components/TodoList";
+
 interface ListProps {
   listId: number;
 }
@@ -23,8 +23,11 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">{listWithTodos.title}</h2>
-      <TodoList todos={listWithTodos.todos} editable={editable} />
-      {editable && <AddTodoForm listId={listId} />}
+      <TodoList
+        todos={listWithTodos.todos}
+        editable={editable}
+        listId={listId}
+      />
     </div>
   );
 };

@@ -41,14 +41,20 @@ const todoColumns = (editable: boolean): ColumnDef<Todo>[] => {
 export default function TodoList({
   todos,
   editable = false,
+  listId,
 }: {
   todos: Todo[];
   editable?: boolean;
+  listId: string | number;
 }) {
-  const [data] = useState(todos);
+  const [data, setData] = useState(todos);
+  const addTodo = (todo: Todo) => {
+    setData([...data, todo]);
+  };
   return (
     <div>
       <DataTable data={data} columns={todoColumns(editable)} />
+      {editable && <AddTodoForm listId={listId} addTodo={addTodo} />}
     </div>
   );
 }
@@ -86,7 +92,13 @@ const StatusDropDown = ({ todo }: { todo: Todo }) => {
   );
 };
 
-export const AddTodoForm = ({ listId }: { listId: string | number }) => {
+export const AddTodoForm = ({
+  listId,
+  addTodo,
+}: {
+  listId: string | number;
+  addTodo: (todo: Todo) => void;
+}) => {
   const [todo, setTodo] = useState<Pick<Todo, "title" | "status" | "listId">>({
     title: "",
     status: "not started",
@@ -96,7 +108,12 @@ export const AddTodoForm = ({ listId }: { listId: string | number }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createTodo(todo);
+    try {
+      const newTodo = await createTodo(todo);
+      addTodo(newTodo);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (

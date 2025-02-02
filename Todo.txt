@@ -2,8 +2,8 @@
 Todos:
 - [x] Allow users to update state on Todos table
 - [x] Make list read only unless user is signed in
-- [x] 404 for misisng list ID
-- [ ] User can add todo
+- [x] 404 for missing list ID
+- [x] User can add todo
 - [ ] User can edit todo
 - [ ] User "delete" todo
 - [ ] Where to put core business logic?
@@ -15,3 +15,5 @@ Notes:
   - This may lead to a pattern where we always respond to a db returning  null with 404 when we may want to do something else.
   - Another way to have a custom 404 page at the specific route
  - Note for next time: list/page.tsx is a server component, AddTodoForm is a client component(it uses useState).
+ - We want to update TodoList when AddTodoForm is submitted. TodoList is a client component that uses useState.
+ - We need to update the state of TodoList when AddTodoForm is submitted.

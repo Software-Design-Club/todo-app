@@ -4,8 +4,6 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { ListsTable, TodosTable, UsersTable } from "../drizzle/schema";
 import { notFound } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 type User = {
   email: string;
@@ -83,9 +81,9 @@ export async function createTodo(
   todo: Pick<Todo, "title" | "status" | "listId">
 ) {
   const db = drizzle(sql);
-  await db.insert(TodosTable).values(todo);
-  revalidatePath(`/lists/${todo.listId}`);
-  redirect(`/lists/${todo.listId}`);
+  const [newTodo] = await db.insert(TodosTable).values(todo).returning();
+
+  return newTodo;
 }
 
 export async function getLists(userEmail: string) {
