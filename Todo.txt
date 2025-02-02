@@ -4,7 +4,7 @@ Todos:
 - [x] Make list read only unless user is signed in
 - [x] 404 for missing list ID
 - [x] User can add todo
-- [ ] User can edit todo
+- [x] User can edit todo
 - [ ] User "delete" todo
 - [ ] Where to put core business logic?
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
@@ -17,3 +17,6 @@ Notes:
  - Note for next time: list/page.tsx is a server component, AddTodoForm is a client component(it uses useState).
  - We want to update TodoList when AddTodoForm is submitted. TodoList is a client component that uses useState.
  - We need to update the state of TodoList when AddTodoForm is submitted.
+
+Notes 2/2/2025:
+- Onblur is not a good event to use to close the edit mode. It seems to prevent the form from being submitted.

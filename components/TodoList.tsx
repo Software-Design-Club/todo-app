@@ -1,6 +1,11 @@
 "use client";
 
-import { Todo, updateTodoStatus, createTodo } from "@/app/actions";
+import {
+  Todo,
+  updateTodoStatus,
+  createTodo,
+  updateTodoTitle,
+} from "@/app/actions";
 import { useState } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -23,6 +28,13 @@ const todoColumns = (editable: boolean): ColumnDef<Todo>[] => {
     {
       accessorKey: "title",
       header: "Title",
+      cell: ({ row }) => {
+        return editable ? (
+          <EditableTitle todo={row.original} />
+        ) : (
+          row.original.title
+        );
+      },
     },
     {
       accessorKey: "status",
@@ -59,9 +71,50 @@ export default function TodoList({
   );
 }
 
+const EditableTitle = ({ todo }: { todo: Todo }) => {
+  const [title, setTitle] = useState(todo.title);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleSave = async () => {
+    console.log("Saving todo title", todo.id, title);
+    const response = await updateTodoTitle(todo.id, title);
+    console.log("Response", response);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2 w-fit">
+      {isEditing ? (
+        <form onSubmit={handleSave} className="flex gap-2">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="px-2 py-1 border rounded-md min-w-[200px]"
+            autoFocus
+          />
+          <Button type="submit" variant="outline" size="sm">
+            Save
+          </Button>
+        </form>
+      ) : (
+        <>
+          <span className="w-[300px]">{title}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditing(true)}
+          >
+            Edit
+          </Button>
+        </>
+      )}
+    </div>
+  );
+};
+
 // Dropdown menu of all the possible statuses
 // Current status to be the one show
-
 const StatusDropDown = ({ todo }: { todo: Todo }) => {
   const [currentStatus, setCurrentStatus] = useState(todo.status);
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
@@ -92,7 +145,7 @@ const StatusDropDown = ({ todo }: { todo: Todo }) => {
   );
 };
 
-export const AddTodoForm = ({
+const AddTodoForm = ({
   listId,
   addTodo,
 }: {
