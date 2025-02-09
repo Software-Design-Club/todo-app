@@ -9,6 +9,8 @@ Todos:
 - [ ] Where to put core business logic?
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.
+- [ ] Sorting the todos
+- [ ] Filtering the todos
 
 Notes:
   - We called `notFound()` in `getListWithTodos` to handle the case where the list ID is not found.
@@ -20,3 +22,7 @@ Notes:
 
 Notes 2/2/2025:
 - Onblur is not a good event to use to close the edit mode. It seems to prevent the form from being submitted.
+
+
+Notes 2/9/2025:
+- Client side sorting does not keep persist after updating the data. We think this is because Next.js is refreshing the page

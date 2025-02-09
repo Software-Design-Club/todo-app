@@ -117,11 +117,9 @@ export async function updateTodoTitle(
   todoId: Todo["id"],
   newTitle: Todo["title"]
 ) {
-  console.log("Updating todo title", todoId, newTitle);
   const db = drizzle(sql);
   await db
     .update(TodosTable)
     .set({ title: newTitle })
     .where(eq(TodosTable.id, todoId));
-  return newTitle;
 }

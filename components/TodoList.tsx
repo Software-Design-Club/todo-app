@@ -1,5 +1,4 @@
 "use client";
-
 import {
   Todo,
   updateTodoStatus,
@@ -8,7 +7,7 @@ import {
 } from "@/app/actions";
 import { useState } from "react";
 import { DataTable } from "@/components/data-table";
-import { ColumnDef } from "@tanstack/react-table";
+import { ColumnDef, SortingState } from "@tanstack/react-table";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -17,13 +16,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ArrowUpDown } from "lucide-react";
 
 const todoColumns = (editable: boolean): ColumnDef<Todo>[] => {
   return [
     {
       accessorKey: "id",
-      header: "ID",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="outline"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            ID
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      enableSorting: true,
     },
     {
       accessorKey: "title",
@@ -60,12 +70,22 @@ export default function TodoList({
   listId: string | number;
 }) {
   const [data, setData] = useState(todos);
+
+  const [initialSort, updateInitialSort] = useState<SortingState>([
+    { id: "title", desc: false },
+  ]);
+
   const addTodo = (todo: Todo) => {
     setData([...data, todo]);
   };
   return (
     <div>
-      <DataTable data={data} columns={todoColumns(editable)} />
+      <DataTable
+        data={data}
+        columns={todoColumns(editable)}
+        initialSort={initialSort}
+        updateInitialSort={updateInitialSort}
+      />
       {editable && <AddTodoForm listId={listId} addTodo={addTodo} />}
     </div>
   );
@@ -76,9 +96,7 @@ const EditableTitle = ({ todo }: { todo: Todo }) => {
   const [isEditing, setIsEditing] = useState(false);
 
   const handleSave = async () => {
-    console.log("Saving todo title", todo.id, title);
-    const response = await updateTodoTitle(todo.id, title);
-    console.log("Response", response);
+    await updateTodoTitle(todo.id, title);
     setIsEditing(false);
   };
 
