@@ -4,6 +4,7 @@ import {
   updateTodoStatus,
   createTodo,
   updateTodoTitle,
+  deleteTodo,
 } from "@/app/actions";
 import { useState } from "react";
 import { DataTable } from "@/components/data-table";
@@ -18,7 +19,10 @@ import {
 
 import { ChevronDown, ArrowUpDown } from "lucide-react";
 
-const todoColumns = (editable: boolean): ColumnDef<Todo>[] => {
+const todoColumns = (
+  editable: boolean,
+  onDelete?: (todo: Todo) => void
+): ColumnDef<Todo>[] => {
   return [
     {
       accessorKey: "id",
@@ -57,6 +61,16 @@ const todoColumns = (editable: boolean): ColumnDef<Todo>[] => {
         );
       },
     },
+    {
+      header: "Action",
+      cell: ({ row }) => {
+        return editable ? (
+          <Button variant="outline" onClick={() => onDelete?.(row.original)}>
+            Delete
+          </Button>
+        ) : null;
+      },
+    },
   ];
 };
 
@@ -78,11 +92,17 @@ export default function TodoList({
   const addTodo = (todo: Todo) => {
     setData([...data, todo]);
   };
+
+  const handleDelete = async (todo: Todo) => {
+    await deleteTodo(todo.id);
+    setData(data.filter((t) => t.id !== todo.id));
+  };
+
   return (
     <div>
       <DataTable
         data={data}
-        columns={todoColumns(editable)}
+        columns={todoColumns(editable, handleDelete)}
         initialSort={initialSort}
         updateInitialSort={updateInitialSort}
       />

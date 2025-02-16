@@ -5,11 +5,12 @@ Todos:
 - [x] 404 for missing list ID
 - [x] User can add todo
 - [x] User can edit todo
-- [ ] User "delete" todo
-- [ ] Where to put core business logic?
+- [x] User "delete" todo
+- [x] Where to put core business logic?
+- [ ] User can create a list
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.
-- [ ] Sorting the todos
+- [ ] Persisting sort through list updates
 - [ ] Filtering the todos
 
 Notes:
@@ -25,4 +26,12 @@ Notes 2/2/2025:
 
 
 Notes 2/9/2025:
-- Client side sorting does not keep persist after updating the data. We think this is because Next.js is refreshing the page
+- Client side sorting does not keep persist after updating the data.
+- We think this is because Next.js is refreshing the page.
+
+
+Notes 2/16/2025:
+- We decided to split the business by route/feature for now
+- We will see if we need to change it later.
+
+

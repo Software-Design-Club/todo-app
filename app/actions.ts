@@ -1,7 +1,7 @@
 "use server";
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { eq } from "drizzle-orm";
+import { eq, not, and } from "drizzle-orm";
 import { ListsTable, TodosTable, UsersTable } from "../drizzle/schema";
 import { notFound } from "next/navigation";
 
@@ -58,7 +58,9 @@ export async function getListWithTodos(
     .select()
     .from(ListsTable)
     .leftJoin(TodosTable, eq(ListsTable.id, TodosTable.listId))
-    .where(eq(ListsTable.id, listId));
+    .where(
+      and(eq(ListsTable.id, listId), not(eq(TodosTable.status, "deleted")))
+    );
 
   const todos = listsWithTodos
     .map((listWithTodos) => listWithTodos.todos)
@@ -121,5 +123,13 @@ export async function updateTodoTitle(
   await db
     .update(TodosTable)
     .set({ title: newTitle })
+    .where(eq(TodosTable.id, todoId));
+}
+
+export async function deleteTodo(todoId: Todo["id"]) {
+  const db = drizzle(sql);
+  await db
+    .update(TodosTable)
+    .set({ status: "deleted" })
     .where(eq(TodosTable.id, todoId));
 }
