@@ -1,4 +1,4 @@
-import List from "@/components/list";
+import List from "../_components/list";
 
 const ListPage = async ({ params }: { params: { listId: string } }) => {
   const { listId } = params;

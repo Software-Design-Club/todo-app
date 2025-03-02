@@ -5,17 +5,17 @@ import {
   createTodo,
   updateTodoTitle,
   deleteTodo,
-} from "@/app/actions";
+} from "@/app/lists/_actions/todo";
 import { useState } from "react";
-import { DataTable } from "@/components/data-table";
+import { DataTable } from "@/ui/data-table";
 import { ColumnDef, SortingState } from "@tanstack/react-table";
-import { Button } from "./ui/button";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/ui/dropdown-menu";
 
 import { ChevronDown, ArrowUpDown } from "lucide-react";
 

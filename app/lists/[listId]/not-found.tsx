@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import UserLists from "@/components/users-lists";
+import UserLists from "@/app/lists/_components/user-lists";
 export default async function NotFound() {
   const session = await auth();
   const user = session?.user;

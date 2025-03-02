@@ -7,6 +7,7 @@ Todos:
 - [x] User can edit todo
 - [x] User "delete" todo
 - [x] Where to put core business logic?
+- [ ] Update todos with Ajax calls instead of server actions
 - [ ] User can create a list
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.

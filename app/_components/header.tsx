@@ -1,5 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,11 +7,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/ui/dropdown-menu";
 import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { User } from "next-auth/";
-import { SignOut } from "./sign-out";
+import { SignOut } from "@/app/sign-in/_components/sign-out";
 import { auth } from "@/auth";
 
 export default async function Header() {

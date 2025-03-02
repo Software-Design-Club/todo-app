@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Github from "next-auth/providers/github";
-import { findOrCreateAccount } from "./app/actions";
+import { findOrCreateAccount } from "@/app/sign-in/_components/_actions/find-or-create-account";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Github],

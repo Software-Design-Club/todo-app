@@ -1,5 +1,5 @@
-import { getListWithTodos } from "@/app/actions";
-import TodoList from "@/components/TodoList";
+import { getListWithTodos } from "@/app/lists/_actions/list";
+import TodoList from "@/app/lists/_components/todo-list";
 import { auth } from "@/auth";
 import React from "react";
 

@@ -1,4 +1,4 @@
-import { getLists } from "@/app/actions";
+import { getLists } from "@/app/lists/_actions/list";
 import Link from "next/link";
 import React from "react";
 
