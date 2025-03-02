@@ -36,3 +36,7 @@ Notes 2/16/2025:
 - We will see if we need to change it later.
 
 
+Notes 2/23/2025:
+- We noticed a trade off between using server actions and client side updates. The server actions did not update the client reliably
+- We tried revalidating the path, but it did not work.
+- We want to investigate if there is some trick/config to make it work.

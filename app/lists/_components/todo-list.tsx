@@ -3,8 +3,9 @@ import {
   Todo,
   updateTodoStatus,
   createTodo,
-  updateTodoTitle,
   deleteTodo,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  updateTodoTitle,
 } from "@/app/lists/_actions/todo";
 import { useState } from "react";
 import { DataTable } from "@/ui/data-table";
@@ -114,39 +115,73 @@ export default function TodoList({
 const EditableTitle = ({ todo }: { todo: Todo }) => {
   const [title, setTitle] = useState(todo.title);
   const [isEditing, setIsEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = async () => {
-    await updateTodoTitle(todo.id, title);
-    setIsEditing(false);
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/todos/${todo.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || "Failed to update todo");
+      }
+
+      setIsEditing(false);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update todo");
+      console.error("Error updating todo:", err);
+    }
   };
+  // const handleSave = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   try {
+  //     await updateTodoTitle(todo.id, title);
+  //     setIsEditing(false);
+  //     setError(null);
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : "Failed to update todo");
+  //     console.error("Error updating todo:", err);
+  //   }
+  // };
 
   return (
-    <div className="flex items-center gap-2 w-fit">
-      {isEditing ? (
-        <form onSubmit={handleSave} className="flex gap-2">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="px-2 py-1 border rounded-md min-w-[200px]"
-            autoFocus
-          />
-          <Button type="submit" variant="outline" size="sm">
-            Save
-          </Button>
-        </form>
-      ) : (
-        <>
-          <span className="w-[300px]">{title}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditing(true)}
-          >
-            Edit
-          </Button>
-        </>
-      )}
+    <div className="flex flex-col gap-2 w-fit">
+      {error && <span className="text-red-500 text-sm">{error}</span>}
+      <div className="flex flex-row gap-2">
+        {isEditing ? (
+          <form onSubmit={handleSave} className="flex gap-2">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="px-2 py-1 border rounded-md min-w-[200px]"
+              autoFocus
+            />
+            <Button type="submit" variant="outline" size="sm">
+              Save
+            </Button>
+          </form>
+        ) : (
+          <>
+            <span className="w-[300px]">{title}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { TodosTable } from "../../../drizzle/schema";
+import { revalidatePath } from "next/cache";
 
 export type Todo = typeof TodosTable.$inferSelect;
 
@@ -32,10 +33,12 @@ export async function updateTodoTitle(
   newTitle: Todo["title"]
 ) {
   const db = drizzle(sql);
-  await db
+  const [updatedTodo] = await db
     .update(TodosTable)
     .set({ title: newTitle })
-    .where(eq(TodosTable.id, todoId));
+    .where(eq(TodosTable.id, todoId))
+    .returning();
+  revalidatePath(`/lists/${updatedTodo.listId}`);
 }
 
 export async function deleteTodo(todoId: Todo["id"]) {
