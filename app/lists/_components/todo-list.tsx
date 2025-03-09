@@ -7,7 +7,7 @@ import {
   updateTodoTitle,
 } from "@/app/lists/_actions/todo";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { DataTable } from "@/ui/data-table";
 import { ColumnDef, SortingState } from "@tanstack/react-table";
 import { Button } from "@/ui/button";
@@ -81,7 +81,7 @@ const fetchTodos = async (listId: string | number): Promise<Todo[]> => {
   // For now, we'll just return an empty array
   const response = await fetch(`/api/lists/${listId}/todos`);
   if (!response.ok) {
-    throw new Error('Failed to fetch todos');
+    throw new Error("Failed to fetch todos");
   }
   return response.json();
 };
@@ -96,10 +96,10 @@ export default function TodoList({
   listId: string | number;
 }) {
   const queryClient = useQueryClient();
-  
+
   // Use the initial todos as fallback data
   const { data = todos } = useQuery({
-    queryKey: ['todos', listId],
+    queryKey: ["todos", listId],
     queryFn: () => fetchTodos(listId),
     initialData: todos,
   });
@@ -112,7 +112,7 @@ export default function TodoList({
   const addTodoMutation = useMutation({
     mutationFn: createTodo,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['todos', listId] });
+      queryClient.invalidateQueries({ queryKey: ["todos", listId] });
     },
   });
 
@@ -120,7 +120,7 @@ export default function TodoList({
   const deleteTodoMutation = useMutation({
     mutationFn: (todoId: number) => deleteTodo(todoId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['todos', listId] });
+      queryClient.invalidateQueries({ queryKey: ["todos", listId] });
     },
   });
 
@@ -152,17 +152,17 @@ const EditableTitle = ({ todo }: { todo: Todo }) => {
   const [error, setError] = useState<string | null>(null);
 
   const updateTitleMutation = useMutation({
-    mutationFn: ({ todoId, title }: { todoId: number, title: string }) => 
+    mutationFn: ({ todoId, title }: { todoId: number; title: string }) =>
       updateTodoTitle(todoId, title),
     onSuccess: () => {
       setIsEditing(false);
       setError(null);
-      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : "Failed to update todo");
       console.error("Error updating todo:", err);
-    }
+    },
   });
 
   const handleSave = async (e: React.FormEvent) => {
@@ -210,16 +210,21 @@ const StatusDropDown = ({ todo }: { todo: Todo }) => {
   const queryClient = useQueryClient();
   const [currentStatus, setCurrentStatus] = useState(todo.status);
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
-  
+
   const updateStatusMutation = useMutation({
-    mutationFn: ({ todoId, status }: { todoId: number, status: Todo["status"] }) => 
-      updateTodoStatus(todoId, status),
+    mutationFn: ({
+      todoId,
+      status,
+    }: {
+      todoId: number;
+      status: Todo["status"];
+    }) => updateTodoStatus(todoId, status),
     onSuccess: (newStatus) => {
       setCurrentStatus(newStatus);
-      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
     },
   });
-  
+
   const updateStatus = (todoId: number, status: Todo["status"]) => {
     // Optimistic update
     setCurrentStatus(status);
