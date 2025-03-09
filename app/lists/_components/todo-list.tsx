@@ -75,17 +75,6 @@ const todoColumns = (
   ];
 };
 
-// Function to fetch todos for a specific list
-const fetchTodos = async (listId: string | number): Promise<Todo[]> => {
-  // You can implement this to fetch from your API
-  // For now, we'll just return an empty array
-  const response = await fetch(`/api/lists/${listId}/todos`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch todos");
-  }
-  return response.json();
-};
-
 export default function TodoList({
   todos,
   editable = false,
@@ -95,41 +84,19 @@ export default function TodoList({
   editable?: boolean;
   listId: string | number;
 }) {
-  const queryClient = useQueryClient();
-
-  // Use the initial todos as fallback data
-  const { data = todos } = useQuery({
-    queryKey: ["todos", listId],
-    queryFn: () => fetchTodos(listId),
-    initialData: todos,
-  });
+  const [data, setData] = useState(todos);
 
   const [initialSort, updateInitialSort] = useState<SortingState>([
     { id: "title", desc: false },
   ]);
 
-  // Mutation for adding a todo
-  const addTodoMutation = useMutation({
-    mutationFn: createTodo,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos", listId] });
-    },
-  });
-
-  // Mutation for deleting a todo
-  const deleteTodoMutation = useMutation({
-    mutationFn: (todoId: number) => deleteTodo(todoId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos", listId] });
-    },
-  });
-
-  const addTodo = (todo: Pick<Todo, "title" | "status" | "listId">) => {
-    addTodoMutation.mutate(todo);
+  const addTodo = (todo: Todo) => {
+    setData([...data, todo]);
   };
 
-  const handleDelete = (todo: Todo) => {
-    deleteTodoMutation.mutate(todo.id);
+  const handleDelete = async (todo: Todo) => {
+    await deleteTodo(todo.id);
+    setData(data.filter((t) => t.id !== todo.id));
   };
 
   return (
@@ -146,29 +113,44 @@ export default function TodoList({
 }
 
 const EditableTitle = ({ todo }: { todo: Todo }) => {
-  const queryClient = useQueryClient();
   const [title, setTitle] = useState(todo.title);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateTitleMutation = useMutation({
-    mutationFn: ({ todoId, title }: { todoId: number; title: string }) =>
-      updateTodoTitle(todoId, title),
-    onSuccess: () => {
-      setIsEditing(false);
-      setError(null);
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-    },
-    onError: (err) => {
-      setError(err instanceof Error ? err.message : "Failed to update todo");
-      console.error("Error updating todo:", err);
-    },
-  });
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateTitleMutation.mutate({ todoId: todo.id, title });
+    try {
+      const response = await fetch(`/api/todos/${todo.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || "Failed to update todo");
+      }
+
+      setIsEditing(false);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update todo");
+      console.error("Error updating todo:", err);
+    }
   };
+  // const handleSave = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   try {
+  //     await updateTodoTitle(todo.id, title);
+  //     setIsEditing(false);
+  //     setError(null);
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : "Failed to update todo");
+  //     console.error("Error updating todo:", err);
+  //   }
+  // };
 
   return (
     <div className="flex flex-col gap-2 w-fit">
@@ -207,28 +189,11 @@ const EditableTitle = ({ todo }: { todo: Todo }) => {
 // Dropdown menu of all the possible statuses
 // Current status to be the one show
 const StatusDropDown = ({ todo }: { todo: Todo }) => {
-  const queryClient = useQueryClient();
   const [currentStatus, setCurrentStatus] = useState(todo.status);
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({
-      todoId,
-      status,
-    }: {
-      todoId: number;
-      status: Todo["status"];
-    }) => updateTodoStatus(todoId, status),
-    onSuccess: (newStatus) => {
-      setCurrentStatus(newStatus);
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-    },
-  });
-
-  const updateStatus = (todoId: number, status: Todo["status"]) => {
-    // Optimistic update
-    setCurrentStatus(status);
-    updateStatusMutation.mutate({ todoId, status });
+  const updateStatus = async (todoId: number, status: Todo["status"]) => {
+    const newlySavedStatus = await updateTodoStatus(todoId, status);
+    setCurrentStatus(newlySavedStatus);
   };
   return (
     <DropdownMenu>
@@ -258,7 +223,7 @@ const AddTodoForm = ({
   addTodo,
 }: {
   listId: string | number;
-  addTodo: (todo: Pick<Todo, "title" | "status" | "listId">) => void;
+  addTodo: (todo: Todo) => void;
 }) => {
   const [todo, setTodo] = useState<Pick<Todo, "title" | "status" | "listId">>({
     title: "",
@@ -267,16 +232,13 @@ const AddTodoForm = ({
   });
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (todo.title.trim()) {
-      addTodo(todo);
-      // Reset form
-      setTodo({
-        title: "",
-        status: "not started",
-        listId: Number(listId),
-      });
+    try {
+      const newTodo = await createTodo(todo);
+      addTodo(newTodo);
+    } catch (error) {
+      console.error(error);
     }
   };
 
