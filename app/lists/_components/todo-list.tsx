@@ -1,12 +1,5 @@
 "use client";
-import {
-  Todo,
-  updateTodoStatus,
-  createTodo,
-  deleteTodo,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  updateTodoTitle,
-} from "@/app/lists/_actions/todo";
+import { Todo } from "@/app/lists/_actions/todo";
 import { useState } from "react";
 
 import { DataTable } from "@/ui/data-table";
@@ -20,11 +13,23 @@ import {
 } from "@/ui/dropdown-menu";
 
 import { ChevronDown, ArrowUpDown } from "lucide-react";
+import {
+  useAddTodo,
+  useDeleteTodo,
+  useUpdateTodoStatus,
+  useUpdateTodoTitle,
+} from "../_hooks/useTodos";
+import { toast } from "sonner";
 
 const todoColumns = (
   editable: boolean,
-  onDelete?: (todo: Todo) => void
+  listId: string | number,
+  onDelete?: (todo: Todo) => void,
+  onUpdate?: (todo: Partial<Todo> & { id: number }) => void
 ): ColumnDef<Todo>[] => {
+  const numericListId =
+    typeof listId === "string" ? parseInt(listId, 10) : listId;
+
   return [
     {
       accessorKey: "id",
@@ -46,7 +51,11 @@ const todoColumns = (
       header: "Title",
       cell: ({ row }) => {
         return editable ? (
-          <EditableTitle todo={row.original} />
+          <EditableTitle
+            todo={row.original}
+            listId={numericListId}
+            onUpdate={onUpdate}
+          />
         ) : (
           row.original.title
         );
@@ -57,7 +66,7 @@ const todoColumns = (
       header: "Status",
       cell: ({ row }) => {
         return editable ? (
-          <StatusDropDown todo={row.original} />
+          <StatusDropDown todo={row.original} listId={numericListId} />
         ) : (
           row.original.status
         );
@@ -95,63 +104,98 @@ export default function TodoList({
     setData([...data, todo]);
   };
 
+  const numericListId =
+    typeof listId === "string" ? parseInt(listId, 10) : listId;
+  const deleteTodoMutation = useDeleteTodo(numericListId);
+
   const handleDelete = async (todo: Todo) => {
-    await deleteTodo(todo.id);
-    setData(data.filter((t) => t.id !== todo.id));
+    try {
+      deleteTodoMutation.mutate(todo.id, {
+        onSuccess: () => {
+          setData(data.filter((t) => t.id !== todo.id));
+          toast.success("Todo deleted successfully");
+        },
+        onError: (error) => {
+          toast.error(`Failed to delete todo: ${error.message}`);
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("An unexpected error occurred");
+    }
+  };
+
+  const handleTodoUpdate = (updatedTodo: Partial<Todo> & { id: number }) => {
+    setData(
+      data.map((todo) =>
+        todo.id === updatedTodo.id ? { ...todo, ...updatedTodo } : todo
+      )
+    );
   };
 
   return (
     <div>
       <DataTable
         data={data}
-        columns={todoColumns(editable, handleDelete)}
+        columns={todoColumns(
+          editable,
+          numericListId,
+          handleDelete,
+          handleTodoUpdate
+        )}
         initialSort={initialSort}
         updateInitialSort={updateInitialSort}
       />
-      {editable && <AddTodoForm listId={listId} addTodo={addTodo} />}
+      {editable && <AddTodoForm listId={numericListId} addTodo={addTodo} />}
     </div>
   );
 }
 
-const EditableTitle = ({ todo }: { todo: Todo }) => {
+const EditableTitle = ({
+  todo,
+  listId,
+  onUpdate,
+}: {
+  todo: Todo;
+  listId: number;
+  onUpdate?: (todo: Partial<Todo> & { id: number }) => void;
+}) => {
   const [title, setTitle] = useState(todo.title);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const updateTitleMutation = useUpdateTodoTitle(listId);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!title.trim()) {
+      setError("Title cannot be empty");
+      toast.error("Title cannot be empty");
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/todos/${todo.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || "Failed to update todo");
-      }
-
-      setIsEditing(false);
-      setError(null);
+      updateTitleMutation.mutate(
+        { todoId: todo.id, title },
+        {
+          onSuccess: () => {
+            setIsEditing(false);
+            setError(null);
+            onUpdate?.({ id: todo.id, title });
+            toast.success("Todo title updated");
+          },
+          onError: (err) => {
+            setError(err.message || "Failed to update todo");
+            toast.error("Failed to update todo title");
+          },
+        }
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update todo");
       console.error("Error updating todo:", err);
     }
   };
-  // const handleSave = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   try {
-  //     await updateTodoTitle(todo.id, title);
-  //     setIsEditing(false);
-  //     setError(null);
-  //   } catch (err) {
-  //     setError(err instanceof Error ? err.message : "Failed to update todo");
-  //     console.error("Error updating todo:", err);
-  //   }
-  // };
 
   return (
     <div className="flex flex-col gap-2 w-fit">
@@ -188,18 +232,31 @@ const EditableTitle = ({ todo }: { todo: Todo }) => {
 };
 
 // Dropdown menu of all the possible statuses
-// Current status to be the one show
-const StatusDropDown = ({ todo }: { todo: Todo }) => {
+const StatusDropDown = ({ todo, listId }: { todo: Todo; listId: number }) => {
   const [currentStatus, setCurrentStatus] = useState(todo.status);
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
+
+  const updateStatusMutation = useUpdateTodoStatus(listId);
+
   const updateStatus = async (todoId: number, status: Todo["status"]) => {
-    const newlySavedStatus = await updateTodoStatus(todoId, status);
-    setCurrentStatus(newlySavedStatus);
+    updateStatusMutation.mutate(
+      { todoId, status },
+      {
+        onSuccess: (newStatus) => {
+          setCurrentStatus(newStatus);
+          toast.success(`Status updated to: ${newStatus}`);
+        },
+        onError: (error) => {
+          toast.error(`Failed to update status: ${error.message}`);
+        },
+      }
+    );
   };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="ml-auto">
+        <Button variant="outline" className="ml-auto inline-flex">
           {currentStatus} <ChevronDown />
         </Button>
       </DropdownMenuTrigger>
@@ -233,14 +290,31 @@ const AddTodoForm = ({
   });
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
 
+  const addTodoMutation = useAddTodo();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const newTodo = await createTodo(todo);
-      addTodo(newTodo);
-    } catch (error) {
-      console.error(error);
+
+    if (!todo.title.trim()) {
+      toast.error("Title cannot be empty");
+      return;
     }
+
+    addTodoMutation.mutate(todo, {
+      onSuccess: (newTodo) => {
+        addTodo(newTodo);
+        setTodo({
+          title: "",
+          status: "not started",
+          listId: Number(listId),
+        });
+        toast.success("Todo added successfully");
+      },
+      onError: (error) => {
+        console.error(error);
+        toast.error(`Failed to add todo: ${error.message}`);
+      },
+    });
   };
 
   return (
@@ -250,7 +324,8 @@ const AddTodoForm = ({
         value={todo.title}
         onChange={(e) => setTodo({ ...todo, title: e.target.value })}
         placeholder="Add a new todo..."
-        className="flex-1 px-3 py-2 border rounded-md"
+        className="flex-1 px-2 py-1 border rounded-md"
+        required
       />
 
       <DropdownMenu>

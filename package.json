@@ -16,6 +16,8 @@
     "@radix-ui/react-icons": "^1.3.0",
     "@radix-ui/react-scroll-area": "^1.2.0",
     "@radix-ui/react-slot": "^1.1.0",
+    "@tanstack/react-query": "^5.67.2",
+    "@tanstack/react-query-devtools": "^5.67.2",
     "@tanstack/react-table": "^8.20.5",
     "@vercel/postgres": "^0.10.0",
     "class-variance-authority": "^0.7.0",
@@ -27,6 +29,7 @@
     "react": "^18",
     "react-dom": "^18",
     "resend": "^4.0.0",
+    "sonner": "^2.0.1",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7"
   },
