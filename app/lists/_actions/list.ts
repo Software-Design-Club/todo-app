@@ -45,6 +45,18 @@ export async function getListWithTodos(
   };
 }
 
+/**
+ * Get record for one list given listId
+ */
+export async function getList(listId: number) {
+  const db = drizzle(sql);
+  const [list] = await db
+    .select()
+    .from(ListsTable)
+    .where(eq(ListsTable.id, listId));
+  return list;
+}
+
 export async function getLists(userEmail: string) {
   const db = drizzle(sql);
   const [foundUser] = await db

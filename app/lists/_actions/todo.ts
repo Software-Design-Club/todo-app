@@ -48,3 +48,15 @@ export async function deleteTodo(todoId: Todo["id"]) {
     .set({ status: "deleted" })
     .where(eq(TodosTable.id, todoId));
 }
+
+/**
+ * Get all todos from one list given listId
+ */
+export async function getTodos(listId: Todo["listId"]) {
+  const db = drizzle(sql);
+  const todos = await db
+    .select()
+    .from(TodosTable)
+    .where(eq(TodosTable.listId, listId));
+  return todos;
+}

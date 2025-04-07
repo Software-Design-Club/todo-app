@@ -16,6 +16,7 @@ import { ChevronDown, ArrowUpDown } from "lucide-react";
 import {
   useAddTodo,
   useDeleteTodo,
+  useTodos,
   useUpdateTodoStatus,
   useUpdateTodoTitle,
 } from "../_hooks/useTodos";
@@ -24,8 +25,7 @@ import { toast } from "sonner";
 const todoColumns = (
   editable: boolean,
   listId: string | number,
-  onDelete?: (todo: Todo) => void,
-  onUpdate?: (todo: Partial<Todo> & { id: number }) => void
+  onDelete?: (todo: Todo) => void
 ): ColumnDef<Todo>[] => {
   const numericListId =
     typeof listId === "string" ? parseInt(listId, 10) : listId;
@@ -51,11 +51,7 @@ const todoColumns = (
       header: "Title",
       cell: ({ row }) => {
         return editable ? (
-          <EditableTitle
-            todo={row.original}
-            listId={numericListId}
-            onUpdate={onUpdate}
-          />
+          <EditableTitle todo={row.original} listId={numericListId} />
         ) : (
           row.original.title
         );
@@ -94,15 +90,11 @@ export default function TodoList({
   editable?: boolean;
   listId: string | number;
 }) {
-  const [data, setData] = useState(todos);
+  const queriedTodos = useTodos(listId, todos);
 
   const [initialSort, updateInitialSort] = useState<SortingState>([
-    { id: "title", desc: false },
+    { id: "id", desc: false },
   ]);
-
-  const addTodo = (todo: Todo) => {
-    setData([...data, todo]);
-  };
 
   const numericListId =
     typeof listId === "string" ? parseInt(listId, 10) : listId;
@@ -112,7 +104,6 @@ export default function TodoList({
     try {
       deleteTodoMutation.mutate(todo.id, {
         onSuccess: () => {
-          setData(data.filter((t) => t.id !== todo.id));
           toast.success("Todo deleted successfully");
         },
         onError: (error) => {
@@ -125,41 +116,20 @@ export default function TodoList({
     }
   };
 
-  const handleTodoUpdate = (updatedTodo: Partial<Todo> & { id: number }) => {
-    setData(
-      data.map((todo) =>
-        todo.id === updatedTodo.id ? { ...todo, ...updatedTodo } : todo
-      )
-    );
-  };
-
   return (
     <div>
       <DataTable
-        data={data}
-        columns={todoColumns(
-          editable,
-          numericListId,
-          handleDelete,
-          handleTodoUpdate
-        )}
+        data={queriedTodos ?? []}
+        columns={todoColumns(editable, numericListId, handleDelete)}
         initialSort={initialSort}
         updateInitialSort={updateInitialSort}
       />
-      {editable && <AddTodoForm listId={numericListId} addTodo={addTodo} />}
+      {editable && <AddTodoForm listId={numericListId} />}
     </div>
   );
 }
 
-const EditableTitle = ({
-  todo,
-  listId,
-  onUpdate,
-}: {
-  todo: Todo;
-  listId: number;
-  onUpdate?: (todo: Partial<Todo> & { id: number }) => void;
-}) => {
+const EditableTitle = ({ todo, listId }: { todo: Todo; listId: number }) => {
   const [title, setTitle] = useState(todo.title);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +152,7 @@ const EditableTitle = ({
           onSuccess: () => {
             setIsEditing(false);
             setError(null);
-            onUpdate?.({ id: todo.id, title });
+
             toast.success("Todo title updated");
           },
           onError: (err) => {
@@ -276,13 +246,7 @@ const StatusDropDown = ({ todo, listId }: { todo: Todo; listId: number }) => {
   );
 };
 
-const AddTodoForm = ({
-  listId,
-  addTodo,
-}: {
-  listId: string | number;
-  addTodo: (todo: Todo) => void;
-}) => {
+const AddTodoForm = ({ listId }: { listId: string | number }) => {
   const [todo, setTodo] = useState<Pick<Todo, "title" | "status" | "listId">>({
     title: "",
     status: "not started",
@@ -301,14 +265,10 @@ const AddTodoForm = ({
     }
 
     addTodoMutation.mutate(todo, {
-      onSuccess: (newTodo) => {
-        addTodo(newTodo);
-        setTodo({
-          title: "",
-          status: "not started",
-          listId: Number(listId),
-        });
+      onSuccess: () => {
         toast.success("Todo added successfully");
+        // Clear the input field after successful addition
+        setTodo({ title: "", status: "not started", listId: Number(listId) });
       },
       onError: (error) => {
         console.error(error);

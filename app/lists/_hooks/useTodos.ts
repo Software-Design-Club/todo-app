@@ -4,6 +4,7 @@ import {
   useMutation,
   useQueryClient,
   UseMutationResult,
+  useQuery,
 } from "@tanstack/react-query";
 import {
   Todo,
@@ -12,6 +13,8 @@ import {
   updateTodoStatus,
   updateTodoTitle,
 } from "../_actions/todo";
+
+import { getTodos } from "../_actions/todo";
 
 // Key factory for React Query cache
 const todoKeys = {
@@ -22,6 +25,23 @@ const todoKeys = {
       : ([...todoKeys.all, "lists"] as const),
   todo: (id: number) => [...todoKeys.all, "todo", id] as const,
 };
+
+/**
+ * Get all todos for a list
+ * @param listId - The id of the list to get todos for
+ * @param initialTodos - Optional initial todos to use
+ * @returns The todos for the list
+ */
+
+export function useTodos(listId: number | string, initialTodos?: Todo[]) {
+  const { data: todos } = useQuery({
+    queryKey: todoKeys.lists(listId),
+    queryFn: () => getTodos(parseInt(listId as string)),
+    initialData: initialTodos ? initialTodos : undefined,
+  });
+
+  return todos;
+}
 
 export function useAddTodo(): UseMutationResult<
   Todo,
@@ -118,11 +138,12 @@ export function useUpdateTodoTitle(
         queryKey: todoKeys.lists(numericListId),
       });
 
-      // Optionally update the cache directly for faster UI updates
+      // Update the cache directly for faster UI updates
       queryClient.setQueryData(
         todoKeys.lists(numericListId),
-        (old: Todo[] = []) => {
-          return old.map((todo) =>
+        (old: Todo[] | undefined) => {
+          if (!old) return old;
+          return old.map((todo: Todo) =>
             todo.id === todoId ? { ...todo, title } : todo
           );
         }
