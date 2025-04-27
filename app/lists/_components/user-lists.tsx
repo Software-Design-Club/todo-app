@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import CreateListForm from "./create-list";
 
 type ListWithDetails = Awaited<ReturnType<typeof getLists>>[number] & {
   // todoCount: number;
@@ -22,17 +23,21 @@ interface ListsProps {
 
 const UserLists: React.FC<ListsProps> = async ({ userEmail, currentPath }) => {
   const lists = (await getLists(userEmail)) as ListWithDetails[];
+  const creatorId = lists[0].creatorId;
 
-  console.log(currentPath);
   return (
     <div>
-      <h2>
-        {currentPath === "/lists" ? (
-          "Your Lists"
-        ) : (
-          <Link href="/lists">Your Lists</Link>
-        )}
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2>
+          {currentPath === "/lists" ? (
+            "Your Lists"
+          ) : (
+            <Link href="/lists">Your Lists</Link>
+          )}
+        </h2>
+        <CreateListForm creatorId={creatorId} />
+      </div>
+
       <Table>
         <TableCaption>A list of your todo lists.</TableCaption>
         <TableHeader>

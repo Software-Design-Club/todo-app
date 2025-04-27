@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/app/_components/header";
+import Breadcrumb from "@/app/_components/breadcrumb";
 import { Providers } from "./providers";
 import { Toaster } from "sonner";
 
@@ -34,6 +35,7 @@ export default function RootLayout({
         <div className="flex flex-col min-h-screen">
           <Header />
           <main className="flex-grow container mx-auto px-4 py-8">
+            <Breadcrumb />
             <Providers>{children}</Providers>
           </main>
           <Toaster position="bottom-right" />

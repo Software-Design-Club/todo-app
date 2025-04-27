@@ -5,6 +5,7 @@ import { eq, not, and } from "drizzle-orm";
 import { ListsTable, TodosTable, UsersTable } from "@/drizzle/schema";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
+import { revalidatePath } from "next/cache";
 
 export type UsersListTodos = {
   id: number;
@@ -70,4 +71,37 @@ export async function getLists(userEmail: string) {
     .where(eq(ListsTable.creatorId, foundUser.id));
 
   return lists;
+}
+
+/**
+ * Creates a new list with the given title for a specific user
+ */
+export async function createList(formData: FormData) {
+  const title = formData.get("title")?.toString();
+  const creatorIdStr = formData.get("creatorId")?.toString();
+
+  if (!title || !creatorIdStr) {
+    throw new Error("Title and creator ID are required");
+  }
+
+  const creatorId = parseInt(creatorIdStr, 10);
+  if (isNaN(creatorId)) {
+    throw new Error("Invalid creator ID");
+  }
+
+  const db = drizzle(sql);
+
+  // Create new list
+  const [newList] = await db
+    .insert(ListsTable)
+    .values({
+      title,
+      creatorId,
+    })
+    .returning();
+
+  // Revalidate to update the UI
+  revalidatePath("/lists");
+
+  return newList;
 }
