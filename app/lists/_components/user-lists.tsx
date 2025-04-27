@@ -1,29 +1,68 @@
 import { getLists } from "@/app/lists/_actions/list";
 import Link from "next/link";
 import React from "react";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+type ListWithDetails = Awaited<ReturnType<typeof getLists>>[number] & {
+  // todoCount: number;
+};
 
 interface ListsProps {
   userEmail: string;
+  currentPath: string;
 }
 
-const UserLists: React.FC<ListsProps> = async ({ userEmail }) => {
-  const lists = await getLists(userEmail);
+const UserLists: React.FC<ListsProps> = async ({ userEmail, currentPath }) => {
+  const lists = (await getLists(userEmail)) as ListWithDetails[];
 
+  console.log(currentPath);
   return (
     <div>
-      <h2>Your Lists</h2>
-      <ul>
-        {lists.map((list) => (
-          <li key={list.id}>
-            <Link
-              className="text-blue-500 hover:underline"
-              href={`/lists/${list.id}`}
-            >
-              {list.title}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <h2>
+        {currentPath === "/lists" ? (
+          "Your Lists"
+        ) : (
+          <Link href="/lists">Your Lists</Link>
+        )}
+      </h2>
+      <Table>
+        <TableCaption>A list of your todo lists.</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px]">List Name</TableHead>
+            <TableHead>Todos</TableHead>
+            <TableHead className="text-right">Last Updated</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lists.map((list) => (
+            <TableRow key={list.id}>
+              <TableCell className="font-medium">
+                <Link
+                  className="text-blue-500 hover:underline"
+                  href={`/lists/${list.id}`}
+                >
+                  {list.title}
+                </Link>
+              </TableCell>
+              <TableCell>N/A</TableCell>
+              <TableCell className="text-right">
+                {list.updatedAt
+                  ? new Date(list.updatedAt).toLocaleDateString()
+                  : "N/A"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 };
