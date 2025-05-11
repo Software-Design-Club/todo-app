@@ -50,8 +50,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "next lint --fix",
-      "npm run typecheck"
+      "next lint --fix --file",
+      "bash -c \"tsc --noEmit -p tsconfig.json\""
     ]
   }
 }

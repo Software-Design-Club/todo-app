@@ -8,7 +8,7 @@ Todos:
 - [x] User "delete" todo
 - [x] Where to put core business logic?
 - [x] Get todos with query client using React Query
-- [ ] User can create a list
+- [x] User can create a list
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.
 - [ ] Persisting sort through list updates
@@ -40,3 +40,8 @@ Notes 2/23/2025:
 - We noticed a trade off between using server actions and client side updates. The server actions did not update the client reliably
 - We tried revalidating the path, but it did not work.
 - We want to investigate if there is some trick/config to make it work.
+
+
+Notes 5/11/2025:
+- Stop using React Query to creat list on home page.
+- Server actions and revalidatePath work fine.
