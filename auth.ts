@@ -21,7 +21,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!user.email) {
         return false;
       }
-      findOrCreateAccount({ email: user.email, name: user.name || user.email });
+      await findOrCreateAccount({
+        email: user.email,
+        name: user.name || user.email,
+      });
       return true;
     },
   },
