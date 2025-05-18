@@ -37,7 +37,28 @@ export const ListsTable = pgTable("lists", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-
+export const ListCollaboratorsTable = pgTable(
+  "list_collaborators",
+  {
+    id: serial("id").primaryKey(),
+    listId: integer("listId")
+      .references(() => ListsTable.id)
+      .notNull(),
+    userId: integer("userId")
+      .references(() => UsersTable.id)
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (collaborators) => {
+    return {
+      pk: uniqueIndex("list_collaborators_pk").on(
+        collaborators.listId,
+        collaborators.userId
+      ),
+    };
+  }
+);
 
 export const todoStatusEnum = pgEnum("todo_status", [
   "not started",

@@ -1,0 +1,1 @@
+ALTER TABLE "list_collaborators" ADD COLUMN "id" serial PRIMARY KEY NOT NULL;

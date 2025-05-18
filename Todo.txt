@@ -9,6 +9,9 @@ Todos:
 - [x] Where to put core business logic?
 - [x] Get todos with query client using React Query
 - [x] User can create a list
+- [x] User can invite collaborators to a list
+- [ ] User can see collaborators on a list
+- [ ] User can remove collaborators from a list
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.
 - [ ] Persisting sort through list updates
@@ -45,3 +48,6 @@ Notes 2/23/2025:
 Notes 5/11/2025:
 - Stop using React Query to creat list on home page.
 - Server actions and revalidatePath work fine.
+
+Notes 5/18/2025:
+- We added collaboration
