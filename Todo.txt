@@ -10,12 +10,13 @@ Todos:
 - [x] Get todos with query client using React Query
 - [x] User can create a list
 - [x] User can invite collaborators to a list
-- [ ] User can see collaborators on a list
+- [x] User can see collaborators on a list
 - [ ] User can remove collaborators from a list
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.
 - [ ] Persisting sort through list updates
 - [ ] Filtering the todos
+- [ ] Clean up components/ui and ui/ folder
 
 Notes:
   - We called `notFound()` in `getListWithTodos` to handle the case where the list ID is not found.

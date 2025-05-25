@@ -120,3 +120,30 @@ export async function addCollaborator(
     throw new Error("Failed to add collaborator due to a database error.");
   }
 }
+
+export async function getCollaborators(listId: number): Promise<User[]> {
+  console.log("[Server Action] Getting collaborators for list:", listId);
+
+  try {
+    const collaboratorsFromDb = await db
+      .select({
+        id: UsersTable.id,
+        name: UsersTable.name,
+        email: UsersTable.email,
+      })
+      .from(ListCollaboratorsTable)
+      .innerJoin(UsersTable, eq(ListCollaboratorsTable.userId, UsersTable.id))
+      .where(eq(ListCollaboratorsTable.listId, listId));
+
+    // Map id to string to match the User interface
+    const results: User[] = collaboratorsFromDb.map((user) => ({
+      ...user,
+      id: String(user.id),
+    }));
+
+    return results;
+  } catch (error) {
+    console.error("Database error while getting collaborators:", error);
+    return []; // Return empty array on error to prevent breaking the client
+  }
+}

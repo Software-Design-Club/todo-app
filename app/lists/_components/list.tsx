@@ -1,6 +1,7 @@
 import { getList } from "@/app/lists/_actions/list";
 import TodoList from "@/app/lists/_components/todo-list";
 import InviteCollaborators from "@/app/lists/_components/invite-collaborators";
+import CollaboratorAvatars from "@/app/lists/_components/collaborator-avatars";
 import { auth } from "@/auth";
 import React from "react";
 import { getTodos } from "../_actions/todo";
@@ -15,6 +16,7 @@ import {
 import {
   searchUsers,
   addCollaborator,
+  getCollaborators,
 } from "@/app/lists/_actions/collaborators";
 
 interface ListProps {
@@ -24,6 +26,7 @@ interface ListProps {
 const List: React.FC<ListProps> = async ({ listId }) => {
   const list = await getList(listId);
   const todos = await getTodos(listId);
+  const collaborators = await getCollaborators(listId);
 
   const session = await auth();
   let editable = false;
@@ -38,22 +41,25 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">{list.title}</h2>
-        {editable && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">Add Collaborator</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80" align="end">
-              <DropdownMenuLabel>Invite to List</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <InviteCollaborators
-                listId={listIdString}
-                searchUsers={searchUsers}
-                addCollaborator={addCollaborator}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <div className="flex items-center space-x-4">
+          <CollaboratorAvatars collaborators={collaborators} />
+          {editable && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">Add Collaborator</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-80" align="end">
+                <DropdownMenuLabel>Invite to List</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <InviteCollaborators
+                  listId={listIdString}
+                  searchUsers={searchUsers}
+                  addCollaborator={addCollaborator}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
       <TodoList todos={todos} editable={editable} listId={listId} />
     </div>
