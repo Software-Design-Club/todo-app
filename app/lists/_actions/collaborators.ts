@@ -147,3 +147,51 @@ export async function getCollaborators(listId: number): Promise<User[]> {
     return []; // Return empty array on error to prevent breaking the client
   }
 }
+
+export async function removeCollaborator(
+  userIdString: string,
+  listIdString: string
+): Promise<void> {
+  console.log(
+    `[Server Action] Attempting to remove user ${userIdString} from list ${listIdString}.`
+  );
+
+  const userId = parseInt(userIdString, 10);
+  const listId = parseInt(listIdString, 10);
+
+  if (isNaN(userId) || isNaN(listId)) {
+    console.error("Invalid userId or listId provided for removal.");
+    throw new Error("Invalid user or list ID for removal.");
+  }
+
+  try {
+    const result = await db
+      .delete(ListCollaboratorsTable)
+      .where(
+        and(
+          eq(ListCollaboratorsTable.userId, userId),
+          eq(ListCollaboratorsTable.listId, listId)
+        )
+      )
+      .returning();
+
+    if (result.length === 0) {
+      // This could happen if the collaborator was already removed or never existed.
+      // Depending on requirements, this might not be an error.
+      console.warn(
+        `[Server Action] No collaborator found for user ${userId} on list ${listId} to remove.`
+      );
+      // Optionally, throw an error if it's critical that a record was deleted.
+      // throw new Error("Collaborator not found or already removed.");
+    } else {
+      console.log(
+        `[Server Action] User ${userId} successfully removed as a collaborator from list ${listId}.`
+      );
+    }
+
+    revalidatePath(`/lists/${listId}`);
+  } catch (error) {
+    console.error("Database error while removing collaborator:", error);
+    throw new Error("Failed to remove collaborator due to a database error.");
+  }
+}

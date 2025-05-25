@@ -1,0 +1,332 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Button } from "@/ui/button";
+import { useMutation } from "@tanstack/react-query";
+import type { User } from "@/app/lists/_actions/collaborators";
+import { Avatar, AvatarFallback } from "@/ui/avatar"; // Assuming you have an Avatar component
+import { XIcon } from "lucide-react"; // For remove icon
+
+interface ManageCollaboratorsProps {
+  listId: string;
+  initialCollaborators: User[];
+  searchUsers: (searchTerm: string) => Promise<User[]>;
+  addCollaborator: (userId: string, listId: string) => Promise<void>;
+  removeCollaborator: (userId: string, listId: string) => Promise<void>;
+}
+
+export default function ManageCollaborators({
+  listId,
+  initialCollaborators,
+  searchUsers,
+  addCollaborator,
+  removeCollaborator,
+}: ManageCollaboratorsProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [selectedUserToAdd, setSelectedUserToAdd] = useState<User | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [currentCollaborators, setCurrentCollaborators] =
+    useState<User[]>(initialCollaborators);
+
+  useEffect(() => {
+    setCurrentCollaborators(initialCollaborators);
+  }, [initialCollaborators]);
+
+  const clearMessages = () => {
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  const getInitials = (name: string): string => {
+    return name
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const addCollaboratorMutation = useMutation({
+    mutationFn: (userId: string) => addCollaborator(userId, listId),
+    onSuccess: (_, userId) => {
+      const addedUser =
+        searchResults.find((u) => u.id === userId) || selectedUserToAdd;
+      setSuccessMessage(
+        `${addedUser?.name || "User"} added as a collaborator.`
+      );
+      if (
+        addedUser &&
+        !currentCollaborators.find((c) => c.id === addedUser.id)
+      ) {
+        setCurrentCollaborators((prev) => [...prev, addedUser]);
+      }
+      setSelectedUserToAdd(null);
+      setSearchTerm("");
+      setSearchResults([]);
+      setError(null);
+      // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] }); // Example if you fetch collaborators separately
+    },
+    onError: (error: Error) => {
+      setError(
+        `Failed to add ${selectedUserToAdd?.name || "user"}. ${
+          error.message || "Please try again."
+        }`
+      );
+      setSuccessMessage(null);
+    },
+  });
+
+  const removeCollaboratorMutation = useMutation({
+    mutationFn: (userId: string) => removeCollaborator(userId, listId),
+    onSuccess: (_, userId) => {
+      const removedUser = currentCollaborators.find((c) => c.id === userId);
+      setSuccessMessage(`${removedUser?.name || "User"} removed successfully.`);
+      setCurrentCollaborators((prev) =>
+        prev.filter((user) => user.id !== userId)
+      );
+      setError(null);
+      // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] });
+    },
+    onError: (error: Error, userId: string) => {
+      const user = currentCollaborators.find((c) => c.id === userId);
+      setError(
+        `Failed to remove ${user?.name || "user"}. ${
+          error.message || "Please try again."
+        }`
+      );
+      setSuccessMessage(null);
+    },
+  });
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      setSelectedUserToAdd(null);
+      clearMessages();
+      return;
+    }
+    setSearchLoading(true);
+    clearMessages();
+    setSelectedUserToAdd(null);
+    setSearchResults([]);
+
+    try {
+      const users = await searchUsers(searchTerm);
+      // Filter out users who are already collaborators
+      const newResults = users.filter(
+        (user) => !currentCollaborators.some((c) => c.id === user.id)
+      );
+      setSearchResults(newResults);
+      if (newResults.length === 0 && users.length > 0) {
+        setError(
+          "All found users are already collaborators or user not found."
+        );
+      } else if (users.length === 0) {
+        setError("No users found.");
+      }
+    } catch (err: unknown) {
+      console.error("Error searching users:", err);
+      let errorMessage = "Search failed. Try again.";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleAddCollaborator = () => {
+    if (selectedUserToAdd) {
+      clearMessages();
+      addCollaboratorMutation.mutate(selectedUserToAdd.id);
+    }
+  };
+
+  const handleRemoveCollaborator = (userId: string) => {
+    clearMessages();
+    removeCollaboratorMutation.mutate(userId);
+  };
+
+  useEffect(() => {
+    clearMessages();
+  }, [listId]);
+
+  return (
+    <div className="p-2 space-y-4">
+      {successMessage && (
+        <div className="mb-2 p-2 bg-green-100 border border-green-300 text-green-700 rounded-md text-sm">
+          {successMessage}
+        </div>
+      )}
+      {error && (
+        <div className="mb-2 p-2 bg-red-100 border border-red-300 text-red-700 rounded-md text-sm">
+          {error}
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-md font-semibold mb-2">Current Collaborators</h3>
+        {currentCollaborators.length > 0 ? (
+          <ul className="space-y-2 max-h-48 overflow-y-auto">
+            {currentCollaborators.map((user) => (
+              <li
+                key={user.id}
+                className="flex items-center justify-between p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              >
+                <div className="flex items-center space-x-2">
+                  <Avatar className="w-7 h-7">
+                    <AvatarFallback className="text-xs">
+                      {getInitials(user.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">{user.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveCollaborator(user.id)}
+                  disabled={
+                    removeCollaboratorMutation.isPending &&
+                    removeCollaboratorMutation.variables === user.id
+                  }
+                  className="text-red-500 hover:text-red-700"
+                  aria-label={`Remove ${user.name}`}
+                >
+                  {removeCollaboratorMutation.isPending &&
+                  removeCollaboratorMutation.variables === user.id ? (
+                    "..."
+                  ) : (
+                    <XIcon className="w-4 h-4" />
+                  )}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No collaborators yet.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-md font-semibold mb-2">Add New Collaborator</h3>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              clearMessages();
+              if (e.target.value.trim() === "") {
+                setError(null);
+                setSearchResults([]);
+                setSelectedUserToAdd(null);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !addCollaboratorMutation.isPending &&
+                !searchLoading
+              ) {
+                handleSearch();
+              }
+            }}
+            placeholder="Search by name or email"
+            className="border border-gray-300 p-2 rounded-md text-sm flex-grow focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            disabled={
+              addCollaboratorMutation.isPending ||
+              searchLoading ||
+              removeCollaboratorMutation.isPending
+            }
+          />
+          <Button
+            onClick={handleSearch}
+            disabled={
+              searchLoading ||
+              !searchTerm.trim() ||
+              addCollaboratorMutation.isPending ||
+              removeCollaboratorMutation.isPending
+            }
+            variant="outline"
+            size="sm"
+          >
+            {searchLoading ? "..." : "Search"}
+          </Button>
+        </div>
+
+        {searchResults.length > 0 && !selectedUserToAdd && (
+          <div className="mb-3 max-h-40 overflow-y-auto border rounded-md p-1">
+            <ul className="space-y-1">
+              {searchResults.map((user) => (
+                <li
+                  key={user.id}
+                  onClick={() => {
+                    setSelectedUserToAdd(user);
+                    clearMessages();
+                    addCollaboratorMutation.reset();
+                  }}
+                  className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
+                >
+                  <p className="font-semibold">{user.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {user.email}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {selectedUserToAdd && (
+          <div className="p-2 bg-blue-50 dark:bg-gray-700 border border-blue-200 dark:border-gray-600 rounded-md">
+            <p className="text-sm font-medium mb-1">Add this user?</p>
+            <p className="font-semibold text-sm">{selectedUserToAdd.name}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+              {selectedUserToAdd.email}
+            </p>
+            <Button
+              onClick={handleAddCollaborator}
+              disabled={
+                addCollaboratorMutation.isPending ||
+                removeCollaboratorMutation.isPending
+              }
+              className="w-full mb-1"
+              size="sm"
+            >
+              {addCollaboratorMutation.isPending
+                ? "Adding..."
+                : `Add ${selectedUserToAdd.name}`}
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedUserToAdd(null);
+                clearMessages();
+                addCollaboratorMutation.reset();
+              }}
+              disabled={
+                addCollaboratorMutation.isPending ||
+                removeCollaboratorMutation.isPending
+              }
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

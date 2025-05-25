@@ -1,6 +1,6 @@
 import { getList } from "@/app/lists/_actions/list";
 import TodoList from "@/app/lists/_components/todo-list";
-import InviteCollaborators from "@/app/lists/_components/invite-collaborators";
+import ManageCollaborators from "@/app/lists/_components/manage-collaborators";
 import CollaboratorAvatars from "@/app/lists/_components/collaborator-avatars";
 import { auth } from "@/auth";
 import React from "react";
@@ -17,6 +17,7 @@ import {
   searchUsers,
   addCollaborator,
   getCollaborators,
+  removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
 
 interface ListProps {
@@ -46,15 +47,17 @@ const List: React.FC<ListProps> = async ({ listId }) => {
           {editable && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">Add Collaborator</Button>
+                <Button variant="outline">Manage Collaborators</Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-80" align="end">
-                <DropdownMenuLabel>Invite to List</DropdownMenuLabel>
+              <DropdownMenuContent className="w-96" align="end">
+                <DropdownMenuLabel>Manage Collaborators</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <InviteCollaborators
+                <ManageCollaborators
                   listId={listIdString}
+                  initialCollaborators={collaborators}
                   searchUsers={searchUsers}
                   addCollaborator={addCollaborator}
+                  removeCollaborator={removeCollaborator}
                 />
               </DropdownMenuContent>
             </DropdownMenu>

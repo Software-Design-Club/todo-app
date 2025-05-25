@@ -11,12 +11,13 @@ Todos:
 - [x] User can create a list
 - [x] User can invite collaborators to a list
 - [x] User can see collaborators on a list
-- [ ] User can remove collaborators from a list
+- [x] User can remove collaborators from a list
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
       Public lists are visible to everyone.
 - [ ] Persisting sort through list updates
 - [ ] Filtering the todos
 - [ ] Clean up components/ui and ui/ folder
+- [ ] Visually whether the user is a collaborator or a creator of the list when on list page
 
 Notes:
   - We called `notFound()` in `getListWithTodos` to handle the case where the list ID is not found.
