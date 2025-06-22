@@ -19,21 +19,28 @@ import {
   getCollaborators,
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
+import type { List } from "@/app/lists/_actions/list";
 
 interface ListProps {
   listId: number;
 }
 
+// getUser
+// getList
+//
+
 const List: React.FC<ListProps> = async ({ listId }) => {
   const list = await getList(listId);
-  const todos = await getTodos(listId);
-  const collaborators = await getCollaborators(listId);
+
+  const todos = await getTodos(list.id);
+  const collaborators = await getCollaborators(list.id);
 
   const session = await auth();
   let editable = false;
   const user = session?.user;
   if (user?.email) {
-    editable = true;
+    // Editable only if user is authorized to edit. Only creators and collaborators can edit.
+    editable = true; // authorizedToEdit(list.id, user.id)
   }
 
   const listIdString = String(listId);
@@ -64,7 +71,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
           )}
         </div>
       </div>
-      <TodoList todos={todos} editable={editable} listId={listId} />
+      <TodoList todos={todos} editable={editable} listId={list.id} />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { TodosTable } from "../../../drizzle/schema";
 import { revalidatePath } from "next/cache";
+import type { List } from "./list";
 
 export type Todo = typeof TodosTable.$inferSelect;
 
@@ -52,7 +53,7 @@ export async function deleteTodo(todoId: Todo["id"]) {
 /**
  * Get all todos from one list given listId
  */
-export async function getTodos(listId: Todo["listId"]) {
+export async function getTodos(listId: List["id"]) {
   const db = drizzle(sql);
   const todos = await db
     .select()

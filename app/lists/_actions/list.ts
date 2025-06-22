@@ -6,6 +6,7 @@ import { ListsTable, TodosTable, UsersTable } from "@/drizzle/schema";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
+import { Tagged } from "type-fest";
 
 export type UsersListTodos = {
   id: number;
@@ -46,16 +47,55 @@ export async function getListWithTodos(
   };
 }
 
+// interface List {
+//   id: Tagged<typeof ListsTable.id.dataType, "ListId">;
+//   title: Tagged<typeof ListsTable.title, "ListTitle">;
+//   creatorId: Tagged<typeof ListsTable.creatorId, "CreatorId">;
+//   createdAt: Tagged<typeof ListsTable.createdAt, "CreatedAt">;
+//   updatedAt: Tagged<typeof ListsTable.updatedAt, "UpdatedAt">;
+// }
+
+// export type List = Tagged<typeof ListsTable.$inferSelect, "List">;
+export type List = {
+  id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
+  title: Tagged<(typeof ListsTable.$inferSelect)["title"], "ListTitle">;
+  creatorId: Tagged<(typeof ListsTable.$inferSelect)["creatorId"], "CreatorId">;
+  createdAt: Tagged<(typeof ListsTable.$inferSelect)["createdAt"], "CreatedAt">;
+  updatedAt: Tagged<(typeof ListsTable.$inferSelect)["updatedAt"], "UpdatedAt">;
+};
+
+const createTaggedList = (list: typeof ListsTable.$inferSelect): List => {
+  return {
+    id: list.id as Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">,
+    title: list.title as Tagged<
+      (typeof ListsTable.$inferSelect)["title"],
+      "ListTitle"
+    >,
+    creatorId: list.creatorId as Tagged<
+      (typeof ListsTable.$inferSelect)["creatorId"],
+      "CreatorId"
+    >,
+    createdAt: list.createdAt as Tagged<
+      (typeof ListsTable.$inferSelect)["createdAt"],
+      "CreatedAt"
+    >,
+    updatedAt: list.updatedAt as Tagged<
+      (typeof ListsTable.$inferSelect)["updatedAt"],
+      "UpdatedAt"
+    >,
+  };
+};
 /**
  * Get record for one list given listId
  */
-export async function getList(listId: number) {
+export async function getList(listId: number): Promise<List> {
   const db = drizzle(sql);
   const [list] = await db
     .select()
     .from(ListsTable)
     .where(eq(ListsTable.id, listId));
-  return list;
+
+  return createTaggedList(list);
 }
 
 export async function getLists(userEmail: string) {

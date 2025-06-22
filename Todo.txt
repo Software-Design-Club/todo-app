@@ -12,19 +12,21 @@ Todos:
 - [x] User can invite collaborators to a list
 - [x] User can see collaborators on a list
 - [x] User can remove collaborators from a list
+- [ ] Add list authorization. Users can only edit list they create or are a collaborator on.
+       - [/] Add opaque types for list and user ids
+       - [ ] Add role to ListCollaborator table
+       - [ ] Backfill ListCollaborator table with roles and ids of list creators
+       - [ ] Add function to check if user is authorized to edit list using the opaque types
 - [ ] Visually whether the user is a collaborator or a creator of the list when on list page
 - [ ] User can see lists they are a collaborator on their lists view
-- [ ] Add list authorization. Users can only edit list they create or are a collaborator on.
-- [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators.
-      Public lists are visible to everyone.
+- [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
 - [ ] User can delete/archive a list
-- [ ] User can share a link to a list
+- [ ] Creator/Collaborator can share a link to a list if its public
 - [ ] User can invite someone who is not signed up to the app to a list - Send email to invitee
-- [ ] User can assign todos to collaborators
-- [ ] User can move todos to a different list
-- [ ] User can be notified when they are invited to a list
-- [ ] User can be notified when a todo is assigned to them
-- [ ] Filtering the todos
+- [ ] Creator/Collaborator can assign todos to collaborators on a list
+- [ ] ??Creator can move todos to a different list
+- [ ] ??Collaborator can be notified when they are invited to a list in the app and in their email
+- [ ] ??User can be notified when a todo is assigned to them
 - [ ] Clean up components/ui and ui/ folder
 
 Notes:

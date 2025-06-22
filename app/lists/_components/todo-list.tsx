@@ -21,15 +21,13 @@ import {
   useUpdateTodoTitle,
 } from "../_hooks/useTodos";
 import { toast } from "sonner";
+import type { List } from "../_actions/list";
 
 const todoColumns = (
   editable: boolean,
-  listId: string | number,
+  listId: List["id"],
   onDelete?: (todo: Todo) => void
 ): ColumnDef<Todo>[] => {
-  const numericListId =
-    typeof listId === "string" ? parseInt(listId, 10) : listId;
-
   return [
     {
       accessorKey: "id",
@@ -51,7 +49,7 @@ const todoColumns = (
       header: "Title",
       cell: ({ row }) => {
         return editable ? (
-          <EditableTitle todo={row.original} listId={numericListId} />
+          <EditableTitle todo={row.original} listId={listId} />
         ) : (
           row.original.title
         );
@@ -62,7 +60,7 @@ const todoColumns = (
       header: "Status",
       cell: ({ row }) => {
         return editable ? (
-          <StatusDropDown todo={row.original} listId={numericListId} />
+          <StatusDropDown todo={row.original} listId={listId} />
         ) : (
           row.original.status
         );
@@ -88,7 +86,7 @@ export default function TodoList({
 }: {
   todos: Todo[];
   editable?: boolean;
-  listId: string | number;
+  listId: List["id"];
 }) {
   const queriedTodos = useTodos(listId, todos);
 
@@ -96,9 +94,7 @@ export default function TodoList({
     { id: "id", desc: false },
   ]);
 
-  const numericListId =
-    typeof listId === "string" ? parseInt(listId, 10) : listId;
-  const deleteTodoMutation = useDeleteTodo(numericListId);
+  const deleteTodoMutation = useDeleteTodo(listId);
 
   const handleDelete = async (todo: Todo) => {
     try {
@@ -120,16 +116,22 @@ export default function TodoList({
     <div>
       <DataTable
         data={queriedTodos ?? []}
-        columns={todoColumns(editable, numericListId, handleDelete)}
+        columns={todoColumns(editable, listId, handleDelete)}
         initialSort={initialSort}
         updateInitialSort={updateInitialSort}
       />
-      {editable && <AddTodoForm listId={numericListId} />}
+      {editable && <AddTodoForm listId={listId} />}
     </div>
   );
 }
 
-const EditableTitle = ({ todo, listId }: { todo: Todo; listId: number }) => {
+const EditableTitle = ({
+  todo,
+  listId,
+}: {
+  todo: Todo;
+  listId: List["id"];
+}) => {
   const [title, setTitle] = useState(todo.title);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +204,13 @@ const EditableTitle = ({ todo, listId }: { todo: Todo; listId: number }) => {
 };
 
 // Dropdown menu of all the possible statuses
-const StatusDropDown = ({ todo, listId }: { todo: Todo; listId: number }) => {
+const StatusDropDown = ({
+  todo,
+  listId,
+}: {
+  todo: Todo;
+  listId: List["id"];
+}) => {
   const [currentStatus, setCurrentStatus] = useState(todo.status);
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
 
@@ -246,11 +254,11 @@ const StatusDropDown = ({ todo, listId }: { todo: Todo; listId: number }) => {
   );
 };
 
-const AddTodoForm = ({ listId }: { listId: string | number }) => {
+const AddTodoForm = ({ listId }: { listId: List["id"] }) => {
   const [todo, setTodo] = useState<Pick<Todo, "title" | "status" | "listId">>({
     title: "",
     status: "not started",
-    listId: Number(listId),
+    listId: listId,
   });
   const statuses: Todo["status"][] = ["not started", "in progress", "done"];
 
@@ -268,7 +276,7 @@ const AddTodoForm = ({ listId }: { listId: string | number }) => {
       onSuccess: () => {
         toast.success("Todo added successfully");
         // Clear the input field after successful addition
-        setTodo({ title: "", status: "not started", listId: Number(listId) });
+        setTodo({ title: "", status: "not started", listId: listId });
       },
       onError: (error) => {
         console.error(error);

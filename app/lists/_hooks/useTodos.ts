@@ -15,6 +15,7 @@ import {
 } from "../_actions/todo";
 
 import { getTodos } from "../_actions/todo";
+import type { List } from "../_actions/list";
 
 // Key factory for React Query cache
 const todoKeys = {
@@ -33,10 +34,10 @@ const todoKeys = {
  * @returns The todos for the list
  */
 
-export function useTodos(listId: number | string, initialTodos?: Todo[]) {
+export function useTodos(listId: List["id"], initialTodos?: Todo[]) {
   const { data: todos } = useQuery({
     queryKey: todoKeys.lists(listId),
-    queryFn: () => getTodos(parseInt(listId as string)),
+    queryFn: () => getTodos(listId),
     initialData: initialTodos ? initialTodos : undefined,
   });
 

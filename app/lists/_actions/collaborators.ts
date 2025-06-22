@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, or, ilike, and } from "drizzle-orm";
 import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
+import type { List } from "./list";
 
 // Initialize Drizzle client
 const db = drizzle(sql);
@@ -121,7 +122,7 @@ export async function addCollaborator(
   }
 }
 
-export async function getCollaborators(listId: number): Promise<User[]> {
+export async function getCollaborators(listId: List["id"]): Promise<User[]> {
   console.log("[Server Action] Getting collaborators for list:", listId);
 
   try {
