@@ -3,10 +3,11 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { ListsTable, TodosTable, UsersTable } from "@/drizzle/schema";
+import type { Tagged } from "type-fest";
 
 type User = {
-  email: string;
-  name?: string;
+  email: Tagged<(typeof UsersTable.$inferSelect)["email"], "UserEmail">;
+  name?: Tagged<(typeof UsersTable.$inferSelect)["name"], "UserName">;
 };
 
 export async function findOrCreateAccount(user: User) {
@@ -19,7 +20,11 @@ export async function findOrCreateAccount(user: User) {
   if (findUser.length === 0) {
     const [newUser] = await db
       .insert(UsersTable)
-      .values({ email: user.email, name: user.name || user.email })
+      .values({
+        email: user.email,
+        name: user.name || user.email,
+        status: "active",
+      })
       .returning();
 
     const [newList] = await db
