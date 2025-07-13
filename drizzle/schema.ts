@@ -37,6 +37,11 @@ export const ListsTable = pgTable("lists", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const CollaboratorRoleEnum = pgEnum("collaborator_role", [
+  "owner",
+  "collaborator",
+]);
+
 export const ListCollaboratorsTable = pgTable(
   "list_collaborators",
   {
@@ -49,6 +54,7 @@ export const ListCollaboratorsTable = pgTable(
       .notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    role: CollaboratorRoleEnum("role").default("collaborator").notNull(),
   },
   (collaborators) => {
     return {
