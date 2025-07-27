@@ -1,8 +1,16 @@
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import Github from "next-auth/providers/github";
-import { findOrCreateAccount } from "@/app/sign-in/_components/_actions/find-or-create-account";
-import { Tagged } from "type-fest";
-import { UsersTable } from "./drizzle/schema";
+import {
+  findOrCreateAccount,
+  getUser,
+} from "@/app/sign-in/_components/_actions/find-or-create-account";
+import type { User } from "@/lib/types";
+
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: User;
+  }
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Github],
@@ -14,9 +22,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return token;
     },
-    session({ session, token }) {
-      session.user.id = token.id as string;
-      return session;
+    async session({ session }) {
+      const dbUser = await getUser(session.user.email);
+      if (!dbUser?.id) {
+        throw new Error("User not found");
+      }
+      return {
+        ...session,
+        user: {
+          ...dbUser,
+          image: session.user.image,
+        },
+      };
     },
     async signIn(params) {
       const user = params.user;
@@ -24,14 +41,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return false;
       }
       await findOrCreateAccount({
-        email: user.email as Tagged<
-          (typeof UsersTable.$inferSelect)["email"],
-          "UserEmail"
-        >,
-        name: user.name as Tagged<
-          (typeof UsersTable.$inferSelect)["name"],
-          "UserName"
-        >,
+        email: user.email,
+        name: user.name,
       });
       return true;
     },

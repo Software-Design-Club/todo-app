@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { TodosTable } from "../../../drizzle/schema";
 import { revalidatePath } from "next/cache";
-import type { List } from "./list";
+import type { List } from "@/lib/types";
 
 export type Todo = typeof TodosTable.$inferSelect;
 

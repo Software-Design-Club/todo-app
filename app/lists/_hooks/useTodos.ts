@@ -15,7 +15,7 @@ import {
 } from "../_actions/todo";
 
 import { getTodos } from "../_actions/todo";
-import type { List } from "../_actions/list";
+import type { List } from "@/lib/types";
 
 // Key factory for React Query cache
 const todoKeys = {

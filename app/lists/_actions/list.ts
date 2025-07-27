@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { Tagged } from "type-fest";
+import type { List } from "@/lib/types";
 
 export type UsersListTodos = {
   id: number;
@@ -46,23 +47,6 @@ export async function getListWithTodos(
     todos: todos,
   };
 }
-
-// interface List {
-//   id: Tagged<typeof ListsTable.id.dataType, "ListId">;
-//   title: Tagged<typeof ListsTable.title, "ListTitle">;
-//   creatorId: Tagged<typeof ListsTable.creatorId, "CreatorId">;
-//   createdAt: Tagged<typeof ListsTable.createdAt, "CreatedAt">;
-//   updatedAt: Tagged<typeof ListsTable.updatedAt, "UpdatedAt">;
-// }
-
-// export type List = Tagged<typeof ListsTable.$inferSelect, "List">;
-export type List = {
-  id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
-  title: Tagged<(typeof ListsTable.$inferSelect)["title"], "ListTitle">;
-  creatorId: Tagged<(typeof ListsTable.$inferSelect)["creatorId"], "CreatorId">;
-  createdAt: Tagged<(typeof ListsTable.$inferSelect)["createdAt"], "CreatedAt">;
-  updatedAt: Tagged<(typeof ListsTable.$inferSelect)["updatedAt"], "UpdatedAt">;
-};
 
 const createTaggedList = (list: typeof ListsTable.$inferSelect): List => {
   return {

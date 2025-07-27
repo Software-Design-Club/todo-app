@@ -10,13 +10,12 @@ import {
 } from "@/ui/dropdown-menu";
 import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
-import { User } from "next-auth/";
 import { SignOut } from "@/app/sign-in/_components/sign-out";
 import { auth } from "@/auth";
 
 export default async function Header() {
   const session = await auth();
-  const user: User | undefined = session?.user;
+  const user = session?.user;
   if (!user) {
     return null;
   }

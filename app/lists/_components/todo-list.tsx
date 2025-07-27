@@ -21,7 +21,7 @@ import {
   useUpdateTodoTitle,
 } from "../_hooks/useTodos";
 import { toast } from "sonner";
-import type { List } from "../_actions/list";
+import type { List } from "@/lib/types";
 
 const todoColumns = (
   editable: boolean,

@@ -3,16 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import type { User } from "@/app/lists/_actions/collaborators";
+import type { User, List } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/ui/avatar"; // Assuming you have an Avatar component
 import { XIcon } from "lucide-react"; // For remove icon
 
 interface ManageCollaboratorsProps {
-  listId: string;
+  listId: List["id"];
   initialCollaborators: User[];
   searchUsers: (searchTerm: string) => Promise<User[]>;
-  addCollaborator: (userId: string, listId: string) => Promise<void>;
-  removeCollaborator: (userId: string, listId: string) => Promise<void>;
+  addCollaborator: (userId: User["id"], listId: List["id"]) => Promise<void>;
+  removeCollaborator: (userId: User["id"], listId: List["id"]) => Promise<void>;
 }
 
 export default function ManageCollaborators({
@@ -40,17 +40,19 @@ export default function ManageCollaborators({
     setSuccessMessage(null);
   };
 
-  const getInitials = (name: string): string => {
-    return name
-      .split(" ")
-      .map((word) => word.charAt(0))
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (name: User["name"]): string => {
+    return (
+      name
+        ?.split(" ")
+        .map((word) => word.charAt(0))
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || ""
+    );
   };
 
   const addCollaboratorMutation = useMutation({
-    mutationFn: (userId: string) => addCollaborator(userId, listId),
+    mutationFn: (userId: User["id"]) => addCollaborator(userId, listId),
     onSuccess: (_, userId) => {
       const addedUser =
         searchResults.find((u) => u.id === userId) || selectedUserToAdd;
@@ -80,8 +82,8 @@ export default function ManageCollaborators({
   });
 
   const removeCollaboratorMutation = useMutation({
-    mutationFn: (userId: string) => removeCollaborator(userId, listId),
-    onSuccess: (_, userId) => {
+    mutationFn: (userId: User["id"]) => removeCollaborator(userId, listId),
+    onSuccess: (_, userId: User["id"]) => {
       const removedUser = currentCollaborators.find((c) => c.id === userId);
       setSuccessMessage(`${removedUser?.name || "User"} removed successfully.`);
       setCurrentCollaborators((prev) =>
@@ -90,7 +92,7 @@ export default function ManageCollaborators({
       setError(null);
       // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] });
     },
-    onError: (error: Error, userId: string) => {
+    onError: (error: Error, userId: User["id"]) => {
       const user = currentCollaborators.find((c) => c.id === userId);
       setError(
         `Failed to remove ${user?.name || "user"}. ${
@@ -146,7 +148,7 @@ export default function ManageCollaborators({
     }
   };
 
-  const handleRemoveCollaborator = (userId: string) => {
+  const handleRemoveCollaborator = (userId: User["id"]) => {
     clearMessages();
     removeCollaboratorMutation.mutate(userId);
   };

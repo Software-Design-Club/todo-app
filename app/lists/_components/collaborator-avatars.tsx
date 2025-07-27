@@ -1,5 +1,5 @@
 import React from "react";
-import { User } from "@/app/lists/_actions/collaborators";
+import type { User } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/ui/avatar";
 
 interface CollaboratorAvatarsProps {
@@ -55,10 +55,10 @@ const CollaboratorAvatars: React.FC<CollaboratorAvatarsProps> = ({
           >
             <AvatarFallback
               className={`${getAvatarColor(
-                collaborator.name
+                collaborator.name as string
               )} text-white text-xs font-medium`}
             >
-              {getInitials(collaborator.name)}
+              {getInitials(collaborator.name as string)}
             </AvatarFallback>
           </Avatar>
         ))}

@@ -4,16 +4,11 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, or, ilike, and } from "drizzle-orm";
 import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
-import type { List } from "./list";
+import type { List, User } from "@/lib/types";
+import { createTaggedUser } from "@/lib/types";
 
 // Initialize Drizzle client
 const db = drizzle(sql);
-
-export interface User {
-  id: string; // Or number, depending on your DB and how you expose it via API
-  name: string;
-  email: string;
-}
 
 export async function searchUsers(searchTerm: string): Promise<User[]> {
   console.log("[Server Action] Searching users for:", searchTerm);
@@ -40,10 +35,7 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
       .limit(10); // Add a limit to prevent overly large result sets
 
     // Map id to string to match the User interface
-    const results: User[] = usersFromDb.map((user) => ({
-      ...user,
-      id: String(user.id),
-    }));
+    const results: User[] = usersFromDb.map(createTaggedUser);
 
     return results;
   } catch (error) {
@@ -55,20 +47,12 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
 }
 
 export async function addCollaborator(
-  userIdString: string,
-  listIdString: string
+  userId: User["id"],
+  listId: List["id"]
 ): Promise<void> {
   console.log(
-    `[Server Action] Attempting to add user ${userIdString} to list ${listIdString}.`
+    `[Server Action] Attempting to add user ${userId} to list ${listId}.`
   );
-
-  const userId = parseInt(userIdString, 10);
-  const listId = parseInt(listIdString, 10);
-
-  if (isNaN(userId) || isNaN(listId)) {
-    console.error("Invalid userId or listId provided.");
-    throw new Error("Invalid user or list ID.");
-  }
 
   try {
     // Check if the user is already a collaborator
@@ -137,10 +121,7 @@ export async function getCollaborators(listId: List["id"]): Promise<User[]> {
       .where(eq(ListCollaboratorsTable.listId, listId));
 
     // Map id to string to match the User interface
-    const results: User[] = collaboratorsFromDb.map((user) => ({
-      ...user,
-      id: String(user.id),
-    }));
+    const results: User[] = collaboratorsFromDb.map(createTaggedUser);
 
     return results;
   } catch (error) {
@@ -150,20 +131,12 @@ export async function getCollaborators(listId: List["id"]): Promise<User[]> {
 }
 
 export async function removeCollaborator(
-  userIdString: string,
-  listIdString: string
+  userId: User["id"],
+  listId: List["id"]
 ): Promise<void> {
   console.log(
-    `[Server Action] Attempting to remove user ${userIdString} from list ${listIdString}.`
+    `[Server Action] Attempting to remove user ${userId} from list ${listId}.`
   );
-
-  const userId = parseInt(userIdString, 10);
-  const listId = parseInt(listIdString, 10);
-
-  if (isNaN(userId) || isNaN(listId)) {
-    console.error("Invalid userId or listId provided for removal.");
-    throw new Error("Invalid user or list ID for removal.");
-  }
 
   try {
     const result = await db

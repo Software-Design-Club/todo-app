@@ -19,15 +19,14 @@ import {
   getCollaborators,
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
-import type { List } from "@/app/lists/_actions/list";
+import type { User } from "@/lib/types";
 
 interface ListProps {
   listId: number;
 }
-
-// getUser
-// getList
-//
+function isAuthorizedToEditList(collaborators: User[], userId: User["id"]) {
+  return collaborators.some((collaborator) => collaborator.id === userId);
+}
 
 const List: React.FC<ListProps> = async ({ listId }) => {
   const list = await getList(listId);
@@ -38,12 +37,9 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   const session = await auth();
   let editable = false;
   const user = session?.user;
-  if (user?.email) {
-    // Editable only if user is authorized to edit. Only creators and collaborators can edit.
-    editable = true; // authorizedToEdit(list.id, user.id)
+  if (user) {
+    editable = isAuthorizedToEditList(collaborators, user.id);
   }
-
-  const listIdString = String(listId);
 
   return (
     <div>
@@ -60,7 +56,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
                 <DropdownMenuLabel>Manage Collaborators</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <ManageCollaborators
-                  listId={listIdString}
+                  listId={list.id}
                   initialCollaborators={collaborators}
                   searchUsers={searchUsers}
                   addCollaborator={addCollaborator}
