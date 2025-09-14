@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { Tagged } from "type-fest";
-import type { List } from "@/lib/types";
+import type { List, User } from "@/lib/types";
 
 export type UsersListTodos = {
   id: number;
@@ -82,7 +82,7 @@ export async function getList(listId: number): Promise<List> {
   return createTaggedList(list);
 }
 
-export async function getLists(userEmail: string) {
+export async function getLists(userEmail: User["email"]): Promise<List[]> {
   const db = drizzle(sql);
   const [foundUser] = await db
     .select()
@@ -94,7 +94,7 @@ export async function getLists(userEmail: string) {
     .from(ListsTable)
     .where(eq(ListsTable.creatorId, foundUser.id));
 
-  return lists;
+  return lists.map(createTaggedList);
 }
 
 /**

@@ -12,13 +12,13 @@ Todos:
 - [x] User can invite collaborators to a list
 - [x] User can see collaborators on a list
 - [x] User can remove collaborators from a list
-- [ ] Add list authorization. Users can only edit list they create or are a collaborator on.
+- [x] Add list authorization. Users can only edit list they create or are a collaborator on.
        - [x] Add opaque types for list and user ids
        - [x] Add role to ListCollaborator table
        - [x] Backfill ListCollaborator table with roles and ids of list creators
        - [x] Add function to check if user is authorized to edit list using the opaque types
-       - [ ] Figure out how to deal with that face that session.user.id is not user.id from the db
-- [ ] Visually whether the user is a collaborator or a creator of the list when on list page
+       - [x] Figure out how to deal with that face that session.user.id is not user.id from the db
+- [ ] Visually tell whether the user is a collaborator or a creator of the list when on list page
 - [ ] User can see lists they are a collaborator on their lists view
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
 - [ ] User can delete/archive a list

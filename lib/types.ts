@@ -1,4 +1,4 @@
-import { ListsTable, UsersTable } from "@/drizzle/schema";
+import { ListsTable, UsersTable, CollaboratorRoleEnum } from "@/drizzle/schema";
 import { Tagged } from "type-fest";
 
 export type List = {
@@ -11,9 +11,15 @@ export type List = {
 
 export type User = {
   email: Tagged<(typeof UsersTable.$inferSelect)["email"], "UserEmail">;
-  name?: Tagged<(typeof UsersTable.$inferSelect)["name"], "UserName">;
+  name: Tagged<(typeof UsersTable.$inferSelect)["name"], "UserName">;
   id: Tagged<(typeof UsersTable.$inferSelect)["id"], "UserId">;
   image?: Tagged<string, "UserImage">;
+};
+
+export type ListUser = {
+  User: User;
+  listId: List["id"];
+  Role: (typeof CollaboratorRoleEnum.enumValues)[number];
 };
 
 export const createTaggedList = (
@@ -47,5 +53,23 @@ export const createTaggedUser = (
     email: user.email as User["email"],
     name: user.name as User["name"],
     id: user.id as User["id"],
+  };
+};
+
+export const createTaggedListUser = (listUser: {
+  id: number;
+  name: string;
+  email: string;
+  role: (typeof CollaboratorRoleEnum.enumValues)[number];
+  listId: number;
+}): ListUser => {
+  return {
+    User: createTaggedUser({
+      id: listUser.id,
+      name: listUser.name,
+      email: listUser.email,
+    }),
+    listId: listUser.listId as List["id"],
+    Role: listUser.role,
   };
 };

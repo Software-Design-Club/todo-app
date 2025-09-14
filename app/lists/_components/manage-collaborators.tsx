@@ -3,15 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import type { User, List } from "@/lib/types";
+import type { User, List, ListUser } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/ui/avatar"; // Assuming you have an Avatar component
 import { XIcon } from "lucide-react"; // For remove icon
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
-  initialCollaborators: User[];
+  initialCollaborators: ListUser[];
   searchUsers: (searchTerm: string) => Promise<User[]>;
-  addCollaborator: (userId: User["id"], listId: List["id"]) => Promise<void>;
+  addCollaborator: (user: User, listId: List["id"]) => Promise<ListUser>;
   removeCollaborator: (userId: User["id"], listId: List["id"]) => Promise<void>;
 }
 
@@ -29,7 +29,7 @@ export default function ManageCollaborators({
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentCollaborators, setCurrentCollaborators] =
-    useState<User[]>(initialCollaborators);
+    useState<ListUser[]>(initialCollaborators);
 
   useEffect(() => {
     setCurrentCollaborators(initialCollaborators);
@@ -52,16 +52,12 @@ export default function ManageCollaborators({
   };
 
   const addCollaboratorMutation = useMutation({
-    mutationFn: (userId: User["id"]) => addCollaborator(userId, listId),
-    onSuccess: (_, userId) => {
-      const addedUser =
-        searchResults.find((u) => u.id === userId) || selectedUserToAdd;
-      setSuccessMessage(
-        `${addedUser?.name || "User"} added as a collaborator.`
-      );
+    mutationFn: (user: User) => addCollaborator(user, listId),
+    onSuccess: (addedUser: ListUser, user: User) => {
+      setSuccessMessage(`${user.name} added as a collaborator.`);
       if (
         addedUser &&
-        !currentCollaborators.find((c) => c.id === addedUser.id)
+        !currentCollaborators.find((c) => c.User.id === addedUser.User.id)
       ) {
         setCurrentCollaborators((prev) => [...prev, addedUser]);
       }
@@ -84,18 +80,22 @@ export default function ManageCollaborators({
   const removeCollaboratorMutation = useMutation({
     mutationFn: (userId: User["id"]) => removeCollaborator(userId, listId),
     onSuccess: (_, userId: User["id"]) => {
-      const removedUser = currentCollaborators.find((c) => c.id === userId);
-      setSuccessMessage(`${removedUser?.name || "User"} removed successfully.`);
+      const removedUser = currentCollaborators.find(
+        (c) => c.User.id === userId
+      );
+      setSuccessMessage(
+        `${removedUser?.User.name || "User"} removed successfully.`
+      );
       setCurrentCollaborators((prev) =>
-        prev.filter((user) => user.id !== userId)
+        prev.filter((user) => user.User.id !== userId)
       );
       setError(null);
       // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] });
     },
     onError: (error: Error, userId: User["id"]) => {
-      const user = currentCollaborators.find((c) => c.id === userId);
+      const user = currentCollaborators.find((c) => c.User.id === userId);
       setError(
-        `Failed to remove ${user?.name || "user"}. ${
+        `Failed to remove ${user?.User.name || "user"}. ${
           error.message || "Please try again."
         }`
       );
@@ -119,7 +119,7 @@ export default function ManageCollaborators({
       const users = await searchUsers(searchTerm);
       // Filter out users who are already collaborators
       const newResults = users.filter(
-        (user) => !currentCollaborators.some((c) => c.id === user.id)
+        (user) => !currentCollaborators.some((c) => c.User.id === user.id)
       );
       setSearchResults(newResults);
       if (newResults.length === 0 && users.length > 0) {
@@ -144,7 +144,7 @@ export default function ManageCollaborators({
   const handleAddCollaborator = () => {
     if (selectedUserToAdd) {
       clearMessages();
-      addCollaboratorMutation.mutate(selectedUserToAdd.id);
+      addCollaboratorMutation.mutate(selectedUserToAdd);
     }
   };
 
@@ -176,35 +176,35 @@ export default function ManageCollaborators({
           <ul className="space-y-2 max-h-48 overflow-y-auto">
             {currentCollaborators.map((user) => (
               <li
-                key={user.id}
+                key={user.User.id}
                 className="flex items-center justify-between p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
               >
                 <div className="flex items-center space-x-2">
                   <Avatar className="w-7 h-7">
                     <AvatarFallback className="text-xs">
-                      {getInitials(user.name)}
+                      {getInitials(user.User.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium">{user.name}</p>
+                    <p className="text-sm font-medium">{user.User.name}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {user.email}
+                      {user.User.email}
                     </p>
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleRemoveCollaborator(user.id)}
+                  onClick={() => handleRemoveCollaborator(user.User.id)}
                   disabled={
                     removeCollaboratorMutation.isPending &&
-                    removeCollaboratorMutation.variables === user.id
+                    removeCollaboratorMutation.variables === user.User.id
                   }
                   className="text-red-500 hover:text-red-700"
-                  aria-label={`Remove ${user.name}`}
+                  aria-label={`Remove ${user.User.name}`}
                 >
                   {removeCollaboratorMutation.isPending &&
-                  removeCollaboratorMutation.variables === user.id ? (
+                  removeCollaboratorMutation.variables === user.User.id ? (
                     "..."
                   ) : (
                     <XIcon className="w-4 h-4" />

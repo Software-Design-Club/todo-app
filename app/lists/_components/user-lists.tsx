@@ -11,18 +11,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import CreateListForm from "./create-list";
-
-type ListWithDetails = Awaited<ReturnType<typeof getLists>>[number] & {
-  // todoCount: number;
-};
+import type { User } from "@/lib/types";
 
 interface ListsProps {
-  userEmail: string;
+  userEmail: User["email"];
   currentPath: string;
 }
 
 const UserLists: React.FC<ListsProps> = async ({ userEmail, currentPath }) => {
-  const lists = (await getLists(userEmail)) as ListWithDetails[];
+  const lists = await getLists(userEmail);
   const creatorId = lists[0].creatorId;
 
   return (

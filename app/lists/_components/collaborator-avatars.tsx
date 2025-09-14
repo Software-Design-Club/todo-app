@@ -1,9 +1,9 @@
 import React from "react";
-import type { User } from "@/lib/types";
+import type { ListUser } from "@/lib/types";
 import { Avatar, AvatarFallback } from "@/ui/avatar";
 
 interface CollaboratorAvatarsProps {
-  collaborators: User[];
+  collaborators: ListUser[];
 }
 
 const CollaboratorAvatars: React.FC<CollaboratorAvatarsProps> = ({
@@ -49,16 +49,16 @@ const CollaboratorAvatars: React.FC<CollaboratorAvatarsProps> = ({
       <div className="flex -space-x-2">
         {collaborators.slice(0, 5).map((collaborator) => (
           <Avatar
-            key={collaborator.id}
+            key={collaborator.User.id}
             className="w-8 h-8 border-2 border-white shadow-sm"
-            title={`${collaborator.name} (${collaborator.email})`}
+            title={`${collaborator.User.name} (${collaborator.User.email})`}
           >
             <AvatarFallback
               className={`${getAvatarColor(
-                collaborator.name as string
+                collaborator.User.name as string
               )} text-white text-xs font-medium`}
             >
-              {getInitials(collaborator.name as string)}
+              {getInitials(collaborator.User.name as string)}
             </AvatarFallback>
           </Avatar>
         ))}

@@ -4,8 +4,8 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, or, ilike, and } from "drizzle-orm";
 import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
-import type { List, User } from "@/lib/types";
-import { createTaggedUser } from "@/lib/types";
+import type { List, User, ListUser } from "@/lib/types";
+import { createTaggedUser, createTaggedListUser } from "@/lib/types";
 
 // Initialize Drizzle client
 const db = drizzle(sql);
@@ -47,11 +47,11 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
 }
 
 export async function addCollaborator(
-  userId: User["id"],
+  user: User,
   listId: List["id"]
-): Promise<void> {
+): Promise<ListUser> {
   console.log(
-    `[Server Action] Attempting to add user ${userId} to list ${listId}.`
+    `[Server Action] Attempting to add user ${user.id} to list ${listId}.`
   );
 
   try {
@@ -61,7 +61,7 @@ export async function addCollaborator(
       .from(ListCollaboratorsTable)
       .where(
         and(
-          eq(ListCollaboratorsTable.userId, userId),
+          eq(ListCollaboratorsTable.userId, user.id),
           eq(ListCollaboratorsTable.listId, listId)
         )
       )
@@ -69,7 +69,7 @@ export async function addCollaborator(
 
     if (existingCollaborator.length > 0) {
       console.log(
-        `User ${userId} is already a collaborator on list ${listId}.`
+        `User ${user.id} is already a collaborator on list ${listId}.`
       );
       // Optionally, throw an error to be caught by useMutation's onError
       throw new Error("User is already a collaborator on this list.");
@@ -78,20 +78,28 @@ export async function addCollaborator(
     }
 
     // Add the new collaborator
-    await db.insert(ListCollaboratorsTable).values({
-      userId: userId,
-      listId: listId,
-      // createdAt and updatedAt will use defaultNow() from the schema
-    });
+    const result = await db
+      .insert(ListCollaboratorsTable)
+      .values({
+        userId: user.id,
+        listId: listId,
+      })
+      .returning();
 
     console.log(
-      `[Server Action] User ${userId} successfully added as a collaborator to list ${listId}.`
+      `[Server Action] User ${user.id} successfully added as a collaborator to list ${listId}.`
     );
 
     // Revalidate the path for the list page to reflect the new collaborator
     revalidatePath(`/lists/${listId}`);
-    // If you have a page showing all lists a user collaborates on, revalidate that too
-    // revalidatePath(\`/user/lists\`); // Example
+
+    return createTaggedListUser({
+      id: result[0].userId,
+      name: user.name,
+      email: user.email,
+      role: result[0].role,
+      listId: result[0].listId,
+    });
   } catch (error) {
     console.error("Database error while adding collaborator:", error);
     // If it's the specific error we threw, re-throw it for the client
@@ -106,7 +114,9 @@ export async function addCollaborator(
   }
 }
 
-export async function getCollaborators(listId: List["id"]): Promise<User[]> {
+export async function getCollaborators(
+  listId: List["id"]
+): Promise<ListUser[]> {
   console.log("[Server Action] Getting collaborators for list:", listId);
 
   try {
@@ -115,13 +125,15 @@ export async function getCollaborators(listId: List["id"]): Promise<User[]> {
         id: UsersTable.id,
         name: UsersTable.name,
         email: UsersTable.email,
+        role: ListCollaboratorsTable.role,
+        listId: ListCollaboratorsTable.listId,
       })
       .from(ListCollaboratorsTable)
       .innerJoin(UsersTable, eq(ListCollaboratorsTable.userId, UsersTable.id))
       .where(eq(ListCollaboratorsTable.listId, listId));
 
     // Map id to string to match the User interface
-    const results: User[] = collaboratorsFromDb.map(createTaggedUser);
+    const results: ListUser[] = collaboratorsFromDb.map(createTaggedListUser);
 
     return results;
   } catch (error) {

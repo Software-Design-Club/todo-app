@@ -19,13 +19,13 @@ import {
   getCollaborators,
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
-import type { User } from "@/lib/types";
+import type { User, ListUser } from "@/lib/types";
 
 interface ListProps {
   listId: number;
 }
-function isAuthorizedToEditList(collaborators: User[], userId: User["id"]) {
-  return collaborators.some((collaborator) => collaborator.id === userId);
+function isAuthorizedToEditList(collaborators: ListUser[], userId: User["id"]) {
+  return collaborators.some((collaborator) => collaborator.User.id === userId);
 }
 
 const List: React.FC<ListProps> = async ({ listId }) => {
