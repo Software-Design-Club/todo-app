@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import type { User, List, ListUser } from "@/lib/types";
-import { Avatar, AvatarFallback } from "@/ui/avatar"; // Assuming you have an Avatar component
-import { XIcon } from "lucide-react"; // For remove icon
+import { CollaboratorListItem } from "./collaborator-list-item";
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
@@ -40,7 +39,7 @@ export default function ManageCollaborators({
     setSuccessMessage(null);
   };
 
-  const getInitials = (name: User["name"]): string => {
+  const getInitials = useCallback((name: User["name"]): string => {
     return (
       name
         ?.split(" ")
@@ -49,18 +48,20 @@ export default function ManageCollaborators({
         .toUpperCase()
         .slice(0, 2) || ""
     );
-  };
+  }, []);
 
   const addCollaboratorMutation = useMutation({
     mutationFn: (user: User) => addCollaborator(user, listId),
     onSuccess: (addedUser: ListUser, user: User) => {
       setSuccessMessage(`${user.name} added as a collaborator.`);
-      if (
-        addedUser &&
-        !currentCollaborators.find((c) => c.User.id === addedUser.User.id)
-      ) {
-        setCurrentCollaborators((prev) => [...prev, addedUser]);
-      }
+
+      setCurrentCollaborators((prev) => {
+        if (!prev.find((c) => c.User.id === addedUser.User.id)) {
+          return [...prev, addedUser];
+        }
+        return prev;
+      });
+
       setSelectedUserToAdd(null);
       setSearchTerm("");
       setSearchResults([]);
@@ -174,43 +175,18 @@ export default function ManageCollaborators({
         <h3 className="text-md font-semibold mb-2">Current Collaborators</h3>
         {currentCollaborators.length > 0 ? (
           <ul className="space-y-2 max-h-48 overflow-y-auto">
-            {currentCollaborators.map((user) => (
-              <li
-                key={user.User.id}
-                className="flex items-center justify-between p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <div className="flex items-center space-x-2">
-                  <Avatar className="w-7 h-7">
-                    <AvatarFallback className="text-xs">
-                      {getInitials(user.User.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{user.User.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {user.User.email}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveCollaborator(user.User.id)}
-                  disabled={
-                    removeCollaboratorMutation.isPending &&
-                    removeCollaboratorMutation.variables === user.User.id
-                  }
-                  className="text-red-500 hover:text-red-700"
-                  aria-label={`Remove ${user.User.name}`}
-                >
-                  {removeCollaboratorMutation.isPending &&
-                  removeCollaboratorMutation.variables === user.User.id ? (
-                    "..."
-                  ) : (
-                    <XIcon className="w-4 h-4" />
-                  )}
-                </Button>
-              </li>
+            {currentCollaborators.map((collaborator) => (
+              <CollaboratorListItem
+                key={collaborator.User.id}
+                collaborator={collaborator}
+                onRemove={handleRemoveCollaborator}
+                pendingRemoval={removeCollaboratorMutation.isPending}
+                isRemoving={
+                  removeCollaboratorMutation.isPending &&
+                  removeCollaboratorMutation.variables === collaborator.User.id
+                }
+                getInitials={getInitials}
+              />
             ))}
           </ul>
         ) : (
