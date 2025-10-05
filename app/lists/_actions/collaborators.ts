@@ -6,6 +6,7 @@ import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
 import type { List, User, ListUser } from "@/lib/types";
 import { createTaggedUser, createTaggedListUser } from "@/lib/types";
+import { canBeRemovedAsCollaborator } from "./permissions";
 
 // Initialize Drizzle client
 const db = drizzle(sql);
@@ -142,21 +143,22 @@ export async function getCollaborators(
   }
 }
 
-export async function removeCollaborator(
-  userId: User["id"],
-  listId: List["id"]
-): Promise<void> {
+export async function removeCollaborator(listUser: ListUser): Promise<void> {
   console.log(
-    `[Server Action] Attempting to remove user ${userId} from list ${listId}.`
+    `[Server Action] Attempting to remove user ${listUser.User.id} from list ${listUser.listId}.`
   );
+
+  if (!canBeRemovedAsCollaborator(listUser)) {
+    throw new Error("User cannot be removed as a collaborator.");
+  }
 
   try {
     const result = await db
       .delete(ListCollaboratorsTable)
       .where(
         and(
-          eq(ListCollaboratorsTable.userId, userId),
-          eq(ListCollaboratorsTable.listId, listId)
+          eq(ListCollaboratorsTable.userId, listUser.User.id),
+          eq(ListCollaboratorsTable.listId, listUser.listId)
         )
       )
       .returning();
@@ -165,17 +167,17 @@ export async function removeCollaborator(
       // This could happen if the collaborator was already removed or never existed.
       // Depending on requirements, this might not be an error.
       console.warn(
-        `[Server Action] No collaborator found for user ${userId} on list ${listId} to remove.`
+        `[Server Action] No collaborator found for user ${listUser.User.id} on list ${listUser.listId} to remove.`
       );
       // Optionally, throw an error if it's critical that a record was deleted.
       // throw new Error("Collaborator not found or already removed.");
     } else {
       console.log(
-        `[Server Action] User ${userId} successfully removed as a collaborator from list ${listId}.`
+        `[Server Action] User ${listUser.User.id} successfully removed as a collaborator from list ${listUser.listId}.`
       );
     }
 
-    revalidatePath(`/lists/${listId}`);
+    revalidatePath(`/lists/${listUser.listId}`);
   } catch (error) {
     console.error("Database error while removing collaborator:", error);
     throw new Error("Failed to remove collaborator due to a database error.");

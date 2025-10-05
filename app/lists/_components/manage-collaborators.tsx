@@ -11,7 +11,7 @@ interface ManageCollaboratorsProps {
   initialCollaborators: ListUser[];
   searchUsers: (searchTerm: string) => Promise<User[]>;
   addCollaborator: (user: User, listId: List["id"]) => Promise<ListUser>;
-  removeCollaborator: (userId: User["id"], listId: List["id"]) => Promise<void>;
+  removeCollaborator: (listUser: ListUser) => Promise<void>;
 }
 
 export default function ManageCollaborators({
@@ -79,22 +79,24 @@ export default function ManageCollaborators({
   });
 
   const removeCollaboratorMutation = useMutation({
-    mutationFn: (userId: User["id"]) => removeCollaborator(userId, listId),
-    onSuccess: (_, userId: User["id"]) => {
+    mutationFn: (listUser: ListUser) => removeCollaborator(listUser),
+    onSuccess: (_, listUser: ListUser) => {
       const removedUser = currentCollaborators.find(
-        (c) => c.User.id === userId
+        (c) => c.User.id === listUser.User.id
       );
       setSuccessMessage(
         `${removedUser?.User.name || "User"} removed successfully.`
       );
       setCurrentCollaborators((prev) =>
-        prev.filter((user) => user.User.id !== userId)
+        prev.filter((user) => user.User.id !== listUser.User.id)
       );
       setError(null);
       // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] });
     },
-    onError: (error: Error, userId: User["id"]) => {
-      const user = currentCollaborators.find((c) => c.User.id === userId);
+    onError: (error: Error, listUser: ListUser) => {
+      const user = currentCollaborators.find(
+        (c) => c.User.id === listUser.User.id
+      );
       setError(
         `Failed to remove ${user?.User.name || "user"}. ${
           error.message || "Please try again."
@@ -149,9 +151,9 @@ export default function ManageCollaborators({
     }
   };
 
-  const handleRemoveCollaborator = (userId: User["id"]) => {
+  const handleRemoveCollaborator = (listUser: ListUser) => {
     clearMessages();
-    removeCollaboratorMutation.mutate(userId);
+    removeCollaboratorMutation.mutate(listUser);
   };
 
   useEffect(() => {
@@ -183,7 +185,7 @@ export default function ManageCollaborators({
                 pendingRemoval={removeCollaboratorMutation.isPending}
                 isRemoving={
                   removeCollaboratorMutation.isPending &&
-                  removeCollaboratorMutation.variables === collaborator.User.id
+                  removeCollaboratorMutation.variables === collaborator
                 }
                 getInitials={getInitials}
               />

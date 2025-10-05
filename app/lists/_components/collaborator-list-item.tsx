@@ -5,10 +5,11 @@ import { Button } from "@/ui/button";
 import { Avatar, AvatarFallback } from "@/ui/avatar";
 import { XIcon } from "lucide-react";
 import type { User, ListUser } from "@/lib/types";
+import { canBeRemovedAsCollaborator } from "@/app/lists/_actions/permissions";
 
 interface CollaboratorListItemProps {
   collaborator: ListUser;
-  onRemove: (userId: User["id"]) => void;
+  onRemove: (listUser: ListUser) => void;
   pendingRemoval: boolean;
   isRemoving: boolean;
   getInitials: (name: User["name"]) => string;
@@ -27,12 +28,14 @@ export const CollaboratorListItem = memo(
     return (
       <li className="flex items-center justify-between p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
         <CollaboratorInfo user={user} role={role} getInitials={getInitials} />
-        <RemoveButton
-          user={user}
-          onRemove={onRemove}
-          pendingRemoval={pendingRemoval}
-          isRemoving={isRemoving}
-        />
+        {canBeRemovedAsCollaborator(collaborator) && (
+          <RemoveButton
+            listUser={collaborator}
+            onRemove={onRemove}
+            pendingRemoval={pendingRemoval}
+            isRemoving={isRemoving}
+          />
+        )}
       </li>
     );
   }
@@ -74,23 +77,23 @@ CollaboratorInfo.displayName = "CollaboratorInfo";
 
 const RemoveButton = memo(
   ({
-    user,
+    listUser,
     onRemove,
     pendingRemoval,
     isRemoving,
   }: {
-    user: User;
-    onRemove: (userId: User["id"]) => void;
+    listUser: ListUser;
+    onRemove: (listUser: ListUser) => void;
     pendingRemoval: boolean;
     isRemoving: boolean;
   }) => (
     <Button
       variant="ghost"
       size="sm"
-      onClick={() => onRemove(user.id)}
+      onClick={() => onRemove(listUser)}
       disabled={pendingRemoval}
       className="text-red-500 hover:text-red-700"
-      aria-label={`Remove ${user.name}`}
+      aria-label={`Remove ${listUser.User.name}`}
     >
       {isRemoving ? "..." : <XIcon className="w-4 h-4" />}
     </Button>
