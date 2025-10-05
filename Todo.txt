@@ -19,8 +19,10 @@ Todos:
        - [x] Add function to check if user is authorized to edit list using the opaque types
        - [x] Figure out how to deal with that face that session.user.id is not user.id from the db
 - [x] Visually tell whether the user is a collaborator or a creator of the list when on list page
+- [x] Separate the authorization for editing lists from authorization for editing collaborators on a list
 - [ ] Make sure that owner cannot be removed as a collaborator on a list
-- [ ] User can see lists they are a collaborator on their lists view
+- [x] User can see lists they are a collaborator on their lists view
+- [ ] User can edit the title of a list they are a collaborator on
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
 - [ ] User can delete/archive a list
 - [ ] Creator/Collaborator can share a link to a list if its public

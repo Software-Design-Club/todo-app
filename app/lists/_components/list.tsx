@@ -19,13 +19,13 @@ import {
   getCollaborators,
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
-import type { User, ListUser } from "@/lib/types";
+import {
+  isAuthorizedToEditCollaborators,
+  isAuthorizedToEditList,
+} from "@/app/lists/_actions/permissions";
 
 interface ListProps {
   listId: number;
-}
-function isAuthorizedToEditList(collaborators: ListUser[], userId: User["id"]) {
-  return collaborators.some((collaborator) => collaborator.User.id === userId);
 }
 
 const List: React.FC<ListProps> = async ({ listId }) => {
@@ -35,10 +35,15 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   const collaborators = await getCollaborators(list.id);
 
   const session = await auth();
-  let editable = false;
+  let editableList = false;
+  let editableCollaborators = false;
   const user = session?.user;
   if (user) {
-    editable = isAuthorizedToEditList(collaborators, user.id);
+    editableList = isAuthorizedToEditList(collaborators, user.id);
+    editableCollaborators = isAuthorizedToEditCollaborators(
+      collaborators,
+      user.id
+    );
   }
 
   return (
@@ -47,7 +52,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
         <h2 className="text-2xl font-bold">{list.title}</h2>
         <div className="flex items-center space-x-4">
           <CollaboratorAvatars collaborators={collaborators} />
-          {editable && (
+          {editableCollaborators && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">Manage Collaborators</Button>
@@ -67,7 +72,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
           )}
         </div>
       </div>
-      <TodoList todos={todos} editable={editable} listId={list.id} />
+      <TodoList todos={todos} editable={editableList} listId={list.id} />
     </div>
   );
 };

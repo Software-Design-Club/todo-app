@@ -1,8 +1,13 @@
 "use server";
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { eq, not, and } from "drizzle-orm";
-import { ListsTable, TodosTable, UsersTable } from "@/drizzle/schema";
+import { eq, not, and, or } from "drizzle-orm";
+import {
+  ListCollaboratorsTable,
+  ListsTable,
+  TodosTable,
+  UsersTable,
+} from "@/drizzle/schema";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
@@ -89,11 +94,20 @@ export async function getLists(userEmail: User["email"]): Promise<List[]> {
     .from(UsersTable)
     .where(eq(UsersTable.email, userEmail));
 
-  const lists = await db
-    .select()
+  const results = await db
+    .select({ lists: ListsTable })
     .from(ListsTable)
-    .where(eq(ListsTable.creatorId, foundUser.id));
-
+    .leftJoin(
+      ListCollaboratorsTable,
+      eq(ListsTable.id, ListCollaboratorsTable.listId)
+    )
+    .where(
+      or(
+        eq(ListsTable.creatorId, foundUser.id),
+        eq(ListCollaboratorsTable.userId, foundUser.id)
+      )
+    );
+  const lists = results.map((result) => result.lists);
   return lists.map(createTaggedList);
 }
 
