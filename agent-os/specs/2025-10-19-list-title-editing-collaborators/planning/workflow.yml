@@ -1,0 +1,31 @@
+name: List Title Editing for Collaborators
+id: 2025-10-19-list-title-editing-collaborators
+created: 2025-10-19
+size: XS
+estimated_duration: 1 day
+
+phases:
+  - name: Planning
+    tasks:
+      - Analyze current authorization logic
+      - Identify files requiring updates
+      - Review UI components for title editing
+
+  - name: Backend Implementation
+    tasks:
+      - Update permission utilities
+      - Modify list update server actions
+      - Add authorization checks for collaborators
+
+  - name: Frontend Implementation
+    tasks:
+      - Update UI components to show edit controls
+      - Test collaborator editing experience
+      - Ensure error handling
+
+  - name: Testing & Verification
+    tasks:
+      - Test as owner (existing functionality)
+      - Test as collaborator (new functionality)
+      - Test edge cases (unauthorized access, validation)
+      - Verify no regressions

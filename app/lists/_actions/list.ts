@@ -13,6 +13,8 @@ import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { Tagged } from "type-fest";
 import type { List, User } from "@/lib/types";
+import { getCollaborators } from "./collaborators";
+import { isAuthorizedToEditList } from "./permissions";
 
 export type UsersListTodos = {
   id: number;
@@ -142,4 +144,96 @@ export async function createList(formData: FormData) {
   revalidatePath("/lists");
 
   return newList;
+}
+
+/**
+ * Updates the title of a list
+ *
+ * @param listId - The ID of the list to update
+ * @param newTitle - The new title for the list
+ * @param userId - The ID of the user attempting to update the list
+ * @returns The updated list object with tagged types
+ * @throws Error if validation fails or user is not authorized
+ *
+ * Validation:
+ * - Title must not be empty after trimming whitespace
+ * - Title must not exceed 255 characters
+ *
+ * Authorization:
+ * - User must be either the owner or a collaborator of the list
+ *
+ * Side Effects:
+ * - Revalidates cache for /lists and /lists/[listId] pages
+ * - Updates the list's updatedAt timestamp
+ *
+ * Note: In the case of simultaneous edits by multiple users, last write wins.
+ * No optimistic locking is implemented in this version.
+ */
+export async function updateListTitle(
+  listId: List["id"],
+  newTitle: string,
+  userId: User["id"]
+): Promise<List> {
+  try {
+    // Validate title - fail fast approach
+    const trimmedTitle = newTitle.trim();
+
+    if (trimmedTitle.length === 0) {
+      throw new Error("Title cannot be empty");
+    }
+
+    if (trimmedTitle.length > 255) {
+      throw new Error("Title cannot exceed 255 characters");
+    }
+
+    // Check authorization
+    const collaborators = await getCollaborators(listId);
+
+    if (!isAuthorizedToEditList(collaborators, userId)) {
+      throw new Error("You do not have permission to edit this list");
+    }
+
+    // Update list in database
+    const db = drizzle(sql);
+    const [updatedList] = await db
+      .update(ListsTable)
+      .set({
+        title: trimmedTitle,
+        updatedAt: new Date(),
+      })
+      .where(eq(ListsTable.id, listId))
+      .returning();
+
+    // Check if list was found and updated
+    if (!updatedList) {
+      throw new Error("List not found");
+    }
+
+    // Revalidate cache for both list pages
+    revalidatePath("/lists");
+    revalidatePath(`/lists/${listId}`);
+
+    return createTaggedList(updatedList);
+  } catch (error) {
+    // Re-throw validation and authorization errors as-is
+    if (error instanceof Error) {
+      // Check if it's one of our expected error messages
+      const expectedErrors = [
+        "Title cannot be empty",
+        "Title cannot exceed 255 characters",
+        "You do not have permission to edit this list",
+        "List not found",
+      ];
+
+      if (expectedErrors.includes(error.message)) {
+        throw error;
+      }
+    }
+
+    // Log unexpected errors for debugging
+    console.error("Database error while updating list title:", error);
+
+    // Throw user-friendly error for unexpected database errors
+    throw new Error("Failed to update list title due to a database error");
+  }
 }

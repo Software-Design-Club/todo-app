@@ -2,6 +2,7 @@ import { getList } from "@/app/lists/_actions/list";
 import TodoList from "@/app/lists/_components/todo-list";
 import ManageCollaborators from "@/app/lists/_components/manage-collaborators";
 import CollaboratorAvatars from "@/app/lists/_components/collaborator-avatars";
+import EditableListTitle from "@/app/lists/_components/editable-list-title";
 import { auth } from "@/auth";
 import React from "react";
 import { getTodos } from "../_actions/todo";
@@ -49,7 +50,15 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">{list.title}</h2>
+        {user ? (
+          <EditableListTitle
+            list={list}
+            editable={editableList}
+            userId={user.id}
+          />
+        ) : (
+          <h2 className="text-2xl font-bold">{list.title}</h2>
+        )}
         <div className="flex items-center space-x-4">
           <CollaboratorAvatars collaborators={collaborators} />
           {editableCollaborators && (
