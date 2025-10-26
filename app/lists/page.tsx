@@ -10,12 +10,12 @@ export default async function ListsPage() {
     redirect("/sign-in");
   }
 
-  const userEmail = session.user.email;
+  const userId = session.user.id;
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">My Todo Lists</h1>
-      <UserLists userEmail={userEmail} currentPath="/lists" />
+      <UserLists userId={userId} currentPath="/lists" />
     </div>
   );
 }

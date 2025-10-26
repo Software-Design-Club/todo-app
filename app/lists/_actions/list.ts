@@ -6,7 +6,6 @@ import {
   ListCollaboratorsTable,
   ListsTable,
   TodosTable,
-  UsersTable,
 } from "@/drizzle/schema";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
@@ -89,13 +88,8 @@ export async function getList(listId: number): Promise<List> {
   return createTaggedList(list);
 }
 
-export async function getLists(userEmail: User["email"]): Promise<List[]> {
+export async function getLists(userId: User["id"]): Promise<List[]> {
   const db = drizzle(sql);
-  const [foundUser] = await db
-    .select()
-    .from(UsersTable)
-    .where(eq(UsersTable.email, userEmail));
-
   const results = await db
     .select({ lists: ListsTable })
     .from(ListsTable)
@@ -105,8 +99,8 @@ export async function getLists(userEmail: User["email"]): Promise<List[]> {
     )
     .where(
       or(
-        eq(ListsTable.creatorId, foundUser.id),
-        eq(ListCollaboratorsTable.userId, foundUser.id)
+        eq(ListsTable.creatorId, userId),
+        eq(ListCollaboratorsTable.userId, userId)
       )
     );
   const lists = results.map((result) => result.lists);

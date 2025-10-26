@@ -20,7 +20,9 @@ Todos:
        - [x] Figure out how to deal with that face that session.user.id is not user.id from the db
 - [x] Visually tell whether the user is a collaborator or a creator of the list when on list page
 - [x] Separate the authorization for editing lists from authorization for editing collaborators on a list
-- [ ] Make sure that owner cannot be removed as a collaborator on a list
+- [ ] Make it clear whether the user is a collaborator or a creator anytime they are viewing list information.
+- [x] Investigate why some users are not able to see their own lists after creating them on the home page and list pages
+- [x] Make sure that owner cannot be removed as a collaborator on a list
 - [x] User can see lists they are a collaborator on their lists view
 - [ ] User can edit the title of a list they are a collaborator on
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.

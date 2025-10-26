@@ -14,13 +14,12 @@ import CreateListForm from "./create-list";
 import type { User } from "@/lib/types";
 
 interface ListsProps {
-  userEmail: User["email"];
   currentPath: string;
+  userId: User["id"];
 }
 
-const UserLists: React.FC<ListsProps> = async ({ userEmail, currentPath }) => {
-  const lists = await getLists(userEmail);
-  const creatorId = lists[0].creatorId;
+const UserLists: React.FC<ListsProps> = async ({ currentPath, userId }) => {
+  const lists = await getLists(userId);
 
   return (
     <div>
@@ -32,7 +31,7 @@ const UserLists: React.FC<ListsProps> = async ({ userEmail, currentPath }) => {
             <Link href="/lists">Your Lists</Link>
           )}
         </h2>
-        <CreateListForm creatorId={creatorId} />
+        <CreateListForm creatorId={userId} />
       </div>
 
       <Table>
