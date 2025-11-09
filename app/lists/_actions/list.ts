@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { Tagged } from "type-fest";
-import type { List, User } from "@/lib/types";
+import type { List, ListWithRole, User } from "@/lib/types";
 import { getCollaborators } from "./collaborators";
 import { isAuthorizedToEditList } from "./permissions";
 
@@ -75,6 +75,7 @@ const createTaggedList = (list: typeof ListsTable.$inferSelect): List => {
     >,
   };
 };
+
 /**
  * Get record for one list given listId
  */
@@ -88,10 +89,24 @@ export async function getList(listId: number): Promise<List> {
   return createTaggedList(list);
 }
 
-export async function getLists(userId: User["id"]): Promise<List[]> {
+/**
+ * Get all lists for a user with their role information
+ *
+ * @param userId - The ID of the user to get lists for
+ * @returns Array of lists with role information
+ *
+ * Role determination:
+ * - "owner" for lists where user is the creator
+ * - "collaborator" for lists where user is added as a collaborator
+ * - Owner role takes precedence if user is both creator and collaborator
+ */
+export async function getLists(userId: User["id"]): Promise<ListWithRole[]> {
   const db = drizzle(sql);
   const results = await db
-    .select({ lists: ListsTable })
+    .select({
+      lists: ListsTable,
+      collaborator: ListCollaboratorsTable
+    })
     .from(ListsTable)
     .leftJoin(
       ListCollaboratorsTable,
@@ -103,8 +118,41 @@ export async function getLists(userId: User["id"]): Promise<List[]> {
         eq(ListCollaboratorsTable.userId, userId)
       )
     );
-  const lists = results.map((result) => result.lists);
-  return lists.map(createTaggedList);
+
+  // Group results by list ID to handle duplicate rows from join
+  const listMap = new Map<number, ListWithRole>();
+
+  for (const result of results) {
+    const list = result.lists;
+    const collaborator = result.collaborator;
+
+    // Determine user's role for this list
+    // Owner role takes precedence if user is the creator
+    let userRole: "owner" | "collaborator";
+
+    if (list.creatorId === userId) {
+      // User is the creator, so they are the owner
+      userRole = "owner";
+    } else if (collaborator && collaborator.userId === userId) {
+      // User is a collaborator (and not the creator)
+      userRole = collaborator.role;
+    } else {
+      // Fallback to collaborator (should not happen with proper where clause)
+      userRole = "collaborator";
+    }
+
+    // Only add the list once, with the determined role
+    if (!listMap.has(list.id) || userRole === "owner") {
+      // If we haven't seen this list yet, or if this is the owner role (which takes precedence)
+      listMap.set(list.id, {
+        ...createTaggedList(list),
+        userRole
+      });
+    }
+  }
+
+  // Convert map to array and return
+  return Array.from(listMap.values());
 }
 
 /**

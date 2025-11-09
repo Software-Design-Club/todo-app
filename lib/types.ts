@@ -9,6 +9,10 @@ export type List = {
   updatedAt: Tagged<(typeof ListsTable.$inferSelect)["updatedAt"], "UpdatedAt">;
 };
 
+export type ListWithRole = List & {
+  userRole: (typeof CollaboratorRoleEnum.enumValues)[number];
+};
+
 export type User = {
   email: Tagged<(typeof UsersTable.$inferSelect)["email"], "UserEmail">;
   name: Tagged<(typeof UsersTable.$inferSelect)["name"], "UserName">;

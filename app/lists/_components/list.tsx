@@ -24,6 +24,7 @@ import {
   isAuthorizedToEditCollaborators,
   isAuthorizedToEditList,
 } from "@/app/lists/_actions/permissions";
+import type { UserRole } from "@/components/ui/role-badge";
 
 interface ListProps {
   listId: number;
@@ -38,6 +39,8 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   const session = await auth();
   let editableList = false;
   let editableCollaborators = false;
+  let userRole: UserRole = "collaborator";
+
   const user = session?.user;
   if (user) {
     editableList = isAuthorizedToEditList(collaborators, user.id);
@@ -45,6 +48,15 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       collaborators,
       user.id
     );
+
+    // Determine user's role from collaborators array
+    const currentUserCollaborator = collaborators.find(
+      (collab) => collab.User.id === user.id
+    );
+
+    if (currentUserCollaborator) {
+      userRole = currentUserCollaborator.Role;
+    }
   }
 
   return (
@@ -55,6 +67,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
             list={list}
             editable={editableList}
             userId={user.id}
+            userRole={userRole}
           />
         ) : (
           <h2 className="text-2xl font-bold">{list.title}</h2>

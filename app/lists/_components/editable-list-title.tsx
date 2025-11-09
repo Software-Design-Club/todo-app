@@ -5,11 +5,13 @@ import { Button } from "@/ui/button";
 import { toast } from "sonner";
 import { updateListTitle } from "@/app/lists/_actions/list";
 import type { List, User } from "@/lib/types";
+import { RoleBadge, type UserRole } from "@/components/ui/role-badge";
 
 interface EditableListTitleProps {
   list: List;
   editable: boolean;
   userId: User["id"];
+  userRole: UserRole;
 }
 
 const MAX_TITLE_LENGTH = 255;
@@ -18,6 +20,7 @@ export default function EditableListTitle({
   list,
   editable,
   userId,
+  userRole,
 }: EditableListTitleProps) {
   const [title, setTitle] = useState<List["title"]>(list.title);
   const [isEditing, setIsEditing] = useState(false);
@@ -69,7 +72,12 @@ export default function EditableListTitle({
   };
 
   if (!editable) {
-    return <h2 className="text-2xl font-bold">{list.title}</h2>;
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-2xl font-bold">{list.title}</h2>
+        <RoleBadge role={userRole} />
+      </div>
+    );
   }
 
   return (
@@ -118,8 +126,9 @@ export default function EditableListTitle({
           </div>
         </form>
       ) : (
-        <div className="flex flex-row gap-2 items-center">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-bold">{list.title}</h2>
+          <RoleBadge role={userRole} />
           <Button
             variant="outline"
             size="sm"
