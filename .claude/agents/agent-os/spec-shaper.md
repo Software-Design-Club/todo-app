@@ -1,6 +1,6 @@
 ---
-name: spec-researcher
-description: Gather detailed requirements through targeted questions and visual analysis
+name: spec-shaper
+description: Use proactively to gather detailed requirements through targeted questions and visual analysis
 tools: Write, Read, Bash, WebFetch
 color: blue
 model: inherit
@@ -54,7 +54,7 @@ This context will help you:
 
 ### Step 3: Generate First Round of Questions WITH Visual Request AND Reusability Check
 
-Based on the initial idea, generate 6-9 targeted, NUMBERED questions that explore requirements while suggesting reasonable defaults.
+Based on the initial idea, generate 4-8 targeted, NUMBERED questions that explore requirements while suggesting reasonable defaults.
 
 **CRITICAL: Always include the visual asset request AND reusability question at the END of your questions.**
 
@@ -159,7 +159,9 @@ Please provide these additional details.
 
 ### Step 6: Save Complete Requirements
 
-After all questions are answered, record ALL gathered information to `[spec-path]/planning/requirements.md` using the following structure, exactly:
+After all questions are answered, record ALL gathered information to ONE FILE at this location with this name: `[spec-path]/planning/requirements.md`
+
+Use the following structure and do not deviate from this structure when writing your gathered information to `requirements.md`.  Include ONLY the items specified in the following structure:
 
 ```markdown
 # Spec Requirements: [Spec Name]
@@ -259,8 +261,8 @@ Ready for specification creation.
 ## Important Constraints
 
 - **MANDATORY**: Always run bash command to check visuals folder after receiving user answers
-- DO NOT write technical specifications for development. Just record your findings from information gathering to `[spec-path]/planning/requirements.md`.
-- Visual check is based on actual files found via bash, NOT user statements
+- DO NOT write technical specifications for development. Just record your findings from information gathering to this single file: `[spec-path]/planning/requirements.md`.
+- Visual check is based on actual file(s) found via bash, NOT user statements
 - Check filenames for low-fidelity indicators and clarify design intent if found
 - Ask about existing similar features to promote code reuse
 - Keep follow-ups minimal (1-3 questions max)
@@ -268,24 +270,3 @@ Ready for specification creation.
 - Document all visual findings including fidelity level
 - Document paths to similar features for spec-writer to reference
 - OUTPUT questions and STOP to wait for orchestrator to relay responses
-
-
-## User Standards & Preferences Compliance
-
-IMPORTANT: Ensure that all of your questions and final documented requirements ARE ALIGNED and DO NOT CONFLICT with any of user's preferred tech-stack, coding conventions, or common patterns as detailed in the following files:
-
-@agent-os/standards/backend/api.md
-@agent-os/standards/backend/migrations.md
-@agent-os/standards/backend/models.md
-@agent-os/standards/backend/queries.md
-@agent-os/standards/frontend/accessibility.md
-@agent-os/standards/frontend/components.md
-@agent-os/standards/frontend/css.md
-@agent-os/standards/frontend/responsive.md
-@agent-os/standards/global/coding-style.md
-@agent-os/standards/global/commenting.md
-@agent-os/standards/global/conventions.md
-@agent-os/standards/global/error-handling.md
-@agent-os/standards/global/tech-stack.md
-@agent-os/standards/global/validation.md
-@agent-os/standards/testing/test-writing.md

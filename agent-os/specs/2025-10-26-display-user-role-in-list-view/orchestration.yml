@@ -1,0 +1,9 @@
+task_groups:
+  - name: Backend Layer
+    claude_code_subagent: implementer
+  - name: UI Component Layer
+    claude_code_subagent: implementer
+  - name: Table View Layer
+    claude_code_subagent: implementer
+  - name: List Detail View Layer
+    claude_code_subagent: implementer

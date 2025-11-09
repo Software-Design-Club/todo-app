@@ -24,7 +24,7 @@ Todos:
 - [x] Investigate why some users are not able to see their own lists after creating them on the home page and list pages
 - [x] Make sure that owner cannot be removed as a collaborator on a list
 - [x] User can see lists they are a collaborator on their lists view
-- [ ] User can edit the title of a list they are a collaborator on
+- [x] User can edit the title of a list they are a collaborator on
 - [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
 - [ ] User can delete/archive a list
 - [ ] Creator/Collaborator can share a link to a list if its public

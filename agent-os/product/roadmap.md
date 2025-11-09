@@ -15,7 +15,7 @@ The application currently has:
 
 ## Development Roadmap
 
-1. [ ] List Title Editing for Collaborators - Enable collaborators to edit the title of lists they have access to, not just owners. Update authorization checks and UI components to allow collaborators to modify list titles. `XS`
+1. [x] List Title Editing for Collaborators - Enable collaborators to edit the title of lists they have access to, not just owners. Update authorization checks and UI components to allow collaborators to modify list titles. `XS`
 
 2. [ ] List Visibility Controls - Add public/private visibility setting to lists. Private lists are only accessible to the creator and invited collaborators. Public lists can be viewed by anyone with the link. Include database schema updates, new UI controls on list settings, and authorization middleware updates. `S`
 
