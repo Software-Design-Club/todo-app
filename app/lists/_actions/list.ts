@@ -105,7 +105,7 @@ export async function getLists(userId: User["id"]): Promise<ListWithRole[]> {
   const results = await db
     .select({
       lists: ListsTable,
-      collaborator: ListCollaboratorsTable
+      collaborator: ListCollaboratorsTable,
     })
     .from(ListsTable)
     .leftJoin(
@@ -146,7 +146,7 @@ export async function getLists(userId: User["id"]): Promise<ListWithRole[]> {
       // If we haven't seen this list yet, or if this is the owner role (which takes precedence)
       listMap.set(list.id, {
         ...createTaggedList(list),
-        userRole
+        userRole,
       });
     }
   }
