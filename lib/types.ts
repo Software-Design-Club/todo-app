@@ -1,10 +1,18 @@
-import { ListsTable, UsersTable, CollaboratorRoleEnum } from "@/drizzle/schema";
+import {
+  ListsTable,
+  UsersTable,
+  CollaboratorRoleEnum,
+  ListVisibilityEnum,
+} from "@/drizzle/schema";
 import { Tagged } from "type-fest";
+
+export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
   title: Tagged<(typeof ListsTable.$inferSelect)["title"], "ListTitle">;
   creatorId: Tagged<(typeof ListsTable.$inferSelect)["creatorId"], "CreatorId">;
+  visibility: Tagged<ListVisibility, "ListVisibility">;
   createdAt: Tagged<(typeof ListsTable.$inferSelect)["createdAt"], "CreatedAt">;
   updatedAt: Tagged<(typeof ListsTable.$inferSelect)["updatedAt"], "UpdatedAt">;
 };
@@ -39,6 +47,7 @@ export const createTaggedList = (
       (typeof ListsTable.$inferSelect)["creatorId"],
       "CreatorId"
     >,
+    visibility: list.visibility as Tagged<ListVisibility, "ListVisibility">,
     createdAt: list.createdAt as Tagged<
       (typeof ListsTable.$inferSelect)["createdAt"],
       "CreatedAt"

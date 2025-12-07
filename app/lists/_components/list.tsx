@@ -1,8 +1,9 @@
-import { getList } from "@/app/lists/_actions/list";
+import { getList, updateListVisibility } from "@/app/lists/_actions/list";
 import TodoList from "@/app/lists/_components/todo-list";
 import ManageCollaborators from "@/app/lists/_components/manage-collaborators";
 import CollaboratorAvatars from "@/app/lists/_components/collaborator-avatars";
 import EditableListTitle from "@/app/lists/_components/editable-list-title";
+import { VisibilityToggle } from "@/app/lists/_components/visibility-toggle";
 import { auth } from "@/auth";
 import React from "react";
 import { getTodos } from "../_actions/todo";
@@ -23,8 +24,10 @@ import {
 import {
   isAuthorizedToEditCollaborators,
   isAuthorizedToEditList,
+  isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
 import type { UserRole } from "@/components/ui/role-badge";
+import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
   listId: number;
@@ -39,12 +42,17 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   const session = await auth();
   let editableList = false;
   let editableCollaborators = false;
+  let canChangeVisibility = false;
   let userRole: UserRole = "collaborator";
 
   const user = session?.user;
   if (user) {
     editableList = isAuthorizedToEditList(collaborators, user.id);
     editableCollaborators = isAuthorizedToEditCollaborators(
+      collaborators,
+      user.id
+    );
+    canChangeVisibility = isAuthorizedToChangeVisibility(
       collaborators,
       user.id
     );
@@ -59,21 +67,44 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     }
   }
 
+  const handleVisibilityToggle = async (visibility: typeof list.visibility) => {
+    "use server";
+    if (!user) return;
+    await updateListVisibility(list.id, visibility, user.id);
+  };
+
+  const VisibilityIcon =
+    list.visibility === "public" ? (
+      <Globe className="h-5 w-5 text-muted-foreground" />
+    ) : (
+      <Lock className="h-5 w-5 text-muted-foreground" />
+    );
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        {user ? (
-          <EditableListTitle
-            list={list}
-            editable={editableList}
-            userId={user.id}
-            userRole={userRole}
-          />
-        ) : (
-          <h2 className="text-2xl font-bold">{list.title}</h2>
-        )}
+        <div className="flex items-center gap-2">
+          {VisibilityIcon}
+          {user ? (
+            <EditableListTitle
+              list={list}
+              editable={editableList}
+              userId={user.id}
+              userRole={userRole}
+            />
+          ) : (
+            <h2 className="text-2xl font-bold">{list.title}</h2>
+          )}
+        </div>
         <div className="flex items-center space-x-4">
           <CollaboratorAvatars collaborators={collaborators} />
+          {canChangeVisibility && (
+            <VisibilityToggle
+              listId={list.id}
+              initialVisibility={list.visibility}
+              onToggle={handleVisibilityToggle}
+            />
+          )}
           {editableCollaborators && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

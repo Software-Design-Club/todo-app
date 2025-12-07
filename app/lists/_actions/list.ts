@@ -13,7 +13,10 @@ import { revalidatePath } from "next/cache";
 import { Tagged } from "type-fest";
 import type { List, ListWithRole, User } from "@/lib/types";
 import { getCollaborators } from "./collaborators";
-import { isAuthorizedToEditList } from "./permissions";
+import {
+  isAuthorizedToEditList,
+  isAuthorizedToChangeVisibility,
+} from "./permissions";
 
 export type UsersListTodos = {
   id: number;
@@ -64,6 +67,10 @@ const createTaggedList = (list: typeof ListsTable.$inferSelect): List => {
     creatorId: list.creatorId as Tagged<
       (typeof ListsTable.$inferSelect)["creatorId"],
       "CreatorId"
+    >,
+    visibility: list.visibility as Tagged<
+      (typeof ListsTable.$inferSelect)["visibility"],
+      "ListVisibility"
     >,
     createdAt: list.createdAt as Tagged<
       (typeof ListsTable.$inferSelect)["createdAt"],
@@ -278,4 +285,39 @@ export async function updateListTitle(
     // Throw user-friendly error for unexpected database errors
     throw new Error("Failed to update list title due to a database error");
   }
+}
+
+/**
+ * Updates list visibility (public/private)
+ * Only list owners can change visibility
+ */
+export async function updateListVisibility(
+  listId: List["id"],
+  visibility: List["visibility"],
+  userId: User["id"]
+): Promise<List> {
+  const collaborators = await getCollaborators(listId);
+
+  if (!isAuthorizedToChangeVisibility(collaborators, userId)) {
+    throw new Error("Only the list owner can change visibility");
+  }
+
+  const db = drizzle(sql);
+  const [updatedList] = await db
+    .update(ListsTable)
+    .set({
+      visibility,
+      updatedAt: new Date(),
+    })
+    .where(eq(ListsTable.id, listId))
+    .returning();
+
+  if (!updatedList) {
+    throw new Error("List not found");
+  }
+
+  revalidatePath("/lists");
+  revalidatePath(`/lists/${listId}`);
+
+  return createTaggedList(updatedList);
 }

@@ -1,0 +1,9 @@
+task_groups:
+  - name: Schema, Migration, and Type Updates
+    claude_code_subagent: implementer
+  - name: Server Actions and Permissions
+    claude_code_subagent: implementer
+  - name: UI Components and Integration
+    claude_code_subagent: implementer
+  - name: Manual Testing and Verification
+    claude_code_subagent: implementation-verifier

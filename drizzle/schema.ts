@@ -10,6 +10,11 @@ import {
 
 export const userStatusEnum = pgEnum("status", ["active", "deleted"]);
 
+export const ListVisibilityEnum = pgEnum("list_visibility", [
+  "private",
+  "public",
+]);
+
 export const UsersTable = pgTable(
   "todo_users",
   {
@@ -33,6 +38,7 @@ export const ListsTable = pgTable("lists", {
   creatorId: integer("creatorId")
     .references(() => UsersTable.id)
     .notNull(),
+  visibility: ListVisibilityEnum("visibility").default("private").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

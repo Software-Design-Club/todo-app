@@ -1,291 +1,500 @@
 # Specification: List Visibility Controls
 
-## Goal
-Enable list owners to control whether their lists are private (visible only to collaborators) or public (viewable by anyone with the link), with appropriate authorization updates and read-only access for non-collaborators viewing public lists.
+## Overview
+
+Enable list owners to control list visibility between private (default) and public. Public lists viewable by anyone with link, private lists accessible only to collaborators.
 
 ## User Stories
-- As a list owner, I want to toggle my list between private and public visibility so that I can control who can see my list
-- As a list owner, I want my lists to be private by default so that my content is secure unless I explicitly choose to share it
-- As a user with a link to a public list, I want to view the list and its todos so that I can see what's being tracked
-- As an unauthenticated user, I want to view public lists (read-only) so that I can see shared content without needing to sign in
-- As a collaborator, I want my permissions to remain unchanged regardless of list visibility so that my access isn't affected by the owner's visibility settings
 
-## Core Requirements
-- List owners can toggle list visibility between private and public states
-- New lists default to private visibility
-- Public lists are viewable by anyone with the link (authenticated or unauthenticated)
-- Private lists are accessible only to collaborators (existing behavior)
-- Unauthenticated users and authenticated non-collaborators have read-only access to public lists
-- Collaborators maintain full permissions regardless of visibility setting
-- Visual indicators show whether a list is private (lock icon) or public (globe icon)
-- Visibility toggle control is only accessible to list owners
-- Authorization logic in getList() and getTodos() must check visibility before enforcing collaborator requirements
+### US-1: List Owner Sets Visibility
+**As a** list owner
+**I want to** toggle my list between private and public
+**So that** I can control who can view my list content
 
-## Visual Design
+**Acceptance Criteria:**
+- Toggle switch appears next to "Manage Collaborators" button
+- Only list owners see the visibility toggle
+- Default state is private (lock icon)
+- Public state shows globe icon
+- Toggle persists immediately to database
 
-### Mockup Reference
-- `planning/visuals/Screenshot 2025-11-09 at 1.10.57 PM.png`: Shadcn Switch component example showing toggle pattern with Label and Switch components
+### US-2: Public List Viewing (Unauthenticated)
+**As an** unauthenticated user
+**I want to** view a public list via shared link
+**So that** I can see list content without signing in
 
-### Key UI Elements
-- Visibility toggle switch positioned next to the Manage Collaborators section
-- Lock icon (from lucide-react) displayed for private lists
-- Globe icon (from lucide-react) displayed for public lists
-- Toggle label indicates current state: "Private List" or "Public List"
-- Toggle is only rendered for list owners
-- Icon is visible to all users viewing the list
+**Acceptance Criteria:**
+- Can access public list URL without authentication
+- See full list title and all todos
+- Cannot add/edit/delete todos
+- Cannot manage collaborators
+- Cannot change visibility
 
-### Interaction States
-- Toggle enabled: Only for list owner
-- Toggle disabled: Not shown to collaborators or non-collaborators
-- View-only mode: All edit capabilities hidden for non-collaborators viewing public lists
-- Full edit mode: Collaborators maintain existing edit capabilities
+### US-3: Public List Viewing (Authenticated Non-Collaborator)
+**As an** authenticated user who is not a collaborator
+**I want to** view a public list via shared link
+**So that** I can see list content while logged in
 
-## Reusable Components
+**Acceptance Criteria:**
+- Can access public list URL
+- See full list title and all todos
+- Cannot add/edit/delete todos
+- Cannot manage collaborators
+- Cannot change visibility
 
-### Existing Code to Leverage
+### US-4: Private List Access Control
+**As a** list owner
+**I want** my private lists protected from unauthorized access
+**So that** only collaborators can view my list content
 
-**Database Schema Pattern:**
-- File: `/Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/drizzle/schema.ts`
-- Pattern: `export const CollaboratorRoleEnum = pgEnum("collaborator_role", ["owner", "collaborator"]);`
-- Usage: Follow this pattern for `ListVisibilityEnum`
+**Acceptance Criteria:**
+- Non-collaborators cannot access private list URLs
+- Unauthenticated users redirected to sign-in for private lists
+- Only collaborators see private list content
 
-**Permission Checking:**
-- File: `/Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/app/lists/_actions/permissions.ts`
-- Functions: `isAuthorizedToEditList()`, `isAuthorizedToEditCollaborators()`
-- Usage: Reference for implementing visibility-based authorization logic
+## Technical Design
 
-**List Component Structure:**
-- File: `/Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/app/lists/_components/list.tsx`
-- Lines: 64-96 show header layout with title, avatars, and Manage Collaborators dropdown
-- Usage: Add visibility toggle near line 77, next to the Manage Collaborators button
+### Database Schema
 
-**Icon Library:**
-- Package: `lucide-react` (already installed)
-- Existing usage: `XIcon`, `ChevronDown`, `ArrowUpDown`, `HomeIcon`, `LogOutIcon`
-- Usage: Import `Lock` and `Globe` icons for visibility indicators
-
-**List Actions:**
-- File: `/Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/app/lists/_actions/list.ts`
-- Function: `getList()` (lines 82-90) - needs authorization update
-- Function: `getLists()` (lines 103-156) - may need visibility awareness
-
-**Todo Actions:**
-- File: `/Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/app/lists/_actions/todo.ts`
-- Function: `getTodos()` (lines 56-63) - needs authorization update
-
-**Type Definitions:**
-- File: `/Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/lib/types.ts`
-- Types: `List`, `ListWithRole`, `User`, `ListUser`
-- Usage: Extend `List` type to include visibility property
-
-### New Components Required
-
-**Visibility Toggle Component:**
-- New client component for toggle UI
-- Cannot reuse: This is a new feature-specific component
-- Location: `/app/lists/_components/visibility-toggle.tsx`
-- Props: listId, initialVisibility, isOwner
-- Uses: shadcn Switch component (needs to be installed if not present)
-
-**Server Action for Visibility Update:**
-- New server action to update list visibility
-- Cannot reuse: This is new visibility-specific logic
-- Location: `/app/lists/_actions/visibility.ts`
-- Function: `updateListVisibility(listId, visibility, userId)`
-
-## Technical Approach
-
-### Database Schema Changes
-
-**Add Visibility Enum:**
-```
-export const ListVisibilityEnum = pgEnum("list_visibility", ["private", "public"]);
+**New Enum Type:**
+```sql
+CREATE TYPE list_visibility AS ENUM ('private', 'public');
 ```
 
-**Update ListsTable:**
-Add visibility column with default value "private":
-```
-visibility: ListVisibilityEnum("visibility").default("private").notNull()
-```
-
-**Migration Required:**
-- Create new migration file to add enum type
-- Alter lists table to add visibility column
-- Set default value to "private" for all existing lists
-
-### Authorization Updates
-
-**Update getList() function:**
-- Current state: No authorization (lines 82-90 in list.ts)
-- New logic:
-  1. Fetch the list from database
-  2. Check visibility property
-  3. If public: return list immediately
-  4. If private: verify user is authenticated and is a collaborator
-  5. If not authorized: throw authorization error or return 403
-
-**Update getTodos() function:**
-- Current state: No authorization (lines 56-63 in todo.ts)
-- New logic:
-  1. Fetch the list to check visibility
-  2. If public: return todos immediately
-  3. If private: verify user is authenticated and is a collaborator
-  4. If not authorized: throw authorization error or return empty array
-
-**Considerations:**
-- Session/user information needs to be passed to these functions
-- Functions should handle unauthenticated users gracefully for public lists
-- Private list access for unauthenticated users should result in appropriate error/redirect
-
-### Type System Updates
-
-**Extend List type:**
+**Schema Addition (`drizzle/schema.ts`):**
 ```typescript
+export const ListVisibilityEnum = pgEnum("list_visibility", ["private", "public"]);
+
+export const ListsTable = pgTable("lists", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  creatorId: integer("creatorId")
+    .references(() => UsersTable.id)
+    .notNull(),
+  visibility: ListVisibilityEnum("visibility").default("private").notNull(), // NEW
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+```
+
+**Migration File:**
+```sql
+CREATE TYPE "list_visibility" AS ENUM('private', 'public');
+ALTER TABLE "lists" ADD COLUMN "visibility" "list_visibility" DEFAULT 'private' NOT NULL;
+```
+
+### Type Definitions
+
+**Update `lib/types.ts`:**
+```typescript
+import { ListVisibilityEnum } from "@/drizzle/schema";
+
+export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
+
 export type List = {
-  id: Tagged<...>;
-  title: Tagged<...>;
-  creatorId: Tagged<...>;
-  createdAt: Tagged<...>;
-  updatedAt: Tagged<...>;
-  visibility: Tagged<(typeof ListVisibilityEnum.enumValues)[number], 'visibility'>;
+  id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
+  title: Tagged<(typeof ListsTable.$inferSelect)["title"], "ListTitle">;
+  creatorId: Tagged<(typeof ListsTable.$inferSelect)["creatorId"], "CreatorId">;
+  visibility: Tagged<ListVisibility, "ListVisibility">; // NEW
+  createdAt: Tagged<(typeof ListsTable.$inferSelect)["createdAt"], "CreatedAt">;
+  updatedAt: Tagged<(typeof ListsTable.$inferSelect)["updatedAt"], "UpdatedAt">;
 };
 ```
 
-**Update createTaggedList function:**
-Include visibility property in the returned object
+### Server Actions
 
-### UI Component Implementation
+**Update `getList()` in `app/lists/_actions/list.ts`:**
+```typescript
+export async function getList(listId: number): Promise<List | null> {
+  const db = drizzle(sql);
+  const [list] = await db
+    .select()
+    .from(ListsTable)
+    .where(eq(ListsTable.id, listId));
 
-**Visibility Toggle Component:**
-- Renders Switch component from shadcn/ui
-- Shows current state with icon (Lock or Globe) and label
-- Calls server action on toggle
-- Optimistic UI update for better UX
-- Only rendered when user is list owner
-- Uses loading state during mutation
+  if (!list) return null;
 
-**List Component Updates:**
-- Import and render visibility icon based on list.visibility
-- Display icon near the list title for all users
-- Conditionally render VisibilityToggle component for owners only
-- Pass visibility prop from getList() result
+  // Public lists: return without auth check
+  if (list.visibility === "public") {
+    return createTaggedList(list);
+  }
 
-**Read-only Mode Enforcement:**
-- Hide "Add Todo" button for non-collaborators viewing public lists
-- Hide edit/delete buttons on todos for non-collaborators
-- Hide todo status change buttons for non-collaborators
-- Maintain display of Manage Collaborators for owners regardless of visibility
+  // Private lists: require collaborator access
+  const session = await auth();
+  if (!session?.user) {
+    return null; // Or throw unauthorized
+  }
 
-### Server Action Implementation
+  const collaborators = await getCollaborators(list.id);
+  const isCollaborator = collaborators.some(
+    (c) => c.User.id === session.user.id
+  );
 
-**createVisibilityAction():**
-- Location: `/app/lists/_actions/visibility.ts`
-- Validation: Check user is list owner before allowing update
-- Database: Update visibility field in ListsTable
-- Revalidation: Call revalidatePath for affected routes
-- Return: Updated list object with new visibility
+  if (!isCollaborator) {
+    return null; // Or throw unauthorized
+  }
+
+  return createTaggedList(list);
+}
+```
+
+**Update `getTodos()` in `app/lists/_actions/todo.ts`:**
+```typescript
+export async function getTodos(listId: List["id"]) {
+  const db = drizzle(sql);
+
+  // Get list to check visibility
+  const [list] = await db
+    .select()
+    .from(ListsTable)
+    .where(eq(ListsTable.id, listId));
+
+  if (!list) return [];
+
+  // Private lists: verify authorization
+  if (list.visibility === "private") {
+    const session = await auth();
+    if (!session?.user) {
+      return []; // Or throw unauthorized
+    }
+
+    const collaborators = await getCollaborators(listId);
+    const isCollaborator = collaborators.some(
+      (c) => c.User.id === session.user.id
+    );
+
+    if (!isCollaborator) {
+      return []; // Or throw unauthorized
+    }
+  }
+
+  // Fetch and return todos
+  const todos = await db
+    .select()
+    .from(TodosTable)
+    .where(
+      and(eq(TodosTable.listId, listId), not(eq(TodosTable.status, "deleted")))
+    );
+
+  return todos;
+}
+```
+
+**New Action - `updateListVisibility()`:**
+```typescript
+export async function updateListVisibility(
+  listId: List["id"],
+  visibility: ListVisibility,
+  userId: User["id"]
+): Promise<List> {
+  // Validate user is list owner
+  const collaborators = await getCollaborators(listId);
+
+  if (!isAuthorizedToChangeVisibility(collaborators, userId)) {
+    throw new Error("Only list owners can change visibility");
+  }
+
+  const db = drizzle(sql);
+  const [updatedList] = await db
+    .update(ListsTable)
+    .set({
+      visibility,
+      updatedAt: new Date(),
+    })
+    .where(eq(ListsTable.id, listId))
+    .returning();
+
+  revalidatePath("/lists");
+  revalidatePath(`/lists/${listId}`);
+
+  return createTaggedList(updatedList);
+}
+```
+
+### Permissions Update
+
+**Add to `app/lists/_actions/permissions.ts`:**
+```typescript
+export function isAuthorizedToChangeVisibility(
+  collaborators: ListUser[],
+  userId: User["id"]
+): boolean {
+  return collaborators.some(
+    (collaborator) =>
+      collaborator.User.id === userId && collaborator.Role === "owner"
+  );
+}
+
+export function canViewList(
+  list: List,
+  collaborators: ListUser[],
+  userId: User["id"] | null
+): boolean {
+  // Public lists viewable by anyone
+  if (list.visibility === "public") {
+    return true;
+  }
+
+  // Private lists require collaborator access
+  if (!userId) return false;
+  return collaborators.some((c) => c.User.id === userId);
+}
+
+export function canEditList(
+  list: List,
+  collaborators: ListUser[],
+  userId: User["id"] | null
+): boolean {
+  // Must be authenticated
+  if (!userId) return false;
+
+  // Must be a collaborator (regardless of visibility)
+  return isAuthorizedToEditList(collaborators, userId);
+}
+```
+
+### UI Components
+
+**New Component: `visibility-toggle.tsx`**
+
+Location: `app/lists/_components/visibility-toggle.tsx`
+
+```typescript
+"use client";
+
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Lock, Globe } from "lucide-react";
+import { useState } from "react";
+import type { List, ListVisibility } from "@/lib/types";
+
+interface VisibilityToggleProps {
+  listId: List["id"];
+  initialVisibility: ListVisibility;
+  onToggle: (visibility: ListVisibility) => Promise<void>;
+}
+
+export function VisibilityToggle({
+  listId,
+  initialVisibility,
+  onToggle,
+}: VisibilityToggleProps) {
+  const [visibility, setVisibility] = useState(initialVisibility);
+  const [isPending, setIsPending] = useState(false);
+
+  const isPublic = visibility === "public";
+
+  const handleToggle = async (checked: boolean) => {
+    const newVisibility = checked ? "public" : "private";
+    setIsPending(true);
+    try {
+      await onToggle(newVisibility);
+      setVisibility(newVisibility);
+    } catch (error) {
+      console.error("Failed to update visibility:", error);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Switch
+        id={`visibility-${listId}`}
+        checked={isPublic}
+        onCheckedChange={handleToggle}
+        disabled={isPending}
+      />
+      <Label
+        htmlFor={`visibility-${listId}`}
+        className="flex items-center gap-1 text-sm"
+      >
+        {isPublic ? (
+          <>
+            <Globe className="h-4 w-4" />
+            Public
+          </>
+        ) : (
+          <>
+            <Lock className="h-4 w-4" />
+            Private
+          </>
+        )}
+      </Label>
+    </div>
+  );
+}
+```
+
+**Install Switch Component:**
+```bash
+npx shadcn@latest add switch
+```
+
+### List Component Updates
+
+**Update `app/lists/_components/list.tsx`:**
+
+Add visibility toggle next to Manage Collaborators button (only for owners):
+
+```typescript
+// Add imports
+import { VisibilityToggle } from "./visibility-toggle";
+import { updateListVisibility } from "@/app/lists/_actions/list";
+import { isAuthorizedToChangeVisibility } from "@/app/lists/_actions/permissions";
+
+// In component body
+const canChangeVisibility = user
+  ? isAuthorizedToChangeVisibility(collaborators, user.id)
+  : false;
+
+// In render - add alongside Manage Collaborators
+{canChangeVisibility && (
+  <VisibilityToggle
+    listId={list.id}
+    initialVisibility={list.visibility}
+    onToggle={async (visibility) => {
+      "use server";
+      await updateListVisibility(list.id, visibility, user.id);
+    }}
+  />
+)}
+```
+
+**Conditional Rendering for Read-Only Mode:**
+
+When user is not a collaborator viewing a public list:
+- Hide todo input field
+- Hide todo status toggle buttons
+- Hide delete buttons
+- Hide "Manage Collaborators" button
+- Hide visibility toggle
+
+### Visual Indicators
+
+**In List Header:**
+- Show lock icon (🔒) next to title for private lists
+- Show globe icon (🌐) next to title for public lists
+- Icon visible to all users viewing the list
+
+```typescript
+// In EditableListTitle or List component
+<span className="ml-2">
+  {list.visibility === "public" ? (
+    <Globe className="h-4 w-4 text-gray-500" />
+  ) : (
+    <Lock className="h-4 w-4 text-gray-500" />
+  )}
+</span>
+```
+
+### Page-Level Authorization
+
+**Update `app/lists/[listId]/page.tsx`:**
+
+```typescript
+import { auth } from "@/auth";
+import { getList } from "../_actions/list";
+import { getCollaborators } from "../_actions/collaborators";
+import { notFound, redirect } from "next/navigation";
+
+const ListPage = async ({ params }: { params: { listId: string } }) => {
+  const { listId } = params;
+  const list = await getList(Number(listId));
+
+  if (!list) {
+    notFound();
+  }
+
+  // For private lists, verify access
+  if (list.visibility === "private") {
+    const session = await auth();
+    if (!session?.user) {
+      redirect("/sign-in");
+    }
+
+    const collaborators = await getCollaborators(list.id);
+    const isCollaborator = collaborators.some(
+      (c) => c.User.id === session.user.id
+    );
+
+    if (!isCollaborator) {
+      notFound(); // Or show "access denied" page
+    }
+  }
+
+  return <div>{listId && <List listId={Number(listId)} />}</div>;
+};
+```
+
+## Component Hierarchy
+
+```
+ListPage
+├── List
+│   ├── EditableListTitle (+ visibility icon)
+│   ├── CollaboratorAvatars
+│   ├── VisibilityToggle (owner only)
+│   ├── ManageCollaborators (owner only)
+│   └── TodoList
+│       ├── TodoItem (read-only for non-collaborators)
+│       └── AddTodo (hidden for non-collaborators)
+```
+
+## Data Flow
+
+```
+1. User visits /lists/[listId]
+2. Page checks list visibility
+3. If private:
+   - Check auth → redirect to sign-in if needed
+   - Check collaborator status → 404 if not collaborator
+4. If public:
+   - Allow access regardless of auth
+5. Determine edit permissions:
+   - Non-collaborators: read-only
+   - Collaborators: full edit
+   - Owners: full edit + visibility control
+6. Render UI with appropriate permissions
+```
+
+## Security Considerations
+
+1. **Server-side authorization**: All visibility checks happen server-side
+2. **API protection**: getTodos() and getList() enforce visibility rules
+3. **No client-side only protection**: UI hiding is supplementary, not primary security
+4. **Mutation protection**: All write operations check collaborator status regardless of visibility
+
+## Manual Testing Checklist
+
+1. Owner can toggle visibility private → public
+2. Owner can toggle visibility public → private
+3. Toggle updates icon (lock ↔ globe) immediately
+4. Unauthenticated user can view public list (read-only)
+5. Unauthenticated user cannot view private list (redirect to sign-in)
+6. Authenticated non-collaborator can view public list (read-only)
+7. Authenticated non-collaborator cannot view private list (404)
+8. All edit controls hidden for non-collaborators on public lists
+9. Collaborator permissions unchanged by visibility setting
+10. Non-owner collaborators cannot see visibility toggle
+
+## Migration Plan
+
+1. Add database migration for visibility column
+2. Run migration (all existing lists default to "private")
+3. Deploy updated server actions with authorization logic
+4. Deploy UI components
+5. Monitor for any access issues
+
+## Dependencies
+
+- **shadcn/ui Switch component** - needs installation
+- **lucide-react** - Lock and Globe icons (already in project)
 
 ## Out of Scope
 
-- Public list discovery features (search, browse, directory)
-- Analytics or tracking for public list views
-- Additional visibility levels (e.g., "unlisted", "password-protected")
-- Sharing modal or share link generation UI
-- Changing collaborator permissions based on visibility
-- Notifications when visibility changes
-- Audit log for visibility changes
-- Rate limiting for public list access
-- SEO optimization for public lists
-- Social media preview cards for public lists
-
-## Success Criteria
-
-**Functional Success:**
-- List owners can successfully toggle visibility via UI
-- Private lists are inaccessible to non-collaborators (return 403 or redirect)
-- Public lists are viewable by unauthenticated users with read-only access
-- Collaborator permissions are unaffected by visibility changes
-- New lists are created with private visibility by default
-
-**Security Success:**
-- Private lists cannot be accessed without proper authorization
-- Authorization checks happen server-side (not just UI hiding)
-- getTodos() and getList() properly enforce visibility rules
-- Non-collaborators cannot perform any mutations on public lists
-
-**UX Success:**
-- Visibility status is clearly indicated with appropriate icon
-- Toggle control is intuitive and provides immediate feedback
-- Read-only state is clear to users (edit controls are hidden, not just disabled)
-- Page loads successfully for unauthenticated users viewing public lists
-
-**Performance Success:**
-- No additional database queries for lists that don't need authorization
-- Visibility check is efficient (single field lookup)
-- UI toggle provides optimistic updates to feel responsive
-
-## Edge Cases and Error Handling
-
-**Unauthenticated Access:**
-- Unauthenticated user views public list: Allow full read access, hide all edit controls
-- Unauthenticated user attempts to access private list: Redirect to sign-in or show 403
-- Unauthenticated user attempts mutation on public list: Block at server action level, return error
-
-**Authenticated Non-Collaborator Access:**
-- Authenticated user views public list: Allow full read access, hide all edit controls
-- Authenticated user attempts to access private list: Show 403 or "Access Denied" message
-- Authenticated user attempts mutation on public list: Block at server action level, return error
-
-**Owner Permissions:**
-- Owner cannot accidentally revoke their own access via visibility change
-- Owner maintains full edit permissions on public lists
-- Owner can always toggle visibility back to private
-
-**Collaborator Permissions:**
-- Existing collaborators maintain their current role permissions regardless of visibility
-- New collaborators can be added to public lists same as private lists
-- Collaborators can be removed from public lists same as private lists
-
-**Race Conditions:**
-- Simultaneous visibility toggles: Last write wins (acceptable for MVP)
-- Visibility change during active editing: Existing sessions continue with current permissions
-- Collaborator removal during visibility change: Collaborator operations take precedence
-
-**Database Errors:**
-- Failed visibility update: Show error message, revert optimistic update
-- Database connection issues: Graceful error handling with user-friendly message
-
-**Invalid States:**
-- Missing visibility value: Default to "private" for safety
-- Invalid visibility enum value: Reject and log error, maintain current state
-
-## Testing Requirements
-
-**Manual Testing**
-
-## Implementation Considerations
-
-**Migration Strategy:**
-- Add visibility enum to schema
-- Create and run database migration
-- All existing lists get "private" default value
-- No user action required for existing lists
-
-**Deployment Strategy:**
-- Deploy schema changes first
-- Deploy backend authorization changes
-- Deploy UI changes last
-- No downtime expected
-
-**Rollback Plan:**
-- Can remove visibility toggle from UI without breaking functionality
-- Cannot easily roll back database schema without data loss
-- If issues arise, can force all lists to "private" via database update
-
-**Performance Considerations:**
-- Add database index on visibility column if needed for filtering
-
-**Security Considerations:**
-- All authorization must happen server-side
-- Client-side hiding of controls is for UX only, not security
-- Server actions must validate user permissions independently
+- Public list discovery/search
+- Additional visibility levels (e.g., "unlisted")
+- Public list analytics
+- Sharing UI beyond link access
+- Collaborator permission changes based on visibility
