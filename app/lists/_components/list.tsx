@@ -85,7 +85,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           {VisibilityIcon}
-          {user ? (
+          {editableList && user ? (
             <EditableListTitle
               list={list}
               editable={editableList}
