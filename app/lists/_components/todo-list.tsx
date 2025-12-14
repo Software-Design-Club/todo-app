@@ -292,7 +292,7 @@ const AddTodoForm = ({ listId }: { listId: List["id"] }) => {
         value={todo.title}
         onChange={(e) => setTodo({ ...todo, title: e.target.value })}
         placeholder="Add a new todo..."
-        className="flex-1 px-2 py-1 border rounded-md"
+        className="flex-1 px-2 py-1 border border-input bg-background text-foreground rounded-md"
         required
       />
 

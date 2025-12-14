@@ -296,6 +296,7 @@ export async function updateListVisibility(
   visibility: List["visibility"],
   userId: User["id"]
 ): Promise<List> {
+  console.log("inside updateVisibility");
   const collaborators = await getCollaborators(listId);
 
   if (!isAuthorizedToChangeVisibility(collaborators, userId)) {

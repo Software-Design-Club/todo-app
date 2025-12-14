@@ -67,12 +67,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     }
   }
 
-  const handleVisibilityToggle = async (visibility: typeof list.visibility) => {
-    "use server";
-    if (!user) return;
-    await updateListVisibility(list.id, visibility, user.id);
-  };
-
   const VisibilityIcon =
     list.visibility === "public" ? (
       <Globe className="h-5 w-5 text-muted-foreground" />
@@ -98,11 +92,12 @@ const List: React.FC<ListProps> = async ({ listId }) => {
         </div>
         <div className="flex items-center space-x-4">
           <CollaboratorAvatars collaborators={collaborators} />
-          {canChangeVisibility && (
+          {canChangeVisibility && user && (
             <VisibilityToggle
               listId={list.id}
+              userId={user.id}
               initialVisibility={list.visibility}
-              onToggle={handleVisibilityToggle}
+              onToggle={updateListVisibility}
             />
           )}
           {editableCollaborators && (
