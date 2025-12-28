@@ -4,6 +4,7 @@ import ManageCollaborators from "@/app/lists/_components/manage-collaborators";
 import CollaboratorAvatars from "@/app/lists/_components/collaborator-avatars";
 import EditableListTitle from "@/app/lists/_components/editable-list-title";
 import { VisibilityToggle } from "@/app/lists/_components/visibility-toggle";
+import { ShareLinkButton } from "@/app/lists/_components/share-link-button";
 import { auth } from "@/auth";
 import React from "react";
 import { getTodos } from "../_actions/todo";
@@ -92,6 +93,9 @@ const List: React.FC<ListProps> = async ({ listId }) => {
         </div>
         <div className="flex items-center space-x-4">
           <CollaboratorAvatars collaborators={collaborators} />
+          {list.visibility === "public" && (
+            <ShareLinkButton listId={list.id} />
+          )}
           {canChangeVisibility && user && (
             <VisibilityToggle
               listId={list.id}
