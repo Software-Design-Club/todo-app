@@ -28,11 +28,13 @@ export function VisibilityToggle({
   const isPublic = visibility === "public";
 
   const handleToggle = async (checked: boolean) => {
-    const newVisibility = checked ? "public" : "private";
+    const newVisibility = (
+      checked ? "public" : "private"
+    ) as List["visibility"];
     setIsPending(true);
     try {
-      await onToggle(listId, newVisibility as List["visibility"], userId);
-      setVisibility(newVisibility as List["visibility"]);
+      await onToggle(listId, newVisibility, userId);
+      setVisibility(newVisibility);
     } catch (error) {
       console.error("Failed to update visibility:", error);
     } finally {

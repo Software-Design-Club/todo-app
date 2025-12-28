@@ -17,9 +17,9 @@ The application currently has:
 
 1. [x] List Title Editing for Collaborators - Enable collaborators to edit the title of lists they have access to, not just owners. Update authorization checks and UI components to allow collaborators to modify list titles. `XS`
 
-2. [ ] List Visibility Controls - Add public/private visibility setting to lists. Private lists are only accessible to the creator and invited collaborators. Public lists can be viewed by anyone with the link. Include database schema updates, new UI controls on list settings, and authorization middleware updates. `S`
+2. [x] List Visibility Controls - Add public/private visibility setting to lists. Private lists are only accessible to the creator and invited collaborators. Public lists can be viewed by anyone with the link. Include database schema updates, new UI controls on list settings, and authorization middleware updates. `S`
 
-3. [ ] Public List Link Sharing - Generate shareable links for public lists that allow anyone to view (but not edit) the list without being added as a collaborator. Implement read-only view mode and link generation UI. `S`
+3. [ ] Public List Link Sharing - Generate shareable links for public lists that allow anyone to view (but not edit) the list without being added as a collaborator. Implement link generation UI. `S`
 
 4. [ ] List Archival and Deletion - Allow list owners to archive lists (hide from main view but keep data) or permanently delete lists and all associated tasks. Add confirmation dialogs and update list retrieval queries to exclude archived lists by default. `S`
 
