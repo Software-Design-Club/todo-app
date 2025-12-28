@@ -6,7 +6,7 @@ branch: main
 repository: todo-app
 topic: "Public List Link Sharing Implementation"
 tags: [research, codebase, visibility, sharing, link-generation, UI]
-status: complete
+status: pending
 last_updated: 2025-12-21
 last_updated_by: Claude
 ---
