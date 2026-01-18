@@ -72,6 +72,10 @@ const createTaggedList = (list: typeof ListsTable.$inferSelect): List => {
       (typeof ListsTable.$inferSelect)["visibility"],
       "ListVisibility"
     >,
+    state: list.state as Tagged<
+      (typeof ListsTable.$inferSelect)["state"],
+      "ListState"
+    >,
     createdAt: list.createdAt as Tagged<
       (typeof ListsTable.$inferSelect)["createdAt"],
       "CreatedAt"
@@ -100,15 +104,44 @@ export async function getList(listId: number): Promise<List> {
  * Get all lists for a user with their role information
  *
  * @param userId - The ID of the user to get lists for
+ * @param includeArchived - Whether to include archived lists (only owners see archived)
  * @returns Array of lists with role information
  *
  * Role determination:
  * - "owner" for lists where user is the creator
  * - "collaborator" for lists where user is added as a collaborator
  * - Owner role takes precedence if user is both creator and collaborator
+ *
+ * Archived list visibility:
+ * - Active lists are visible to both owners and collaborators
+ * - Archived lists are only visible to owners
  */
-export async function getLists(userId: User["id"]): Promise<ListWithRole[]> {
+export async function getLists(
+  userId: User["id"],
+  includeArchived: boolean = false
+): Promise<ListWithRole[]> {
   const db = drizzle(sql);
+
+  // Build base query conditions
+  const userCondition = or(
+    eq(ListsTable.creatorId, userId),
+    eq(ListCollaboratorsTable.userId, userId)
+  );
+
+  // For archived lists, only show to owners
+  // For active lists, show to both owners and collaborators
+  let stateCondition;
+  if (includeArchived) {
+    // Only show archived lists owned by user
+    stateCondition = and(
+      eq(ListsTable.state, "archived"),
+      eq(ListsTable.creatorId, userId)
+    );
+  } else {
+    // Show only active lists
+    stateCondition = eq(ListsTable.state, "active");
+  }
+
   const results = await db
     .select({
       lists: ListsTable,
@@ -119,12 +152,7 @@ export async function getLists(userId: User["id"]): Promise<ListWithRole[]> {
       ListCollaboratorsTable,
       eq(ListsTable.id, ListCollaboratorsTable.listId)
     )
-    .where(
-      or(
-        eq(ListsTable.creatorId, userId),
-        eq(ListCollaboratorsTable.userId, userId)
-      )
-    );
+    .where(and(userCondition, stateCondition));
 
   // Group results by list ID to handle duplicate rows from join
   const listMap = new Map<number, ListWithRole>();
@@ -321,4 +349,103 @@ export async function updateListVisibility(
   revalidatePath(`/lists/${listId}`);
 
   return createTaggedList(updatedList);
+}
+
+/**
+ * Archives a list (owner only)
+ */
+export async function archiveList(
+  listId: List["id"],
+  userId: User["id"]
+): Promise<List> {
+  const list = await getList(listId);
+
+  if (Number(list.creatorId) !== Number(userId)) {
+    throw new Error("Only the list owner can archive this list");
+  }
+
+  if (list.state === "archived") {
+    throw new Error("List is already archived");
+  }
+
+  const db = drizzle(sql);
+  const [updatedList] = await db
+    .update(ListsTable)
+    .set({
+      state: "archived",
+      updatedAt: new Date(),
+    })
+    .where(eq(ListsTable.id, listId))
+    .returning();
+
+  if (!updatedList) {
+    throw new Error("List not found");
+  }
+
+  revalidatePath("/lists");
+
+  return createTaggedList(updatedList);
+}
+
+/**
+ * Unarchives a list (owner only)
+ */
+export async function unarchiveList(
+  listId: List["id"],
+  userId: User["id"]
+): Promise<List> {
+  const list = await getList(listId);
+
+  if (Number(list.creatorId) !== Number(userId)) {
+    throw new Error("Only the list owner can unarchive this list");
+  }
+
+  if (list.state === "active") {
+    throw new Error("List is not archived");
+  }
+
+  const db = drizzle(sql);
+  const [updatedList] = await db
+    .update(ListsTable)
+    .set({
+      state: "active",
+      updatedAt: new Date(),
+    })
+    .where(eq(ListsTable.id, listId))
+    .returning();
+
+  if (!updatedList) {
+    throw new Error("List not found");
+  }
+
+  revalidatePath("/lists");
+
+  return createTaggedList(updatedList);
+}
+
+/**
+ * Permanently deletes a list and all associated data (owner only)
+ * This action is irreversible - todos and collaborator records are deleted via cascade
+ */
+export async function deleteList(
+  listId: List["id"],
+  userId: User["id"]
+): Promise<void> {
+  const list = await getList(listId);
+
+  if (Number(list.creatorId) !== Number(userId)) {
+    throw new Error("Only the list owner can delete this list");
+  }
+
+  const db = drizzle(sql);
+  const result = await db
+    .delete(ListsTable)
+    .where(eq(ListsTable.id, listId))
+    .returning();
+
+  if (result.length === 0) {
+    throw new Error("List not found");
+  }
+
+  revalidatePath("/lists");
 }

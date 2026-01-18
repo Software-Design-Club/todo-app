@@ -11,7 +11,11 @@ interface ListsProps {
 }
 
 const UserLists: React.FC<ListsProps> = async ({ currentPath, userId }) => {
-  const lists = await getLists(userId);
+  // Fetch active and archived lists in parallel
+  const [lists, archivedLists] = await Promise.all([
+    getLists(userId, false),
+    getLists(userId, true),
+  ]);
 
   return (
     <div>
@@ -26,7 +30,7 @@ const UserLists: React.FC<ListsProps> = async ({ currentPath, userId }) => {
         <CreateListForm creatorId={userId} />
       </div>
 
-      <UserListsTable lists={lists} />
+      <UserListsTable lists={lists} archivedLists={archivedLists} userId={userId} />
     </div>
   );
 };

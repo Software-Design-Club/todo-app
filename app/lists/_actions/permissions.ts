@@ -52,6 +52,12 @@ export function canViewList(
   collaborators: ListUser[],
   userId: User["id"] | null
 ): boolean {
+  // Archived lists are only accessible to owners
+  if (list.state === "archived") {
+    if (!userId) return false;
+    return Number(list.creatorId) === Number(userId);
+  }
+
   // Public lists viewable by anyone
   if (list.visibility === "public") {
     return true;

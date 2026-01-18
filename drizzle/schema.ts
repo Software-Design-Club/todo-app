@@ -15,6 +15,8 @@ export const ListVisibilityEnum = pgEnum("list_visibility", [
   "public",
 ]);
 
+export const ListStateEnum = pgEnum("list_state", ["active", "archived"]);
+
 export const UsersTable = pgTable(
   "todo_users",
   {
@@ -39,6 +41,7 @@ export const ListsTable = pgTable("lists", {
     .references(() => UsersTable.id)
     .notNull(),
   visibility: ListVisibilityEnum("visibility").default("private").notNull(),
+  state: ListStateEnum("state").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -53,7 +56,7 @@ export const ListCollaboratorsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     listId: integer("listId")
-      .references(() => ListsTable.id)
+      .references(() => ListsTable.id, { onDelete: "cascade" })
       .notNull(),
     userId: integer("userId")
       .references(() => UsersTable.id)
@@ -83,7 +86,7 @@ export const TodosTable = pgTable("todos", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   listId: integer("listId")
-    .references(() => ListsTable.id)
+    .references(() => ListsTable.id, { onDelete: "cascade" })
     .notNull(),
   status: todoStatusEnum("status").default("not started").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
