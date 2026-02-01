@@ -21,7 +21,7 @@ The application currently has:
 
 3. [x] Public List Link Sharing - Generate shareable links for public lists that allow anyone to view (but not edit) the list without being added as a collaborator. Implement link generation UI. `S`
 
-4. [ ] List Archival and Deletion - Allow list owners to archive lists (hide from main view but keep data) or permanently delete lists and all associated tasks. Add confirmation dialogs and update list retrieval queries to exclude archived lists by default. `S`
+4. [x] List Archival and Deletion - Allow list owners to archive lists (hide from main view but keep data) or permanently delete lists and all associated tasks. Add confirmation dialogs and update list retrieval queries to exclude archived lists by default. `S`
 
 5. [ ] Email Invitation System - Send email invitations when users are added as collaborators to a list, including a link to sign up/sign in and access the shared list. Integrate with Resend email service (already in dependencies), create email templates, and handle invitation token generation and validation. `M`
 
