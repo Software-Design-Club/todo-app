@@ -25,7 +25,7 @@ Todos:
 - [x] Make sure that owner cannot be removed as a collaborator on a list
 - [x] User can see lists they are a collaborator on their lists view
 - [x] User can edit the title of a list they are a collaborator on
-- [ ] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
+- [x] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
 - [ ] User can delete/archive a list
 - [ ] Creator/Collaborator can share a link to a list if its public
 - [ ] User can invite someone who is not signed up to the app to a list - Send email to invitee
