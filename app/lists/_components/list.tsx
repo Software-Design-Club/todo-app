@@ -24,7 +24,7 @@ import {
 } from "@/app/lists/_actions/collaborators";
 import {
   isAuthorizedToEditCollaborators,
-  isAuthorizedToEditList,
+  userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
 import type { UserRole } from "@/components/ui/role-badge";
@@ -48,7 +48,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
 
   const user = session?.user;
   if (user) {
-    editableList = isAuthorizedToEditList(collaborators, user.id);
+    editableList = userCanEditList(collaborators, user.id);
     editableCollaborators = isAuthorizedToEditCollaborators(
       collaborators,
       user.id

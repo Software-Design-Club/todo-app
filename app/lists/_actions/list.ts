@@ -10,11 +10,10 @@ import {
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
-import { Tagged } from "type-fest";
-import type { List, ListWithRole, User } from "@/lib/types";
+import { createTaggedList, type List, type ListWithRole, type User } from "@/lib/types";
 import { getCollaborators } from "./collaborators";
 import {
-  isAuthorizedToEditList,
+  userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "./permissions";
 
@@ -56,36 +55,6 @@ export async function getListWithTodos(
     todos: todos,
   };
 }
-
-const createTaggedList = (list: typeof ListsTable.$inferSelect): List => {
-  return {
-    id: list.id as Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">,
-    title: list.title as Tagged<
-      (typeof ListsTable.$inferSelect)["title"],
-      "ListTitle"
-    >,
-    creatorId: list.creatorId as Tagged<
-      (typeof ListsTable.$inferSelect)["creatorId"],
-      "CreatorId"
-    >,
-    visibility: list.visibility as Tagged<
-      (typeof ListsTable.$inferSelect)["visibility"],
-      "ListVisibility"
-    >,
-    state: list.state as Tagged<
-      (typeof ListsTable.$inferSelect)["state"],
-      "ListState"
-    >,
-    createdAt: list.createdAt as Tagged<
-      (typeof ListsTable.$inferSelect)["createdAt"],
-      "CreatedAt"
-    >,
-    updatedAt: list.updatedAt as Tagged<
-      (typeof ListsTable.$inferSelect)["updatedAt"],
-      "UpdatedAt"
-    >,
-  };
-};
 
 /**
  * Get record for one list given listId
@@ -266,7 +235,7 @@ export async function updateListTitle(
     // Check authorization
     const collaborators = await getCollaborators(listId);
 
-    if (!isAuthorizedToEditList(collaborators, userId)) {
+    if (!userCanEditList(collaborators, userId)) {
       throw new Error("You do not have permission to edit this list");
     }
 

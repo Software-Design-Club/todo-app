@@ -7,10 +7,16 @@ const ALLOWED_TO_EDIT_COLLABORATORS_ROLES = [
 const ALLOWED_TO_EDIT_LIST_ROLES = [...CollaboratorRoleEnum.enumValues];
 type CollaboratorRole = (typeof CollaboratorRoleEnum.enumValues)[number];
 
-export function isAuthorizedToEditList(
+export function userCanEditList(
   collaborators: ListUser[],
-  userId: User["id"]
-) {
+  userId: User["id"] | null
+): boolean {
+  // A user must be authenticated to edit a list
+  if (!userId) {
+    return false;
+  }
+
+  // An authenticated user must also be a collaborator with an allowed role
   return collaborators.some(
     (collaborator) =>
       collaborator.User.id === userId &&
@@ -68,13 +74,3 @@ export function canViewList(
   return collaborators.some((c) => c.User.id === userId);
 }
 
-export function canEditList(
-  collaborators: ListUser[],
-  userId: User["id"] | null
-): boolean {
-  // Must be authenticated
-  if (!userId) return false;
-
-  // Must be a collaborator (regardless of visibility)
-  return isAuthorizedToEditList(collaborators, userId);
-}
