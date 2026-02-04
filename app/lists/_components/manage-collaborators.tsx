@@ -5,21 +5,20 @@ import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import type { User, List, ListUser } from "@/lib/types";
 import { CollaboratorListItem } from "./collaborator-list-item";
+import {
+  searchUsers,
+  addCollaborator,
+  removeCollaborator,
+} from "@/app/lists/_actions/collaborators";
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
   initialCollaborators: ListUser[];
-  searchUsers: (searchTerm: string) => Promise<User[]>;
-  addCollaborator: (user: User, listId: List["id"]) => Promise<ListUser>;
-  removeCollaborator: (listUser: ListUser) => Promise<void>;
 }
 
 export default function ManageCollaborators({
   listId,
   initialCollaborators,
-  searchUsers,
-  addCollaborator,
-  removeCollaborator,
 }: ManageCollaboratorsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);

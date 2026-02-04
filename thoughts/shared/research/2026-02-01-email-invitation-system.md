@@ -105,8 +105,14 @@ The current codebase already supports adding collaborators by selecting existing
 ## Open Questions
 
 ### Data & Persistence
-- Where the invitation tokens should be persisted (no existing schema/table found).
-- Should invitations be stored in a **separate table** (invitations table with token, email, listId, expiresAt) or should we modify the existing collaborator flow?
+- Decision: persist invitation tokens by **extending `ListCollaboratorsTable`** (no separate invitations/tokens table).
+- Rationale:
+  - Auth is handled by OAuth providers (GitHub/Google), so a generic tokens table is not needed for the current roadmap scope.
+  - A separate invitations table would add extra query/join complexity to present collaborators and invites in different states in one UI.
+- Implications:
+  - Make `userId` nullable for pending invites.
+  - Add invite fields (token/email/expires/status/timestamps) to `ListCollaboratorsTable` (fields present in schema but nullable).
+  - Update collaborator queries/permissions to ignore pending invites.
 
 ### Integration & Infrastructure
 - Where invitation emails would be triggered in the collaborator add flow (no existing email utilities found).

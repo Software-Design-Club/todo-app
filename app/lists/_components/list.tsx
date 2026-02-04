@@ -1,4 +1,4 @@
-import { getList, updateListVisibility } from "@/app/lists/_actions/list";
+import { getList } from "@/app/lists/_actions/list";
 import TodoList from "@/app/lists/_components/todo-list";
 import ManageCollaborators from "@/app/lists/_components/manage-collaborators";
 import CollaboratorAvatars from "@/app/lists/_components/collaborator-avatars";
@@ -16,12 +16,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/ui/dropdown-menu";
-import {
-  searchUsers,
-  addCollaborator,
-  getCollaborators,
-  removeCollaborator,
-} from "@/app/lists/_actions/collaborators";
+import { getCollaborators } from "@/app/lists/_actions/collaborators";
 import {
   isAuthorizedToEditCollaborators,
   userCanEditList,
@@ -101,7 +96,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
               listId={list.id}
               userId={user.id}
               initialVisibility={list.visibility}
-              onToggle={updateListVisibility}
             />
           )}
           {editableCollaborators && (
@@ -115,9 +109,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
                 <ManageCollaborators
                   listId={list.id}
                   initialCollaborators={collaborators}
-                  searchUsers={searchUsers}
-                  addCollaborator={addCollaborator}
-                  removeCollaborator={removeCollaborator}
                 />
               </DropdownMenuContent>
             </DropdownMenu>
