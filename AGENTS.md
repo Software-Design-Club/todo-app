@@ -43,6 +43,13 @@ Schema defined in `drizzle/schema.ts`. Key tables:
 
 Run migrations with `npx drizzle-kit push`.
 
+## Version Control Notes
+
+This repository uses **Jujutsu (jj)** for version control instead of Git.
+- Use `jj` commands instead of `git` commands
+- Jujutsu provides a more intuitive interface for managing changes
+- Consult the Jujutsu documentation for workflow commands
+
 ## Additional Documentation
 
 For detailed context on specific topics, read the relevant files in `plan/`:
