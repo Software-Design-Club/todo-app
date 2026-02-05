@@ -34,6 +34,8 @@ Todos:
 - [ ] ??Collaborator can be notified when they are invited to a list in the app and in their email
 - [ ] ??User can be notified when a todo is assigned to them
 - [ ] Clean up components/ui and ui/ folder
+- [ ] On branches deployed to Vercel, sign in does not work because the redirect_uri does not match up with the redirect_ui registerd in
+- [ ]
 
 Notes:
   - We called `notFound()` in `getListWithTodos` to handle the case where the list ID is not found.
