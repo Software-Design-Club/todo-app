@@ -165,6 +165,7 @@ Then wait for the user's research query.
    - Run `jj commit -m "research: [brief topic description]"` to commit the initial research document
    - Present a concise summary of findings to the user
    - Include key file references for easy navigation
+   - jj commit with one sentence description of the findings
    - Ask if they have follow-up questions or need clarification
 
 9. **Handle follow-up questions:**
