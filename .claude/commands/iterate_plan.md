@@ -132,9 +132,6 @@ Get user confirmation before proceeding.
 
 ### Step 5: Sync and Review
 
-1. **Sync the updated plan**:
-   - Run `humanlayer thoughts sync`
-   - This ensures changes are properly indexed
 
 2. **Present the changes made**:
    ```

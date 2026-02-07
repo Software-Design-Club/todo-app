@@ -77,8 +77,7 @@ If the user's feedback requires understanding new code patterns or validating as
    - **thoughts-analyzer** - To extract insights from documents
 
    **Be EXTREMELY specific about directories**:
-   - If the change involves "WUI", specify `humanlayer-wui/` directory
-   - If it involves "daemon", specify `hld/` directory
+  - If the ticket mentions "ui" , specify `ui/` or `components/ui` directory
    - Include full path context in prompts
 
 3. **Read any new files identified by research**:
@@ -132,7 +131,7 @@ Get user confirmation before proceeding.
 ### Step 5: Sync and Review
 
 1. **Sync the updated plan**:
-   - Run `humanlayer thoughts sync`
+   - jj commit with one sentence description of the plan 
    - This ensures changes are properly indexed
 
 2. **Present the changes made**:
