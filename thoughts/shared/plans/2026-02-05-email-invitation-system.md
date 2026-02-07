@@ -63,6 +63,18 @@ Use incremental vertical slices:
 6. Expand owner UX for invitation operations.
 7. Tie invite lifecycle into archive/delete and finalize release hardening.
 
+## Version Control Workflow (Jujutsu)
+- Before Phase 1, create the feature bookmark: `jj bookmark create codex/email-invitation-system` (or move an existing bookmark with `jj bookmark set codex/email-invitation-system -r @`).
+- After each phase, make exactly one `jj` commit with a one-sentence message.
+- Use these checkpoint commit commands:
+1. `jj commit -m "Phase 1: Enforce owner collaborator invariants and add environment verification scaffolding."`
+2. `jj commit -m "Phase 2: Bootstrap unit, integration, and e2e test harness tooling and scripts."`
+3. `jj commit -m "Phase 3: Extend collaborator schema for invitation lifecycle with migration and backfill coverage."`
+4. `jj commit -m "Phase 4: Implement invitation domain services and Resend email dispatch with automated tests."`
+5. `jj commit -m "Phase 5: Add invite acceptance route and sign-in continuation with integration and e2e coverage."`
+6. `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
+7. `jj commit -m "Phase 7: Integrate lifecycle hooks, webhook handling, and final release hardening checks."`
+
 ---
 
 ## Phase 1: Foundation and Invariants
@@ -105,6 +117,7 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 - [ ] Required invitation/env values are configured in local and deployment environments.
 
 **Implementation Note**: This is the only phase that requires a manual pause/confirmation.
+**Jujutsu Checkpoint**: `jj commit -m "Phase 1: Enforce owner collaborator invariants and add environment verification scaffolding."`
 
 ---
 
@@ -157,6 +170,8 @@ Add the missing test infrastructure so all subsequent phases can be automaticall
 
 #### Manual Verification
 - [ ] None required.
+
+**Jujutsu Checkpoint**: `jj commit -m "Phase 2: Bootstrap unit, integration, and e2e test harness tooling and scripts."`
 
 ---
 
@@ -211,6 +226,8 @@ Extend `list_collaborators` to represent both accepted collaborators and pending
 
 #### Manual Verification
 - [ ] None required.
+
+**Jujutsu Checkpoint**: `jj commit -m "Phase 3: Extend collaborator schema for invitation lifecycle with migration and backfill coverage."`
 
 ---
 
@@ -269,6 +286,8 @@ Add server-side invitation lifecycle operations and transactional email integrat
 #### Manual Verification
 - [ ] None required.
 
+**Jujutsu Checkpoint**: `jj commit -m "Phase 4: Implement invitation domain services and Resend email dispatch with automated tests."`
+
 ---
 
 ## Phase 5: Invite Acceptance Route and Auth Continuation
@@ -320,6 +339,8 @@ Implement invite-link handling with deterministic outcomes across auth states.
 
 #### Manual Verification
 - [ ] None required.
+
+**Jujutsu Checkpoint**: `jj commit -m "Phase 5: Add invite acceptance route and sign-in continuation with integration and e2e coverage."`
 
 ---
 
@@ -373,6 +394,8 @@ Expose invitation workflows in both existing list-level controls and a dedicated
 #### Manual Verification
 - [ ] None required.
 
+**Jujutsu Checkpoint**: `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
+
 ---
 
 ## Phase 7: Lifecycle Hooks, Webhook, and Release Hardening
@@ -418,6 +441,8 @@ Make invitation state resilient to list lifecycle events and finalize release re
 
 #### Manual Verification
 - [ ] Optional post-deploy production smoke for real provider behavior; not a phase gate.
+
+**Jujutsu Checkpoint**: `jj commit -m "Phase 7: Integrate lifecycle hooks, webhook handling, and final release hardening checks."`
 
 ---
 
