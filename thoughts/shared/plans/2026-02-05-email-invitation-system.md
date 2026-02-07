@@ -3,7 +3,7 @@
 ## Overview
 Implement roadmap item 5 from `agent-os/product/roadmap.md:26` by adding email-based collaborator invitations with secure one-time tokens, sign-in continuation, and owner management controls.
 
-This rewrite replaces the prior plan with a tighter execution path based on the current codebase and existing constraints.
+This revision is automation-first: after initial environment setup, phase completion should be validated by automated checks (unit, integration, e2e) whenever technically possible.
 
 ## Current State Analysis
 
@@ -15,6 +15,7 @@ This rewrite replaces the prior plan with a tighter execution path based on the 
 - Sign-in always redirects to `/` and cannot preserve invite continuation (`app/sign-in/_components/sign-in.tsx:23`).
 - List lifecycle operations exist (archive/delete) but have no invitation lifecycle hook (`app/lists/_actions/list.ts:326`, `app/lists/_actions/list.ts:399`).
 - `resend` is installed but there is no email-delivery code path in `app/` or `lib/` (`package.json:35`).
+- The codebase currently has no unit/integration/e2e test harness configured (`package.json:6`).
 
 ### Gaps Blocking Invitations
 - No invitation token generation, persistence, or acceptance route exists.
@@ -31,12 +32,14 @@ This rewrite replaces the prior plan with a tighter execution path based on the 
 6. Owners can resend, revoke, and copy invite links.
 7. Archive/delete invalidates open invites automatically.
 
-### End-State Verification
+### End-State Verification (Automation-First)
+- `npm run verify:env` passes.
 - `npm run typecheck` passes.
 - `npm run lint` passes.
-- New invitation-focused automated tests pass.
-- Migration applies cleanly and backfill assertions pass.
-- Manual checks confirm real email delivery and OAuth invite continuation.
+- `npm run test:unit` passes.
+- `npm run test:integration` passes.
+- `npm run test:e2e:smoke` passes.
+- `npm run verify:all` passes as the release gate.
 
 ### Locked Decisions (No Open Questions)
 - Persist invitation lifecycle by extending `list_collaborators` (no new invitations table).
@@ -52,12 +55,13 @@ This rewrite replaces the prior plan with a tighter execution path based on the 
 
 ## Implementation Approach
 Use incremental vertical slices:
-1. Stabilize collaborator invariants and environment safety.
-2. Evolve schema and data model safely.
-3. Add invitation domain services and email dispatch.
-4. Add invite acceptance + auth continuation.
-5. Expand owner UX for invitation operations.
-6. Tie invite lifecycle into archive/delete and release checks.
+1. Stabilize environment and collaborator ownership invariants.
+2. Bootstrap the test harness (unit, integration, e2e, aggregate gate).
+3. Evolve schema and data model safely.
+4. Add invitation domain services and email dispatch.
+5. Add invite acceptance and auth continuation.
+6. Expand owner UX for invitation operations.
+7. Tie invite lifecycle into archive/delete and finalize release hardening.
 
 ---
 
@@ -92,7 +96,7 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Owner row is created/upserted when creating new lists (test or assertion run).
+- [ ] Owner row is created/upserted when creating new lists (automated test or assertion).
 - [ ] `npm run verify:env` fails when required keys are missing.
 - [ ] `npm run verify:env` passes when keys are present.
 - [ ] `npm run typecheck` passes.
@@ -100,11 +104,63 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 #### Manual Verification
 - [ ] Required invitation/env values are configured in local and deployment environments.
 
-**Implementation Note**: Pause after this phase for human confirmation that environment setup is complete.
+**Implementation Note**: This is the only phase that requires a manual pause/confirmation.
 
 ---
 
-## Phase 2: Schema Evolution for Invitation Lifecycle
+## Phase 2: Test Harness Bootstrap
+
+### Overview
+Add the missing test infrastructure so all subsequent phases can be automatically validated.
+
+### Changes Required
+
+#### 1. Add unit/integration/e2e tooling
+**Files**:
+- `package.json`
+- `vitest.config.ts` (new)
+- `playwright.config.ts` (new)
+- `tests/setup/*.ts` (new)
+
+**Changes**:
+- Add Vitest for unit and integration tests.
+- Add Playwright for e2e smoke coverage.
+- Add shared setup utilities and test environment config.
+
+#### 2. Add standard verification scripts
+**Files**:
+- `package.json`
+
+**Changes**:
+- Add scripts:
+  - `test:unit`
+  - `test:integration`
+  - `test:e2e:smoke`
+  - `verify:all` (chaining env + typecheck + lint + all tests)
+
+#### 3. Add baseline smoke tests
+**Files**:
+- `tests/unit/smoke.test.ts` (new)
+- `tests/integration/smoke.test.ts` (new)
+- `tests/e2e/smoke.spec.ts` (new)
+
+**Changes**:
+- Add minimal passing tests proving each harness layer executes in CI/local.
+
+### Success Criteria
+
+#### Automated Verification
+- [ ] `npm run test:unit` executes successfully.
+- [ ] `npm run test:integration` executes successfully.
+- [ ] `npm run test:e2e:smoke` executes successfully.
+- [ ] `npm run verify:all` executes successfully.
+
+#### Manual Verification
+- [ ] None required.
+
+---
+
+## Phase 3: Schema Evolution for Invitation Lifecycle
 
 ### Overview
 Extend `list_collaborators` to represent both accepted collaborators and pending invitations.
@@ -136,6 +192,13 @@ Extend `list_collaborators` to represent both accepted collaborators and pending
 - Keep collaborator read-paths filtering for accepted rows so existing list rendering remains stable.
 - Add invitation-focused types instead of overloading `ListUser`.
 
+#### 3. Add migration-focused integration coverage
+**Files**:
+- `tests/integration/invitations/schema-migration.test.ts` (new)
+
+**Changes**:
+- Add assertions for migration/backfill correctness and uniqueness constraints.
+
 ### Success Criteria
 
 #### Automated Verification
@@ -143,16 +206,15 @@ Extend `list_collaborators` to represent both accepted collaborators and pending
 - [ ] Migration applies cleanly on existing DB state.
 - [ ] Backfill results in zero legacy rows with invalid invite status.
 - [ ] Existing collaborator list screens still render accepted users only.
+- [ ] `npm run test:integration` passes schema/backfill tests.
 - [ ] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] Spot-check one migrated list in DB to confirm accepted collaborator rows remain intact.
-
-**Implementation Note**: Pause after this phase for manual DB validation before service-layer work.
+- [ ] None required.
 
 ---
 
-## Phase 3: Invitation Domain Services and Email Dispatch
+## Phase 4: Invitation Domain Services and Email Dispatch
 
 ### Overview
 Add server-side invitation lifecycle operations and transactional email integration.
@@ -186,32 +248,30 @@ Add server-side invitation lifecycle operations and transactional email integrat
 - Send invitation email with canonical acceptance URL built from `APP_BASE_URL`.
 - Persist delivery attempt metadata for operational debugging.
 
-#### 3. Automated tests for domain logic
+#### 3. Add unit and integration tests
 **Files**:
 - `tests/unit/invitations/*.test.ts` (new)
-- `vitest.config.ts` (new)
-- `package.json`
+- `tests/integration/invitations/service.test.ts` (new)
 
 **Changes**:
-- Add invitation-focused unit tests for token hashing, expiry, duplicate open invite handling, and state transitions.
-- Add `npm run test:unit`.
+- Add tests for token hashing, expiry, duplicate open invite handling, and state transitions.
+- Add integration tests for permission checks and DB writes.
 
 ### Success Criteria
 
 #### Automated Verification
 - [ ] `npm run test:unit` passes invitation domain tests.
+- [ ] `npm run test:integration` passes invitation action/service tests.
 - [ ] Duplicate open invite reuses row and rotates token.
 - [ ] Revoke/approve/reject transitions are enforced by role and current status.
 - [ ] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required in this phase.
-
-**Implementation Note**: Pause after this phase for review of invitation state machine behavior.
+- [ ] None required.
 
 ---
 
-## Phase 4: Invite Acceptance Route and Auth Continuation
+## Phase 5: Invite Acceptance Route and Auth Continuation
 
 ### Overview
 Implement invite-link handling with deterministic outcomes across auth states.
@@ -241,23 +301,29 @@ Implement invite-link handling with deterministic outcomes across auth states.
 - Read `redirectTo` from `searchParams` on sign-in page.
 - Pass dynamic redirect target to `signIn` instead of always `/` (`app/sign-in/_components/sign-in.tsx:23`).
 
+#### 3. Add integration + e2e coverage
+**Files**:
+- `tests/integration/invitations/acceptance.test.ts` (new)
+- `tests/e2e/invitations/acceptance.spec.ts` (new)
+
+**Changes**:
+- Verify redirect-to-sign-in behavior and resumed acceptance path.
+- Verify match vs mismatch outcomes.
+
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Unit/integration coverage for token validation and state rendering decisions.
-- [ ] Unauthenticated invite route redirects to sign-in with preserved return URL.
+- [ ] `npm run test:integration` passes token validation and state rendering tests.
+- [ ] `npm run test:e2e:smoke` covers unauthenticated redirect and resumed acceptance.
 - [ ] Authenticated matching-email flow creates accepted collaborator membership.
 - [ ] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] End-to-end OAuth roundtrip from invite link returns user to invite acceptance.
-- [ ] Mismatched-email account lands in pending-owner-approval state.
-
-**Implementation Note**: Pause after this phase for human validation of the live auth redirect flow.
+- [ ] None required.
 
 ---
 
-## Phase 5: Owner Invitation Management UX
+## Phase 6: Owner Invitation Management UX
 
 ### Overview
 Expose invitation workflows in both existing list-level controls and a dedicated cross-list page.
@@ -286,23 +352,30 @@ Expose invitation workflows in both existing list-level controls and a dedicated
 - Allow list selection for invite creation from one central page.
 - Link to this page from existing lists UI.
 
+#### 3. Add integration + e2e coverage
+**Files**:
+- `tests/integration/invitations/owner-ui-actions.test.ts` (new)
+- `tests/e2e/invitations/owner-management.spec.ts` (new)
+
+**Changes**:
+- Validate owner-only constraints and pending-approval actions.
+- Cover send/resend/revoke/copy flows in e2e smoke or targeted e2e suite.
+
 ### Success Criteria
 
 #### Automated Verification
 - [ ] Owner-only access enforced for invite operations.
 - [ ] Collaborator/non-owner attempts fail with clear server errors.
-- [ ] Pending invites and accepted collaborators are both rendered correctly.
-- [ ] `npm run typecheck`, `npm run lint`, and relevant tests pass.
+- [ ] Pending invites and accepted collaborators are rendered correctly.
+- [ ] `npm run test:integration` and `npm run test:e2e:smoke` pass relevant invite management scenarios.
+- [ ] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] From a list dropdown, owner can send/resend/revoke/copy invite.
-- [ ] Dedicated page shows invites across owned lists and allows approval decisions.
-
-**Implementation Note**: Pause after this phase for UX sign-off before lifecycle/webhook wiring.
+- [ ] None required.
 
 ---
 
-## Phase 6: Lifecycle Hooks, Webhook, and Release Hardening
+## Phase 7: Lifecycle Hooks, Webhook, and Release Hardening
 
 ### Overview
 Make invitation state resilient to list lifecycle events and finalize release readiness.
@@ -333,21 +406,18 @@ Make invitation state resilient to list lifecycle events and finalize release re
 - `README.md` or `plan/` runbook doc
 
 **Changes**:
-- Add one release verification command that chains env/type/lint/tests.
+- Ensure `npm run verify:all` is the single release gate.
 - Document env requirements, migration order, and failure troubleshooting.
 
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Archive/delete tests confirm open invites are invalidated.
-- [ ] Webhook tests confirm failure metadata persistence.
-- [ ] Release verification command passes in CI/local.
+- [ ] `npm run test:integration` confirms archive/delete invalidates open invites.
+- [ ] `npm run test:integration` confirms webhook failure metadata persistence.
+- [ ] `npm run verify:all` passes in CI/local.
 
 #### Manual Verification
-- [ ] Send one real invitation email in deployed environment.
-- [ ] Trigger one webhook test event and confirm persisted update.
-
-**Implementation Note**: Pause after this phase for production-readiness approval.
+- [ ] Optional post-deploy production smoke for real provider behavior; not a phase gate.
 
 ---
 
@@ -364,13 +434,14 @@ Make invitation state resilient to list lifecycle events and finalize release re
 - Archive/delete effects on open invites.
 - Webhook failure persistence.
 
-### Manual Testing Steps
-1. Owner sends invite from list dropdown.
-2. Invitee opens link while logged out and is redirected to sign-in.
-3. After OAuth sign-in, invite is accepted and list access is granted.
-4. Repeat with mismatched email and confirm pending-owner-approval.
-5. Owner resolves pending approval and verify final access outcome.
-6. Archive list and confirm outstanding invite link is invalid.
+### End-to-End Tests
+- Invite link redirect to sign-in and return flow.
+- Owner invitation management operations.
+- Acceptance UX outcomes for valid/invalid/expired/pending states.
+
+### Manual Smoke (Non-Blocking)
+1. Confirm one real invitation email in deployed environment.
+2. Confirm one webhook event from provider is accepted.
 
 ## Performance Considerations
 - Add indexes for `inviteTokenHash`, `invitedEmailNormalized`, and partial open-invite uniqueness.
