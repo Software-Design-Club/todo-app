@@ -62,6 +62,10 @@ export type ListInvitation = {
   ownerApprovedAt: Date | null;
   ownerRejectedBy: User["id"] | null;
   ownerRejectedAt: Date | null;
+  emailDeliveryStatus: Tagged<string, "EmailDeliveryStatus"> | null;
+  emailDeliveryError: string | null;
+  emailDeliveryProviderId: string | null;
+  emailLastSentAt: Date | null;
   role: (typeof CollaboratorRoleEnum.enumValues)[number];
   createdAt: Date;
   updatedAt: Date;
@@ -146,6 +150,12 @@ export const createTaggedListInvitation = (
     ownerApprovedAt: invitation.ownerApprovedAt,
     ownerRejectedBy: invitation.ownerRejectedBy as User["id"] | null,
     ownerRejectedAt: invitation.ownerRejectedAt,
+    emailDeliveryStatus: invitation.emailDeliveryStatus as
+      | ListInvitation["emailDeliveryStatus"]
+      | null,
+    emailDeliveryError: invitation.emailDeliveryError,
+    emailDeliveryProviderId: invitation.emailDeliveryProviderId,
+    emailLastSentAt: invitation.emailLastSentAt,
     role: invitation.role,
     createdAt: invitation.createdAt,
     updatedAt: invitation.updatedAt,

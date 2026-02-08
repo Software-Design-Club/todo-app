@@ -88,6 +88,10 @@ export const ListCollaboratorsTable = pgTable(
     ownerApprovedAt: timestamp("ownerApprovedAt"),
     ownerRejectedBy: integer("ownerRejectedBy").references(() => UsersTable.id),
     ownerRejectedAt: timestamp("ownerRejectedAt"),
+    emailDeliveryStatus: text("emailDeliveryStatus"),
+    emailDeliveryError: text("emailDeliveryError"),
+    emailDeliveryProviderId: text("emailDeliveryProviderId"),
+    emailLastSentAt: timestamp("emailLastSentAt"),
   },
   (collaborators) => {
     return {
