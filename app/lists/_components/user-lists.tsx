@@ -27,7 +27,15 @@ const UserLists: React.FC<ListsProps> = async ({ currentPath, userId }) => {
             <Link href="/lists">Your Lists</Link>
           )}
         </h2>
-        <CreateListForm creatorId={userId} />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/lists/collaborators"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Manage Invitations
+          </Link>
+          <CreateListForm creatorId={userId} />
+        </div>
       </div>
 
       <UserListsTable lists={lists} archivedLists={archivedLists} userId={userId} />
