@@ -35,11 +35,16 @@ export interface InvitationRepository {
     listId: List["id"]
   ): Promise<InvitationRow | null>;
   findByTokenHash(tokenHash: string): Promise<InvitationRow | null>;
+  findByEmailDeliveryProviderId(providerId: string): Promise<InvitationRow | null>;
   createInvitation(values: InvitationInsert): Promise<InvitationRow>;
   updateInvitation(
     invitationId: ListInvitation["id"],
     values: InvitationUpdate
   ): Promise<InvitationRow | null>;
+  updateOpenInvitations(
+    listId: List["id"],
+    values: InvitationUpdate
+  ): Promise<InvitationRow[]>;
   listInvitationsByStatus(
     listId: List["id"],
     statuses: InvitationStatus[]
@@ -96,6 +101,18 @@ class DrizzleInvitationRepository implements InvitationRepository {
     return row ?? null;
   }
 
+  async findByEmailDeliveryProviderId(
+    providerId: string
+  ): Promise<InvitationRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(ListCollaboratorsTable)
+      .where(eq(ListCollaboratorsTable.emailDeliveryProviderId, providerId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
   async createInvitation(values: InvitationInsert): Promise<InvitationRow> {
     const [created] = await this.db
       .insert(ListCollaboratorsTable)
@@ -123,6 +140,25 @@ class DrizzleInvitationRepository implements InvitationRepository {
       .returning();
 
     return updated ?? null;
+  }
+
+  async updateOpenInvitations(
+    listId: List["id"],
+    values: InvitationUpdate
+  ): Promise<InvitationRow[]> {
+    return this.db
+      .update(ListCollaboratorsTable)
+      .set({
+        ...values,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(ListCollaboratorsTable.listId, listId),
+          inArray(ListCollaboratorsTable.inviteStatus, OPEN_INVITATION_STATUSES)
+        )
+      )
+      .returning();
   }
 
   async listInvitationsByStatus(
@@ -535,4 +571,50 @@ export async function markInvitationEmailDelivery(
   }
 
   return toTaggedInvitation(updated);
+}
+
+export async function markInvitationEmailDeliveryByProviderId(
+  params: {
+    providerId: string;
+    status: "sent" | "failed";
+    errorMessage: string | null;
+  },
+  repo?: InvitationRepository
+): Promise<ListInvitation | null> {
+  const invitationRepo = getRepository(repo);
+  const existing = await invitationRepo.findByEmailDeliveryProviderId(
+    params.providerId
+  );
+  if (!existing) {
+    return null;
+  }
+
+  const updated = await invitationRepo.updateInvitation(
+    existing.id as ListInvitation["id"],
+    {
+      emailDeliveryStatus: params.status,
+      emailDeliveryError: params.errorMessage,
+      emailLastSentAt: new Date(),
+    }
+  );
+
+  return updated ? toTaggedInvitation(updated) : null;
+}
+
+export async function revokeOpenInvitationsForList(
+  params: {
+    listId: List["id"];
+  },
+  repo?: InvitationRepository
+): Promise<ListInvitation[]> {
+  const invitationRepo = getRepository(repo);
+  const now = new Date();
+  const updated = await invitationRepo.updateOpenInvitations(params.listId, {
+    inviteStatus: "revoked",
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    inviteRevokedAt: now,
+  });
+
+  return updated.map(toTaggedInvitation);
 }

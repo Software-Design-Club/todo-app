@@ -444,9 +444,9 @@ Make invitation state resilient to list lifecycle events and finalize release re
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:integration` confirms archive/delete invalidates open invites.
-- [ ] `npm run test:integration` confirms webhook failure metadata persistence.
-- [ ] `npm run verify:all` passes in CI/local.
+- [x] `npm run test:integration` confirms archive/delete invalidates open invites.
+- [x] `npm run test:integration` confirms webhook failure metadata persistence.
+- [x] `npm run verify:all` passes in CI/local.
 
 #### Manual Verification
 - [ ] Optional post-deploy production smoke for real provider behavior; not a phase gate.

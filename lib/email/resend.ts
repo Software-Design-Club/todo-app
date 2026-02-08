@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { renderInvitationEmail } from "@/app/emails/invitation-email";
 
 interface EmailConfig {
@@ -19,6 +20,25 @@ export interface SendInvitationEmailResult {
   status: "sent" | "failed";
   providerId: string | null;
   errorMessage: string | null;
+}
+
+export function verifyResendWebhookSignature(params: {
+  payload: string;
+  signature: string;
+  secret: string;
+}): boolean {
+  const expectedSignature = createHmac("sha256", params.secret)
+    .update(params.payload)
+    .digest("hex");
+
+  const provided = Buffer.from(params.signature, "utf8");
+  const expected = Buffer.from(expectedSignature, "utf8");
+
+  if (provided.length !== expected.length) {
+    return false;
+  }
+
+  return timingSafeEqual(provided, expected);
 }
 
 function getEmailConfig(): EmailConfig {
