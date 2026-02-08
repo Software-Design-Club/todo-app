@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -20,11 +20,12 @@ export async function PATCH(
       return new NextResponse("Invalid title", { status: 400 });
     }
 
+    const { id } = await params;
     const db = drizzle(sql);
     await db
       .update(TodosTable)
       .set({ title, updatedAt: new Date() })
-      .where(eq(TodosTable.id, parseInt(params.id)));
+      .where(eq(TodosTable.id, parseInt(id)));
 
     return NextResponse.json({ message: "Todo updated successfully" });
   } catch (error) {

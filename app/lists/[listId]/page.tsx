@@ -5,8 +5,8 @@ import { canViewList } from "@/app/lists/_actions/permissions";
 import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 
-const ListPage = async ({ params }: { params: { listId: string } }) => {
-  const { listId } = params;
+const ListPage = async ({ params }: { params: Promise<{ listId: string }> }) => {
+  const { listId } = await params;
   const numericListId = Number(listId);
 
   if (!listId || isNaN(numericListId)) {
