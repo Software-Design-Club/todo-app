@@ -1,6 +1,8 @@
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { ListsTable, ListCollaboratorsTable } from "./schema";
+import { ListsTable } from "./schema";
+import { upsertListOwnerCollaborator } from "./ownerCollaborator";
+import type { List, User } from "../lib/types";
 
 async function backfillListCollaborators() {
   console.log("Starting backfill of ListCollaborators table...");
@@ -23,23 +25,10 @@ async function backfillListCollaborators() {
     for (const list of lists) {
       try {
         // Upsert the creator as an owner
-        await db
-          .insert(ListCollaboratorsTable)
-          .values({
-            listId: list.id,
-            userId: list.creatorId,
-            role: "owner",
-          })
-          .onConflictDoUpdate({
-            target: [
-              ListCollaboratorsTable.listId,
-              ListCollaboratorsTable.userId,
-            ],
-            set: {
-              role: "owner",
-              updatedAt: new Date(),
-            },
-          });
+        await upsertListOwnerCollaborator(db, {
+          listId: list.id as List["id"],
+          ownerId: list.creatorId as User["id"],
+        });
 
         console.log(`Upserted owner record for list ${list.id}`);
         upsertedCount++;
