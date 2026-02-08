@@ -9,6 +9,10 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "verify:env": "node scripts/verify-env.mjs",
+    "test:unit": "VITEST_SUITE=unit vitest run",
+    "test:integration": "VITEST_SUITE=integration vitest run",
+    "test:e2e:smoke": "playwright test --project=smoke",
+    "verify:all": "npm run verify:env && npm run typecheck && npm run lint && npm run test:unit && npm run test:integration && npm run test:e2e:smoke",
     "prepare": "husky"
   },
   "dependencies": {
@@ -40,6 +44,7 @@
     "type-fest": "^4.41.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -50,7 +55,8 @@
     "lint-staged": "^15.5.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.8"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
