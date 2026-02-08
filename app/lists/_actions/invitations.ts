@@ -35,7 +35,7 @@ async function assertOwnerAccess(listId: List["id"], userId: User["id"]) {
   }
 }
 
-export function isOwnerAuthorizedForInvitationActions(
+function isOwnerAuthorizedForInvitationActions(
   collaborators: ListUser[],
   userId: User["id"]
 ): boolean {
