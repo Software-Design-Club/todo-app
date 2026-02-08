@@ -7,6 +7,7 @@ import {
   ListsTable,
   TodosTable,
 } from "@/drizzle/schema";
+import { upsertListOwnerCollaborator } from "@/drizzle/ownerCollaborator";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
@@ -170,10 +171,11 @@ export async function createList(formData: FormData) {
     throw new Error("Title and creator ID are required");
   }
 
-  const creatorId = parseInt(creatorIdStr, 10);
-  if (isNaN(creatorId)) {
+  const parsedCreatorId = parseInt(creatorIdStr, 10);
+  if (isNaN(parsedCreatorId)) {
     throw new Error("Invalid creator ID");
   }
+  const creatorId = parsedCreatorId as User["id"];
 
   const db = drizzle(sql);
 
@@ -185,6 +187,15 @@ export async function createList(formData: FormData) {
       creatorId,
     })
     .returning();
+
+  const ownerRow = await upsertListOwnerCollaborator(db, {
+    listId: newList.id as List["id"],
+    ownerId: creatorId,
+  });
+
+  if (!ownerRow) {
+    throw new Error("Failed to create owner collaborator record");
+  }
 
   // Revalidate to update the UI
   revalidatePath("/lists");

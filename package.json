@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "verify:env": "node scripts/verify-env.mjs",
     "prepare": "husky"
   },
   "dependencies": {

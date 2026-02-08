@@ -46,6 +46,7 @@ This revision is automation-first: after initial environment setup, phase comple
 - Keep strict email-match on acceptance; mismatch requires owner approval.
 - Keep existing dropdown workflow and add a dedicated collaborator management page.
 - Keep GitHub auth provider for MVP.
+- Use tagged types from `lib/types.ts` whenever practical for function/module boundaries (especially IDs and domain inputs/outputs) instead of raw primitives.
 
 ## What We're NOT Doing
 - Adding new auth providers.
@@ -62,6 +63,10 @@ Use incremental vertical slices:
 5. Add invite acceptance and auth continuation.
 6. Expand owner UX for invitation operations.
 7. Tie invite lifecycle into archive/delete and finalize release hardening.
+
+Cross-cutting implementation rule:
+- For all new or modified invitation/collaborator modules, prefer tagged types from `lib/types.ts` at API boundaries (server actions, helpers, services, and UI props) whenever feasible.
+- Only use raw primitives internally where required by low-level libraries or SQL adapters.
 
 ## Version Control Workflow (Jujutsu)
 - Before Phase 1, create the feature bookmark: `jj bookmark create implement-email-invitation-system` (or move an existing bookmark with `jj bookmark set implement-email-invitation-system -r @`).
@@ -89,11 +94,14 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 - `app/lists/_actions/list.ts`
 - `app/sign-in/_components/_actions/find-or-create-account.ts`
 - `drizzle/backfillListCollaborators.ts`
+- `drizzle/ownerCollaborator.ts`
+- `lib/types.ts`
 
 **Changes**:
 - Ensure list creation always creates/upserts an owner row in `list_collaborators`.
 - Reuse one helper for owner-upsert logic from both list creation paths.
 - Keep backfill script for historical rows and make it idempotent.
+- Ensure `drizzle/ownerCollaborator.ts` uses tagged IDs from `lib/types.ts` for helper inputs/outputs whenever feasible (instead of raw `number` IDs).
 
 #### 2. Environment guardrails
 **Files**:
@@ -108,10 +116,11 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Owner row is created/upserted when creating new lists (automated test or assertion).
-- [ ] `npm run verify:env` fails when required keys are missing.
-- [ ] `npm run verify:env` passes when keys are present.
-- [ ] `npm run typecheck` passes.
+- [x] Owner row is created/upserted when creating new lists (automated test or assertion).
+- [x] `drizzle/ownerCollaborator.ts` helper surface uses tagged types from `lib/types.ts` for IDs wherever feasible.
+- [x] `npm run verify:env` fails when required keys are missing.
+- [x] `npm run verify:env` passes when keys are present.
+- [x] `npm run typecheck` passes.
 
 #### Manual Verification
 - [ ] Required invitation/env values are configured in local and deployment environments.
