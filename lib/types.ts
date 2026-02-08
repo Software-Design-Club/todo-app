@@ -1,4 +1,6 @@
 import {
+  InvitationStatusEnum,
+  ListCollaboratorsTable,
   ListsTable,
   UsersTable,
   CollaboratorRoleEnum,
@@ -35,6 +37,34 @@ export type ListUser = {
   User: User;
   listId: List["id"];
   Role: (typeof CollaboratorRoleEnum.enumValues)[number];
+};
+
+export type InvitationStatus = (typeof InvitationStatusEnum.enumValues)[number];
+
+export type ListInvitation = {
+  id: Tagged<
+    (typeof ListCollaboratorsTable.$inferSelect)["id"],
+    "ListInvitationId"
+  >;
+  listId: List["id"];
+  userId: User["id"] | null;
+  inviteStatus: Tagged<InvitationStatus, "InvitationStatus">;
+  invitedEmailNormalized: Tagged<string, "InvitedEmailNormalized"> | null;
+  inviteTokenHash: Tagged<string, "InviteTokenHash"> | null;
+  inviteExpiresAt: Date | null;
+  inviterId: User["id"] | null;
+  inviteSentAt: Date | null;
+  inviteAcceptedAt: Date | null;
+  inviteRevokedAt: Date | null;
+  inviteExpiredAt: Date | null;
+  ownerApprovalRequestedAt: Date | null;
+  ownerApprovedBy: User["id"] | null;
+  ownerApprovedAt: Date | null;
+  ownerRejectedBy: User["id"] | null;
+  ownerRejectedAt: Date | null;
+  role: (typeof CollaboratorRoleEnum.enumValues)[number];
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export const createTaggedList = (
@@ -88,5 +118,36 @@ export const createTaggedListUser = (listUser: {
     }),
     listId: listUser.listId as List["id"],
     Role: listUser.role,
+  };
+};
+
+export const createTaggedListInvitation = (
+  invitation: typeof ListCollaboratorsTable.$inferSelect
+): ListInvitation => {
+  return {
+    id: invitation.id as ListInvitation["id"],
+    listId: invitation.listId as List["id"],
+    userId: invitation.userId as User["id"] | null,
+    inviteStatus: invitation.inviteStatus as ListInvitation["inviteStatus"],
+    invitedEmailNormalized: invitation.invitedEmailNormalized as
+      | ListInvitation["invitedEmailNormalized"]
+      | null,
+    inviteTokenHash: invitation.inviteTokenHash as
+      | ListInvitation["inviteTokenHash"]
+      | null,
+    inviteExpiresAt: invitation.inviteExpiresAt,
+    inviterId: invitation.inviterId as User["id"] | null,
+    inviteSentAt: invitation.inviteSentAt,
+    inviteAcceptedAt: invitation.inviteAcceptedAt,
+    inviteRevokedAt: invitation.inviteRevokedAt,
+    inviteExpiredAt: invitation.inviteExpiredAt,
+    ownerApprovalRequestedAt: invitation.ownerApprovalRequestedAt,
+    ownerApprovedBy: invitation.ownerApprovedBy as User["id"] | null,
+    ownerApprovedAt: invitation.ownerApprovedAt,
+    ownerRejectedBy: invitation.ownerRejectedBy as User["id"] | null,
+    ownerRejectedAt: invitation.ownerRejectedAt,
+    role: invitation.role,
+    createdAt: invitation.createdAt,
+    updatedAt: invitation.updatedAt,
   };
 };

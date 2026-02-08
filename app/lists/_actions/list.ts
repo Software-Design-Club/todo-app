@@ -3,6 +3,7 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, not, and, or } from "drizzle-orm";
 import {
+  InvitationStatusEnum,
   ListCollaboratorsTable,
   ListsTable,
   TodosTable,
@@ -120,7 +121,13 @@ export async function getLists(
     .from(ListsTable)
     .leftJoin(
       ListCollaboratorsTable,
-      eq(ListsTable.id, ListCollaboratorsTable.listId)
+      and(
+        eq(ListsTable.id, ListCollaboratorsTable.listId),
+        eq(
+          ListCollaboratorsTable.inviteStatus,
+          InvitationStatusEnum.enumValues[1]
+        )
+      )
     )
     .where(and(userCondition, stateCondition));
 

@@ -229,12 +229,12 @@ Extend `list_collaborators` to represent both accepted collaborators and pending
 - [ ] Migration applies cleanly on a fresh DB.
 - [ ] Migration applies cleanly on existing DB state.
 - [ ] Backfill results in zero legacy rows with invalid invite status.
-- [ ] Existing collaborator list screens still render accepted users only.
-- [ ] `npm run test:integration` passes schema/backfill tests.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] Existing collaborator list screens still render accepted users only.
+- [x] `npm run test:integration` passes schema/backfill tests.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 3: Extend collaborator schema for invitation lifecycle with migration and backfill coverage."`
 
