@@ -8,7 +8,11 @@ import {
   CardTitle,
 } from "@/ui/card";
 
-export default function SignInForm() {
+interface SignInFormProps {
+  redirectTo: string;
+}
+
+export default function SignInForm({ redirectTo }: SignInFormProps) {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
@@ -20,7 +24,7 @@ export default function SignInForm() {
           <form
             action={async () => {
               "use server";
-              await signIn("github", { redirectTo: "/" });
+              await signIn("github", { redirectTo });
             }}
           >
             <Button variant="outline" size="sm" type="submit">
