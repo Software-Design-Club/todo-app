@@ -2,7 +2,11 @@
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, or, ilike, and } from "drizzle-orm";
-import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
+import {
+  InvitationStatusEnum,
+  ListCollaboratorsTable,
+  UsersTable,
+} from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
 import type { List, User, ListUser } from "@/lib/types";
 import { createTaggedUser, createTaggedListUser } from "@/lib/types";
@@ -63,7 +67,11 @@ export async function addCollaborator(
       .where(
         and(
           eq(ListCollaboratorsTable.userId, user.id),
-          eq(ListCollaboratorsTable.listId, listId)
+          eq(ListCollaboratorsTable.listId, listId),
+          eq(
+            ListCollaboratorsTable.inviteStatus,
+            InvitationStatusEnum.enumValues[1]
+          )
         )
       )
       .limit(1);
@@ -84,6 +92,8 @@ export async function addCollaborator(
       .values({
         userId: user.id,
         listId: listId,
+        inviteStatus: InvitationStatusEnum.enumValues[1],
+        inviteAcceptedAt: new Date(),
       })
       .returning();
 
@@ -94,8 +104,13 @@ export async function addCollaborator(
     // Revalidate the path for the list page to reflect the new collaborator
     revalidatePath(`/lists/${listId}`);
 
+    const insertedUserId = result[0]?.userId;
+    if (!insertedUserId) {
+      throw new Error("Failed to persist accepted collaborator membership.");
+    }
+
     return createTaggedListUser({
-      id: result[0].userId,
+      id: insertedUserId,
       name: user.name,
       email: user.email,
       role: result[0].role,
@@ -131,7 +146,15 @@ export async function getCollaborators(
       })
       .from(ListCollaboratorsTable)
       .innerJoin(UsersTable, eq(ListCollaboratorsTable.userId, UsersTable.id))
-      .where(eq(ListCollaboratorsTable.listId, listId));
+      .where(
+        and(
+          eq(ListCollaboratorsTable.listId, listId),
+          eq(
+            ListCollaboratorsTable.inviteStatus,
+            InvitationStatusEnum.enumValues[1]
+          )
+        )
+      );
 
     // Map id to string to match the User interface
     const results: ListUser[] = collaboratorsFromDb.map(createTaggedListUser);
@@ -158,7 +181,11 @@ export async function removeCollaborator(listUser: ListUser): Promise<void> {
       .where(
         and(
           eq(ListCollaboratorsTable.userId, listUser.User.id),
-          eq(ListCollaboratorsTable.listId, listUser.listId)
+          eq(ListCollaboratorsTable.listId, listUser.listId),
+          eq(
+            ListCollaboratorsTable.inviteStatus,
+            InvitationStatusEnum.enumValues[1]
+          )
         )
       )
       .returning();

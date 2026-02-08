@@ -4,9 +4,11 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  index,
   pgEnum,
   integer,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const userStatusEnum = pgEnum("status", ["active", "deleted"]);
 
@@ -51,6 +53,14 @@ export const CollaboratorRoleEnum = pgEnum("collaborator_role", [
   "collaborator",
 ]);
 
+export const InvitationStatusEnum = pgEnum("invitation_status", [
+  "sent",
+  "accepted",
+  "pending_owner_approval",
+  "revoked",
+  "expired",
+]);
+
 export const ListCollaboratorsTable = pgTable(
   "list_collaborators",
   {
@@ -58,18 +68,49 @@ export const ListCollaboratorsTable = pgTable(
     listId: integer("listId")
       .references(() => ListsTable.id, { onDelete: "cascade" })
       .notNull(),
-    userId: integer("userId")
-      .references(() => UsersTable.id)
-      .notNull(),
+    userId: integer("userId").references(() => UsersTable.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
     role: CollaboratorRoleEnum("role").default("collaborator").notNull(),
+    inviteStatus: InvitationStatusEnum("inviteStatus")
+      .default("accepted")
+      .notNull(),
+    invitedEmailNormalized: text("invitedEmailNormalized"),
+    inviteTokenHash: text("inviteTokenHash"),
+    inviteExpiresAt: timestamp("inviteExpiresAt"),
+    inviterId: integer("inviterId").references(() => UsersTable.id),
+    inviteSentAt: timestamp("inviteSentAt"),
+    inviteAcceptedAt: timestamp("inviteAcceptedAt"),
+    inviteRevokedAt: timestamp("inviteRevokedAt"),
+    inviteExpiredAt: timestamp("inviteExpiredAt"),
+    ownerApprovalRequestedAt: timestamp("ownerApprovalRequestedAt"),
+    ownerApprovedBy: integer("ownerApprovedBy").references(() => UsersTable.id),
+    ownerApprovedAt: timestamp("ownerApprovedAt"),
+    ownerRejectedBy: integer("ownerRejectedBy").references(() => UsersTable.id),
+    ownerRejectedAt: timestamp("ownerRejectedAt"),
   },
   (collaborators) => {
     return {
       pk: uniqueIndex("list_collaborators_pk").on(
         collaborators.listId,
         collaborators.userId
+      ),
+      acceptedMembershipUnique: uniqueIndex(
+        "list_collaborators_accepted_membership_unique"
+      )
+        .on(collaborators.listId, collaborators.userId)
+        .where(
+          sql`${collaborators.inviteStatus} = 'accepted' AND ${collaborators.userId} IS NOT NULL`
+        ),
+      openInviteEmailUnique: uniqueIndex(
+        "list_collaborators_open_invite_email_unique"
+      )
+        .on(collaborators.listId, collaborators.invitedEmailNormalized)
+        .where(
+          sql`${collaborators.inviteStatus} IN ('sent', 'pending_owner_approval') AND ${collaborators.invitedEmailNormalized} IS NOT NULL`
+        ),
+      inviteTokenHashIndex: index("list_collaborators_invite_token_hash_idx").on(
+        collaborators.inviteTokenHash
       ),
     };
   }

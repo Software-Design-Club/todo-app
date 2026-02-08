@@ -25,11 +25,15 @@ export async function upsertListOwnerCollaborator(
       listId: params.listId,
       userId: params.ownerId,
       role: "owner",
+      inviteStatus: "accepted",
+      inviteAcceptedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: [ListCollaboratorsTable.listId, ListCollaboratorsTable.userId],
       set: {
         role: "owner",
+        inviteStatus: "accepted",
+        inviteAcceptedAt: new Date(),
         updatedAt: new Date(),
       },
     })

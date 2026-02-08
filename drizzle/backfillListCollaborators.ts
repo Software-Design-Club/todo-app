@@ -1,6 +1,7 @@
 import { sql } from "@vercel/postgres";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { ListsTable } from "./schema";
+import { ListCollaboratorsTable, ListsTable } from "./schema";
 import { upsertListOwnerCollaborator } from "./ownerCollaborator";
 import type { List, User } from "../lib/types";
 
@@ -19,6 +20,29 @@ async function backfillListCollaborators() {
       .from(ListsTable);
 
     console.log(`Found ${lists.length} lists to backfill`);
+
+    const acceptedNow = new Date();
+    const statusBackfillRows = await db
+      .update(ListCollaboratorsTable)
+      .set({
+        inviteStatus: "accepted",
+        inviteAcceptedAt: acceptedNow,
+        updatedAt: acceptedNow,
+      })
+      .where(
+        and(
+          isNotNull(ListCollaboratorsTable.userId),
+          isNull(ListCollaboratorsTable.invitedEmailNormalized),
+          eq(ListCollaboratorsTable.inviteStatus, "sent")
+        )
+      )
+      .returning({
+        id: ListCollaboratorsTable.id,
+      });
+
+    console.log(
+      `Backfilled inviteStatus to accepted for ${statusBackfillRows.length} legacy collaborator rows`
+    );
 
     let upsertedCount = 0;
 

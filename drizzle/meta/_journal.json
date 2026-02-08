@@ -22,6 +22,27 @@
       "when": 1752425406007,
       "tag": "0002_fast_lady_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1764518400000,
+      "tag": "0003_list_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1764522000000,
+      "tag": "0004_list_state_and_cascade",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770610800000,
+      "tag": "0005_invitation_lifecycle",
+      "breakpoints": true
     }
   ]
 }
