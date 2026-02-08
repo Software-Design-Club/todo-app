@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
 } from "@/ui/dropdown-menu";
 import { getCollaborators } from "@/app/lists/_actions/collaborators";
+import { getInvitationsForList } from "@/app/lists/_actions/invitations";
 import {
   isAuthorizedToEditCollaborators,
   userCanEditList,
@@ -24,6 +25,7 @@ import {
 } from "@/app/lists/_actions/permissions";
 import type { UserRole } from "@/components/ui/role-badge";
 import { Lock, Globe } from "lucide-react";
+import type { ListInvitation } from "@/lib/types";
 
 interface ListProps {
   listId: number;
@@ -36,6 +38,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   const collaborators = await getCollaborators(list.id);
 
   const session = await auth();
+  let invitations: ListInvitation[] = [];
   let editableList = false;
   let editableCollaborators = false;
   let canChangeVisibility = false;
@@ -60,6 +63,13 @@ const List: React.FC<ListProps> = async ({ listId }) => {
 
     if (currentUserCollaborator) {
       userRole = currentUserCollaborator.Role;
+    }
+
+    if (editableCollaborators) {
+      invitations = await getInvitationsForList({
+        listId: list.id,
+        ownerUserId: user.id,
+      });
     }
   }
 
@@ -108,7 +118,9 @@ const List: React.FC<ListProps> = async ({ listId }) => {
                 <DropdownMenuSeparator />
                 <ManageCollaborators
                   listId={list.id}
+                  ownerUserId={user!.id}
                   initialCollaborators={collaborators}
+                  initialInvitations={invitations}
                 />
               </DropdownMenuContent>
             </DropdownMenu>

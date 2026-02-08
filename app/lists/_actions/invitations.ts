@@ -5,11 +5,17 @@ import { eq } from "drizzle-orm";
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { UsersTable } from "@/drizzle/schema";
-import type { InvitationStatus, List, ListInvitation, User } from "@/lib/types";
+import type {
+  InvitationStatus,
+  List,
+  ListInvitation,
+  ListUser,
+  User,
+} from "@/lib/types";
 import { getList } from "@/app/lists/_actions/list";
 import { getCollaborators } from "@/app/lists/_actions/collaborators";
-import { isListOwner } from "@/app/lists/_actions/permissions";
-import { sendInvitationEmail } from "@/lib/email/resend";
+import { buildInvitationAcceptUrl, sendInvitationEmail } from "@/lib/email/resend";
+import { canManageInvitations } from "@/lib/invitations/permissions";
 import {
   approvePendingOwnerInvitation,
   consumeInvitationToken,
@@ -24,9 +30,16 @@ import {
 
 async function assertOwnerAccess(listId: List["id"], userId: User["id"]) {
   const collaborators = await getCollaborators(listId);
-  if (!isListOwner(collaborators, userId)) {
+  if (!isOwnerAuthorizedForInvitationActions(collaborators, userId)) {
     throw new Error("Only the list owner can manage invitations.");
   }
+}
+
+export function isOwnerAuthorizedForInvitationActions(
+  collaborators: ListUser[],
+  userId: User["id"]
+): boolean {
+  return canManageInvitations(collaborators, userId);
 }
 
 async function getInviterName(inviterId: User["id"]): Promise<string> {
@@ -74,7 +87,10 @@ export async function createInvitationForList(params: {
 
   revalidatePath(`/lists/${params.listId}`);
 
-  return updatedInvitation;
+  return {
+    invitation: updatedInvitation,
+    inviteLink: buildInvitationAcceptUrl(inviteToken),
+  };
 }
 
 export async function resendInvitationForList(params: {
@@ -114,7 +130,10 @@ export async function resendInvitationForList(params: {
 
   revalidatePath(`/lists/${params.listId}`);
 
-  return updatedInvitation;
+  return {
+    invitation: updatedInvitation,
+    inviteLink: buildInvitationAcceptUrl(inviteToken),
+  };
 }
 
 export async function revokeInvitationForList(params: {

@@ -394,14 +394,14 @@ Expose invitation workflows in both existing list-level controls and a dedicated
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Owner-only access enforced for invite operations.
-- [ ] Collaborator/non-owner attempts fail with clear server errors.
-- [ ] Pending invites and accepted collaborators are rendered correctly.
-- [ ] `npm run test:integration` and `npm run test:e2e:smoke` pass relevant invite management scenarios.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] Owner-only access enforced for invite operations.
+- [x] Collaborator/non-owner attempts fail with clear server errors.
+- [x] Pending invites and accepted collaborators are rendered correctly.
+- [x] `npm run test:integration` and `npm run test:e2e:smoke` pass relevant invite management scenarios.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
 
