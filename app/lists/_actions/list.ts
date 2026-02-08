@@ -9,6 +9,7 @@ import {
   TodosTable,
 } from "@/drizzle/schema";
 import { upsertListOwnerCollaborator } from "@/drizzle/ownerCollaborator";
+import { revokeOpenInvitationsForList } from "@/lib/invitations/service";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
@@ -355,6 +356,10 @@ export async function archiveList(
     throw new Error("List is already archived");
   }
 
+  await revokeOpenInvitationsForList({
+    listId,
+  });
+
   const db = drizzle(sql);
   const [updatedList] = await db
     .update(ListsTable)
@@ -423,6 +428,10 @@ export async function deleteList(
   if (Number(list.creatorId) !== Number(userId)) {
     throw new Error("Only the list owner can delete this list");
   }
+
+  await revokeOpenInvitationsForList({
+    listId,
+  });
 
   const db = drizzle(sql);
   const result = await db
