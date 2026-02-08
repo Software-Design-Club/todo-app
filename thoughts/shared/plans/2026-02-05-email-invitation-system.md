@@ -341,13 +341,13 @@ Implement invite-link handling with deterministic outcomes across auth states.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:integration` passes token validation and state rendering tests.
-- [ ] `npm run test:e2e:smoke` covers unauthenticated redirect and resumed acceptance.
-- [ ] Authenticated matching-email flow creates accepted collaborator membership.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] `npm run test:integration` passes token validation and state rendering tests.
+- [x] `npm run test:e2e:smoke` covers unauthenticated redirect and resumed acceptance.
+- [x] Authenticated matching-email flow creates accepted collaborator membership.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 5: Add invite acceptance route and sign-in continuation with integration and e2e coverage."`
 
