@@ -64,7 +64,7 @@ Use incremental vertical slices:
 7. Tie invite lifecycle into archive/delete and finalize release hardening.
 
 ## Version Control Workflow (Jujutsu)
-- Before Phase 1, create the feature bookmark: `jj bookmark create codex/email-invitation-system` (or move an existing bookmark with `jj bookmark set codex/email-invitation-system -r @`).
+- Before Phase 1, create the feature bookmark: `jj bookmark create implement-email-invitation-system` (or move an existing bookmark with `jj bookmark set implement-email-invitation-system -r @`).
 - After each phase, make exactly one `jj` commit with a one-sentence message.
 - Use these checkpoint commit commands:
 1. `jj commit -m "Phase 1: Enforce owner collaborator invariants and add environment verification scaffolding."`
