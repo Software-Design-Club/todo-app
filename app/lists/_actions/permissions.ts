@@ -37,6 +37,16 @@ export function isAuthorizedToEditCollaborators(
   );
 }
 
+export function isListOwner(
+  collaborators: ListUser[],
+  userId: User["id"]
+): boolean {
+  return collaborators.some(
+    (collaborator) =>
+      collaborator.User.id === userId && collaborator.Role === "owner"
+  );
+}
+
 export function canBeRemovedAsCollaborator(collaborator: ListUser) {
   const isOwner = collaborator.Role === "owner";
 
@@ -73,4 +83,3 @@ export function canViewList(
   if (!userId) return false;
   return collaborators.some((c) => c.User.id === userId);
 }
-

@@ -286,14 +286,14 @@ Add server-side invitation lifecycle operations and transactional email integrat
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:unit` passes invitation domain tests.
-- [ ] `npm run test:integration` passes invitation action/service tests.
-- [ ] Duplicate open invite reuses row and rotates token.
-- [ ] Revoke/approve/reject transitions are enforced by role and current status.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] `npm run test:unit` passes invitation domain tests.
+- [x] `npm run test:integration` passes invitation action/service tests.
+- [x] Duplicate open invite reuses row and rotates token.
+- [x] Revoke/approve/reject transitions are enforced by role and current status.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 4: Implement invitation domain services and Resend email dispatch with automated tests."`
 

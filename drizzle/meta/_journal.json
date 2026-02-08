@@ -43,6 +43,13 @@
       "when": 1770610800000,
       "tag": "0005_invitation_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770614400000,
+      "tag": "0006_email_delivery_metadata",
+      "breakpoints": true
     }
   ]
 }
