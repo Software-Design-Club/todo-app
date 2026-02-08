@@ -172,13 +172,13 @@ Add the missing test infrastructure so all subsequent phases can be automaticall
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:unit` executes successfully.
-- [ ] `npm run test:integration` executes successfully.
-- [ ] `npm run test:e2e:smoke` executes successfully.
-- [ ] `npm run verify:all` executes successfully.
+- [x] `npm run test:unit` executes successfully.
+- [x] `npm run test:integration` executes successfully.
+- [x] `npm run test:e2e:smoke` executes successfully.
+- [x] `npm run verify:all` executes successfully.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 2: Bootstrap unit, integration, and e2e test harness tooling and scripts."`
 
