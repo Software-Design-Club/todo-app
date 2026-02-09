@@ -40,3 +40,6 @@ next-env.d.ts
 .aider*
 
 .windsurfrules
+
+test-results/
+test-results/.last-run.json

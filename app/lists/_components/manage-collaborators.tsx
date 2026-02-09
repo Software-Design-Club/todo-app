@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import type { User, List, ListInvitation, ListUser } from "@/lib/types";
-import { groupInvitationsForOwnerUi } from "@/lib/invitations/ui";
 import { CollaboratorListItem } from "./collaborator-list-item";
 import {
   searchUsers,
@@ -12,23 +11,24 @@ import {
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
 import {
-  approveInvitationForList,
   createInvitationForList,
-  rejectInvitationForList,
   resendInvitationForList,
   revokeInvitationForList,
+  approveInvitationForList,
+  rejectInvitationForList,
 } from "@/app/lists/_actions/invitations";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
   initialCollaborators: ListUser[];
-  initialInvitations: ListInvitation[];
+  initialInvitations?: ListInvitation[];
 }
 
 export default function ManageCollaborators({
   listId,
   initialCollaborators,
-  initialInvitations,
+  initialInvitations = [],
 }: ManageCollaboratorsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -45,9 +45,6 @@ export default function ManageCollaborators({
   useEffect(() => {
     setCurrentCollaborators(initialCollaborators);
   }, [initialCollaborators]);
-  useEffect(() => {
-    setCurrentInvitations(initialInvitations);
-  }, [initialInvitations]);
 
   const clearMessages = () => {
     setError(null);
@@ -94,7 +91,11 @@ export default function ManageCollaborators({
   });
 
   const removeCollaboratorMutation = useMutation({
-    mutationFn: (listUser: ListUser) => removeCollaborator(listUser),
+    mutationFn: (listUser: ListUser) =>
+      removeCollaborator({
+        listId: listUser.listId,
+        collaboratorUserId: listUser.User.id,
+      }),
     onSuccess: (_, listUser: ListUser) => {
       const removedUser = currentCollaborators.find(
         (c) => c.User.id === listUser.User.id
@@ -127,7 +128,14 @@ export default function ManageCollaborators({
         listId,
         invitedEmail,
       }),
-    onSuccess: ({ invitation }) => {
+    onSuccess: (data) => {
+      if (!data?.invitation) {
+        setSuccessMessage(null);
+        setError("Invitation created but response was invalid.");
+        return;
+      }
+      const { invitation } = data;
+
       setCurrentInvitations((previousInvitations) => {
         const inviteIndex = previousInvitations.findIndex(
           (existingInvite) => existingInvite.id === invitation.id
@@ -142,8 +150,15 @@ export default function ManageCollaborators({
       });
 
       setInviteEmail("");
-      setError(null);
-      setSuccessMessage(`Invitation sent to ${invitation.invitedEmailNormalized}.`);
+      if (invitation.emailDeliveryStatus === "failed") {
+        setError("Email delivery failed. You can copy the invite link instead.");
+        setSuccessMessage(null);
+      } else {
+        setError(null);
+        setSuccessMessage(
+          `Invitation sent to ${invitation.invitedEmailNormalized}.`
+        );
+      }
     },
     onError: (mutationError: Error) => {
       setSuccessMessage(null);
@@ -162,15 +177,14 @@ export default function ManageCollaborators({
         invitationId: params.invitationId,
         listId,
       }).then((response) => ({ ...response, copyAfterResend: params.copyAfterResend })),
-    onSuccess: async ({
-      invitation,
-      inviteLink,
-      copyAfterResend,
-    }: {
-      invitation: ListInvitation;
-      inviteLink: string;
-      copyAfterResend?: boolean;
-    }) => {
+    onSuccess: async (data) => {
+      if (!data?.invitation || !data.inviteLink) {
+        setSuccessMessage(null);
+        setError("Invitation resent but response was invalid.");
+        return;
+      }
+      const { invitation, inviteLink, copyAfterResend } = data;
+
       setCurrentInvitations((previousInvitations) =>
         previousInvitations.map((existingInvite) =>
           existingInvite.id === invitation.id ? invitation : existingInvite
@@ -178,8 +192,12 @@ export default function ManageCollaborators({
       );
 
       if (copyAfterResend) {
-        await navigator.clipboard.writeText(inviteLink);
-        setSuccessMessage("Invite link copied to clipboard.");
+        try {
+          await navigator.clipboard.writeText(inviteLink);
+          setSuccessMessage("Invite link copied to clipboard.");
+        } catch {
+          setSuccessMessage(`Could not copy to clipboard. Link: ${inviteLink}`);
+        }
       } else {
         setSuccessMessage(
           `Invitation resent to ${invitation.invitedEmailNormalized}.`
@@ -202,6 +220,11 @@ export default function ManageCollaborators({
         listId,
       }),
     onSuccess: (invitation) => {
+      if (!invitation) {
+        setSuccessMessage(null);
+        setError("Invitation revoked but response was invalid.");
+        return;
+      }
       setCurrentInvitations((previousInvitations) =>
         previousInvitations.map((existingInvite) =>
           existingInvite.id === invitation.id ? invitation : existingInvite
@@ -225,6 +248,11 @@ export default function ManageCollaborators({
         listId,
       }),
     onSuccess: (invitation) => {
+      if (!invitation) {
+        setSuccessMessage(null);
+        setError("Invitation approved but response was invalid.");
+        return;
+      }
       setCurrentInvitations((previousInvitations) =>
         previousInvitations.map((existingInvite) =>
           existingInvite.id === invitation.id ? invitation : existingInvite
@@ -248,6 +276,11 @@ export default function ManageCollaborators({
         listId,
       }),
     onSuccess: (invitation) => {
+      if (!invitation) {
+        setSuccessMessage(null);
+        setError("Invitation rejected but response was invalid.");
+        return;
+      }
       setCurrentInvitations((previousInvitations) =>
         previousInvitations.map((existingInvite) =>
           existingInvite.id === invitation.id ? invitation : existingInvite
@@ -315,11 +348,26 @@ export default function ManageCollaborators({
   };
 
   const handleCreateInvitation = () => {
-    clearMessages();
-    createInvitationMutation.mutate(inviteEmail);
+    if (inviteEmail.trim()) {
+      clearMessages();
+      createInvitationMutation.mutate(inviteEmail.trim());
+    }
   };
 
-  const invitationGroups = groupInvitationsForOwnerUi(currentInvitations);
+  const invitationGroups = useMemo(() => {
+    const pending: ListInvitation[] = [];
+    const pendingApproval: ListInvitation[] = [];
+
+    for (const invitation of currentInvitations) {
+      if (invitation.inviteStatus === INVITATION_STATUS.SENT) {
+        pending.push(invitation);
+      } else if (invitation.inviteStatus === INVITATION_STATUS.PENDING_APPROVAL) {
+        pendingApproval.push(invitation);
+      }
+    }
+
+    return { pending, pendingApproval };
+  }, [currentInvitations]);
 
   useEffect(() => {
     clearMessages();
@@ -562,13 +610,13 @@ export default function ManageCollaborators({
 
       <div>
         <h3 className="text-md font-semibold mb-2">Owner Approvals</h3>
-        {invitationGroups.pendingOwnerApproval.length === 0 ? (
+        {invitationGroups.pendingApproval.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No invitations are awaiting owner approval.
           </p>
         ) : (
           <ul className="space-y-2 max-h-40 overflow-y-auto">
-            {invitationGroups.pendingOwnerApproval.map((invitation) => (
+            {invitationGroups.pendingApproval.map((invitation) => (
               <li
                 key={invitation.id}
                 className="rounded-md border p-2 text-sm dark:bg-gray-700 dark:border-gray-600"

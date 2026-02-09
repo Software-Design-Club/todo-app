@@ -24,6 +24,7 @@ import {
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
 import type { UserRole } from "@/components/ui/role-badge";
+import type { ListUser } from "@/lib/types";
 import { Lock, Globe } from "lucide-react";
 import type { ListInvitation } from "@/lib/types";
 
@@ -34,10 +35,16 @@ interface ListProps {
 const List: React.FC<ListProps> = async ({ listId }) => {
   const list = await getList(listId);
 
-  const todos = await getTodos(list.id);
-  const collaborators = await getCollaborators(list.id);
-
   const session = await auth();
+  const isPublicActiveList =
+    list.visibility === "public" && list.state === "active";
+  const shouldLoadCollaborators =
+    Boolean(session?.user?.id) || !isPublicActiveList;
+  const collaborators: ListUser[] = shouldLoadCollaborators
+    ? await getCollaborators(list.id)
+    : [];
+  const todos = await getTodos(list.id);
+
   let invitations: ListInvitation[] = [];
   let editableList = false;
   let editableCollaborators = false;

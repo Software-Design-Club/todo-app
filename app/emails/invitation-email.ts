@@ -1,4 +1,4 @@
-interface InvitationEmailTemplateProps {
+interface InvitationEmailParams {
   inviterName: string;
   listTitle: string;
   acceptUrl: string;
@@ -14,17 +14,22 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-export function renderInvitationEmail(props: InvitationEmailTemplateProps): string {
-  const inviterName = escapeHtml(props.inviterName);
-  const listTitle = escapeHtml(props.listTitle);
-  const acceptUrl = escapeHtml(props.acceptUrl);
-  const expiry = escapeHtml(props.expiresAt.toLocaleString());
+export function renderInvitationEmail(params: InvitationEmailParams): string {
+  const inviterName = escapeHtml(params.inviterName);
+  const listTitle = escapeHtml(params.listTitle);
+  const acceptUrl = escapeHtml(params.acceptUrl);
+  const expiry = params.expiresAt.toISOString();
 
-  return `<!DOCTYPE html>
-<main style="font-family: Arial, sans-serif; line-height: 1.5;">
-  <h1>Invitation to collaborate</h1>
-  <p>${inviterName} invited you to collaborate on <strong>${listTitle}</strong>.</p>
-  <p><a href="${acceptUrl}">Accept invitation</a></p>
-  <p>This one-time link expires on ${expiry}.</p>
-</main>`;
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h1 style="font-size: 20px; margin-bottom: 12px;">You're invited to collaborate</h1>
+      <p>${inviterName} invited you to collaborate on <strong>${listTitle}</strong>.</p>
+      <p>
+        <a href="${acceptUrl}" style="color: #2563eb; text-decoration: underline;">
+          Accept invitation
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #6b7280;">This invite expires at ${expiry}.</p>
+    </div>
+  `.trim();
 }

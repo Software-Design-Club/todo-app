@@ -180,6 +180,11 @@ These are maintenance tasks, bugs, and improvements that don't fit into feature 
 4. Begin Task Assignment implementation
 
 **Next Up:**
+- Explore different ways to authorize users before common use cases(edit todo, update list, invite collaborators). Right now it is function that act as guards in the top of actions but those functions make DB calls(could this be avoided? Without adding something like redis or could it in some kind of service/workflow type service that checks it once at the top)
+- Fix depraction warnings
+  - The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+  - Next Lint deprecration
+  - Using '@vercel/postgres' driver for database querying Warning  '@vercel/postgres' can only connect to remote Neon/Vercel 
 - Email Notifications for Task Changes
 - In-App Notification Center
 - Cleanup tasks (UI folder organization, collaborator/creator visibility)

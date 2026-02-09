@@ -3,21 +3,22 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, not, and, or } from "drizzle-orm";
 import {
-  InvitationStatusEnum,
   ListCollaboratorsTable,
   ListsTable,
   TodosTable,
 } from "@/drizzle/schema";
-import { upsertListOwnerCollaborator } from "@/drizzle/ownerCollaborator";
 import { revokeOpenInvitationsForList } from "@/lib/invitations/service";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { createTaggedList, type List, type ListWithRole } from "@/lib/types";
+import { upsertListOwnerCollaborator } from "@/drizzle/ownerCollaborator";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 import { getCollaborators } from "./collaborators";
 import {
   userCanEditList,
   isAuthorizedToChangeVisibility,
+  canViewList,
 } from "./permissions";
 import { requireAuth } from "./require-auth";
 
@@ -33,6 +34,7 @@ export type UsersListTodos = {
 export async function getListWithTodos(
   listId: number
 ): Promise<UsersListTodos> {
+  const { user } = await requireAuth();
   const db = drizzle(sql);
 
   const listsWithTodos = await db
@@ -50,6 +52,13 @@ export async function getListWithTodos(
   if (listsWithTodos.length === 0) {
     notFound();
   }
+
+  const list = createTaggedList(listsWithTodos[0].lists);
+  const collaborators = await getCollaborators(list.id);
+  if (!canViewList(list, collaborators, user.id)) {
+    notFound();
+  }
+
   return {
     id: listsWithTodos[0].lists.id,
     title: listsWithTodos[0].lists.title,
@@ -64,13 +73,24 @@ export async function getListWithTodos(
  * Get record for one list given listId
  */
 export async function getList(listId: number): Promise<List> {
+  const { user } = await requireAuth();
   const db = drizzle(sql);
   const [list] = await db
     .select()
     .from(ListsTable)
     .where(eq(ListsTable.id, listId));
 
-  return createTaggedList(list);
+  if (!list) {
+    notFound();
+  }
+
+  const taggedList = createTaggedList(list);
+  const collaborators = await getCollaborators(taggedList.id);
+  if (!canViewList(taggedList, collaborators, user.id)) {
+    notFound();
+  }
+
+  return taggedList;
 }
 
 /**
@@ -89,9 +109,7 @@ export async function getList(listId: number): Promise<List> {
  * - Active lists are visible to both owners and collaborators
  * - Archived lists are only visible to owners
  */
-export async function getLists(
-  includeArchived: boolean = false
-): Promise<ListWithRole[]> {
+export async function getLists(includeArchived: boolean = false): Promise<ListWithRole[]> {
   const { user } = await requireAuth();
   const userId = user.id;
   const db = drizzle(sql);
@@ -126,10 +144,7 @@ export async function getLists(
       ListCollaboratorsTable,
       and(
         eq(ListsTable.id, ListCollaboratorsTable.listId),
-        eq(
-          ListCollaboratorsTable.inviteStatus,
-          InvitationStatusEnum.enumValues[1]
-        )
+        eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
       )
     )
     .where(and(userCondition, stateCondition));
@@ -176,7 +191,6 @@ export async function getLists(
 export async function createList(formData: FormData) {
   const { user } = await requireAuth();
   const title = formData.get("title")?.toString();
-
   if (!title) {
     throw new Error("Title is required");
   }
@@ -192,14 +206,14 @@ export async function createList(formData: FormData) {
     })
     .returning();
 
-  const ownerRow = await upsertListOwnerCollaborator(db, {
+  if (!newList) {
+    throw new Error("Failed to create list");
+  }
+
+  await upsertListOwnerCollaborator(db, {
     listId: newList.id as List["id"],
     ownerId: user.id,
   });
-
-  if (!ownerRow) {
-    throw new Error("Failed to create owner collaborator record");
-  }
 
   // Revalidate to update the UI
   revalidatePath("/lists");
@@ -308,7 +322,6 @@ export async function updateListVisibility(
   visibility: List["visibility"]
 ): Promise<List> {
   const { user } = await requireAuth();
-  console.log("inside updateVisibility");
   const collaborators = await getCollaborators(listId);
 
   if (!isAuthorizedToChangeVisibility(collaborators, user.id)) {

@@ -56,7 +56,7 @@ export const CollaboratorRoleEnum = pgEnum("collaborator_role", [
 export const InvitationStatusEnum = pgEnum("invitation_status", [
   "sent",
   "accepted",
-  "pending_owner_approval",
+  "pending_approval",
   "revoked",
   "expired",
 ]);
@@ -68,7 +68,8 @@ export const ListCollaboratorsTable = pgTable(
     listId: integer("listId")
       .references(() => ListsTable.id, { onDelete: "cascade" })
       .notNull(),
-    userId: integer("userId").references(() => UsersTable.id),
+    userId: integer("userId")
+      .references(() => UsersTable.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
     role: CollaboratorRoleEnum("role").default("collaborator").notNull(),
@@ -83,11 +84,11 @@ export const ListCollaboratorsTable = pgTable(
     inviteAcceptedAt: timestamp("inviteAcceptedAt"),
     inviteRevokedAt: timestamp("inviteRevokedAt"),
     inviteExpiredAt: timestamp("inviteExpiredAt"),
-    ownerApprovalRequestedAt: timestamp("ownerApprovalRequestedAt"),
-    ownerApprovedBy: integer("ownerApprovedBy").references(() => UsersTable.id),
-    ownerApprovedAt: timestamp("ownerApprovedAt"),
-    ownerRejectedBy: integer("ownerRejectedBy").references(() => UsersTable.id),
-    ownerRejectedAt: timestamp("ownerRejectedAt"),
+    invitationApprovalRequestedAt: timestamp("invitationApprovalRequestedAt"),
+    invitationApprovedBy: integer("invitationApprovedBy").references(() => UsersTable.id),
+    invitationApprovedAt: timestamp("invitationApprovedAt"),
+    invitationRejectedBy: integer("invitationRejectedBy").references(() => UsersTable.id),
+    invitationRejectedAt: timestamp("invitationRejectedAt"),
     emailDeliveryStatus: text("emailDeliveryStatus"),
     emailDeliveryError: text("emailDeliveryError"),
     emailDeliveryProviderId: text("emailDeliveryProviderId"),
@@ -95,6 +96,11 @@ export const ListCollaboratorsTable = pgTable(
   },
   (collaborators) => {
     return {
+      // NOTE: This unique index on (listId, userId) allows duplicate NULL userId values
+      // because PostgreSQL treats each NULL as distinct in unique indexes.
+      // Since userId became nullable for invitation rows, invitation uniqueness now relies on:
+      // - list_collaborators_accepted_membership_unique
+      // - list_collaborators_open_invite_email_unique
       pk: uniqueIndex("list_collaborators_pk").on(
         collaborators.listId,
         collaborators.userId
@@ -111,11 +117,14 @@ export const ListCollaboratorsTable = pgTable(
       )
         .on(collaborators.listId, collaborators.invitedEmailNormalized)
         .where(
-          sql`${collaborators.inviteStatus} IN ('sent', 'pending_owner_approval') AND ${collaborators.invitedEmailNormalized} IS NOT NULL`
+          sql`${collaborators.inviteStatus} IN ('sent', 'pending_approval') AND ${collaborators.invitedEmailNormalized} IS NOT NULL`
         ),
       inviteTokenHashIndex: index("list_collaborators_invite_token_hash_idx").on(
         collaborators.inviteTokenHash
       ),
+      emailDeliveryProviderIdIndex: index(
+        "list_collaborators_email_delivery_provider_id_idx"
+      ).on(collaborators.emailDeliveryProviderId),
     };
   }
 );

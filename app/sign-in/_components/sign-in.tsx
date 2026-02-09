@@ -12,7 +12,7 @@ interface SignInFormProps {
   redirectTo: string;
 }
 
-export default function SignInForm({ redirectTo }: SignInFormProps) {
+export default function SignInForm({ redirectTo = "/" }: SignInFormProps) {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>

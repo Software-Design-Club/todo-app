@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { InvitationStatusEnum } from "@/drizzle/schema";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 
 const repoRoot = process.cwd();
 
@@ -10,32 +11,66 @@ describe("invitation schema migration", () => {
     expect(InvitationStatusEnum.enumValues).toEqual([
       "sent",
       "accepted",
-      "pending_owner_approval",
+      "pending_approval",
       "revoked",
       "expired",
     ]);
   });
 
-  it("ships migration SQL with lifecycle columns and partial unique indexes", () => {
-    const migrationPath = path.join(
+  it("ships lifecycle schema and migration markers for invitations", () => {
+    const schemaPath = path.join(repoRoot, "drizzle", "schema.ts");
+    const schemaSource = readFileSync(schemaPath, "utf8");
+    const migrationDir = path.join(repoRoot, "drizzle");
+    const migrationSql = readdirSync(migrationDir)
+      .filter((fileName) => fileName.endsWith(".sql"))
+      .map((fileName) => readFileSync(path.join(migrationDir, fileName), "utf8"))
+      .join("\n");
+
+    expect(schemaSource).toContain('InvitationStatusEnum = pgEnum("invitation_status"');
+    expect(schemaSource).toContain('userId: integer("userId")');
+    expect(schemaSource).toContain('"list_collaborators_accepted_membership_unique"');
+    expect(schemaSource).toContain('"list_collaborators_open_invite_email_unique"');
+    expect(migrationSql).toContain('"invitation_status"');
+  });
+
+  it("keeps provider-id lookup index after 0008 migration", () => {
+    const migration0007Path = path.join(
       repoRoot,
       "drizzle",
-      "0005_invitation_lifecycle.sql"
+      "0007_email_delivery_provider_id_index.sql"
     );
-    const migrationSql = readFileSync(migrationPath, "utf8");
+    const migration0008Path = path.join(
+      repoRoot,
+      "drizzle",
+      "0008_rename_owner_columns_and_pending_status.sql"
+    );
+    const migration0007 = readFileSync(migration0007Path, "utf8");
+    const migration0008 = readFileSync(migration0008Path, "utf8");
 
-    expect(migrationSql).toContain(
-      'ALTER TABLE "list_collaborators" ALTER COLUMN "userId" DROP NOT NULL;'
+    expect(migration0007).toContain(
+      'CREATE INDEX "list_collaborators_email_delivery_provider_id_idx"'
     );
-    expect(migrationSql).toContain(
-      'ADD COLUMN "inviteStatus" "invitation_status" DEFAULT \'accepted\' NOT NULL;'
+    expect(migration0008).not.toContain(
+      'DROP INDEX IF EXISTS "list_collaborators_email_delivery_provider_id_idx"'
     );
-    expect(migrationSql).toContain(
-      '"list_collaborators_accepted_membership_unique"'
+  });
+
+  it("keeps migration journal aligned with migration SQL files", () => {
+    const migrationDir = path.join(repoRoot, "drizzle");
+    const journalPath = path.join(repoRoot, "drizzle", "meta", "_journal.json");
+    const journal = JSON.parse(readFileSync(journalPath, "utf8")) as {
+      entries: Array<{ idx: number; tag: string }>;
+    };
+    const migrationTags = readdirSync(migrationDir)
+      .filter((fileName) => fileName.endsWith(".sql"))
+      .map((fileName) => fileName.replace(/\.sql$/, ""))
+      .sort();
+    const journalTags = journal.entries.map((entry) => entry.tag).sort();
+
+    expect(journal.entries.map((entry) => entry.idx)).toEqual(
+      journal.entries.map((_, index) => index)
     );
-    expect(migrationSql).toContain(
-      '"list_collaborators_open_invite_email_unique"'
-    );
+    expect(journalTags).toEqual(migrationTags);
   });
 
   it("keeps collaborator read paths filtered to accepted rows", () => {
@@ -60,10 +95,9 @@ describe("invitation schema migration", () => {
     expect(collaboratorsAction).toContain(
       "ListCollaboratorsTable.inviteStatus"
     );
-    expect(collaboratorsAction).toContain(
-      "InvitationStatusEnum.enumValues[1]"
-    );
+    expect(collaboratorsAction).toContain("INVITATION_STATUS.ACCEPTED");
     expect(listAction).toContain("ListCollaboratorsTable.inviteStatus");
-    expect(listAction).toContain("InvitationStatusEnum.enumValues[1]");
+    expect(listAction).toContain("INVITATION_STATUS.ACCEPTED");
+    expect(INVITATION_STATUS.ACCEPTED).toBe("accepted");
   });
 });

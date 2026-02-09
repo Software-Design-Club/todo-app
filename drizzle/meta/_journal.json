@@ -40,15 +40,29 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1770610800000,
+      "when": 1769972400000,
       "tag": "0005_invitation_lifecycle",
       "breakpoints": true
     },
     {
       "idx": 6,
       "version": "7",
-      "when": 1770614400000,
+      "when": 1770058800000,
       "tag": "0006_email_delivery_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770610800000,
+      "tag": "0007_email_delivery_provider_id_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1770700800000,
+      "tag": "0008_rename_owner_columns_and_pending_status",
       "breakpoints": true
     }
   ]
