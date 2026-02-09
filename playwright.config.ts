@@ -6,12 +6,23 @@ export default defineConfig({
   fullyParallel: true,
   reporter: "list",
   use: {
+    baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+  },
+  webServer: {
+    command: "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: true,
+    timeout: 120_000,
   },
   projects: [
     {
       name: "smoke",
-      testMatch: /(smoke|acceptance|owner-management)\.spec\.ts/,
+      testMatch: /smoke\.spec\.ts/,
+    },
+    {
+      name: "e2e",
+      testMatch: /(?!smoke).*\.spec\.ts/,
     },
   ],
 });

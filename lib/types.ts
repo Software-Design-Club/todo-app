@@ -41,6 +41,12 @@ export type ListUser = {
 
 export type InvitationStatus = (typeof InvitationStatusEnum.enumValues)[number];
 
+export type InviteToken = Tagged<string, "InviteToken">;
+export type InviteTokenHash = Tagged<string, "InviteTokenHash">;
+export type InvitedEmailNormalized = Tagged<string, "InvitedEmailNormalized">;
+export type EmailDeliveryStatus = Tagged<string, "EmailDeliveryStatus">;
+export type EmailDeliveryProviderId = Tagged<string, "EmailDeliveryProviderId">;
+
 export type ListInvitation = {
   id: Tagged<
     (typeof ListCollaboratorsTable.$inferSelect)["id"],
@@ -49,22 +55,22 @@ export type ListInvitation = {
   listId: List["id"];
   userId: User["id"] | null;
   inviteStatus: Tagged<InvitationStatus, "InvitationStatus">;
-  invitedEmailNormalized: Tagged<string, "InvitedEmailNormalized"> | null;
-  inviteTokenHash: Tagged<string, "InviteTokenHash"> | null;
+  invitedEmailNormalized: InvitedEmailNormalized | null;
+  inviteTokenHash: InviteTokenHash | null;
   inviteExpiresAt: Date | null;
   inviterId: User["id"] | null;
   inviteSentAt: Date | null;
   inviteAcceptedAt: Date | null;
   inviteRevokedAt: Date | null;
   inviteExpiredAt: Date | null;
-  ownerApprovalRequestedAt: Date | null;
-  ownerApprovedBy: User["id"] | null;
-  ownerApprovedAt: Date | null;
-  ownerRejectedBy: User["id"] | null;
-  ownerRejectedAt: Date | null;
-  emailDeliveryStatus: Tagged<string, "EmailDeliveryStatus"> | null;
+  invitationApprovalRequestedAt: Date | null;
+  invitationApprovedBy: User["id"] | null;
+  invitationApprovedAt: Date | null;
+  invitationRejectedBy: User["id"] | null;
+  invitationRejectedAt: Date | null;
+  emailDeliveryStatus: EmailDeliveryStatus | null;
   emailDeliveryError: string | null;
-  emailDeliveryProviderId: string | null;
+  emailDeliveryProviderId: EmailDeliveryProviderId | null;
   emailLastSentAt: Date | null;
   role: (typeof CollaboratorRoleEnum.enumValues)[number];
   createdAt: Date;
@@ -125,6 +131,29 @@ export const createTaggedListUser = (listUser: {
   };
 };
 
+export const createTaggedListId = (id: number): List["id"] =>
+  id as List["id"];
+
+export const createTaggedUserId = (id: number): User["id"] =>
+  id as User["id"];
+
+export const createTaggedListInvitationId = (id: number): ListInvitation["id"] =>
+  id as ListInvitation["id"];
+
+export const createTaggedInviteToken = (token: string): InviteToken =>
+  token as InviteToken;
+
+export const createTaggedInviteTokenHash = (hash: string): InviteTokenHash =>
+  hash as InviteTokenHash;
+
+export const createTaggedInvitedEmailNormalized = (
+  email: string
+): InvitedEmailNormalized => email as InvitedEmailNormalized;
+
+export const createTaggedEmailDeliveryProviderId = (
+  providerId: string
+): EmailDeliveryProviderId => providerId as EmailDeliveryProviderId;
+
 export const createTaggedListInvitation = (
   invitation: typeof ListCollaboratorsTable.$inferSelect
 ): ListInvitation => {
@@ -145,16 +174,18 @@ export const createTaggedListInvitation = (
     inviteAcceptedAt: invitation.inviteAcceptedAt,
     inviteRevokedAt: invitation.inviteRevokedAt,
     inviteExpiredAt: invitation.inviteExpiredAt,
-    ownerApprovalRequestedAt: invitation.ownerApprovalRequestedAt,
-    ownerApprovedBy: invitation.ownerApprovedBy as User["id"] | null,
-    ownerApprovedAt: invitation.ownerApprovedAt,
-    ownerRejectedBy: invitation.ownerRejectedBy as User["id"] | null,
-    ownerRejectedAt: invitation.ownerRejectedAt,
+    invitationApprovalRequestedAt: invitation.invitationApprovalRequestedAt,
+    invitationApprovedBy: invitation.invitationApprovedBy as User["id"] | null,
+    invitationApprovedAt: invitation.invitationApprovedAt,
+    invitationRejectedBy: invitation.invitationRejectedBy as User["id"] | null,
+    invitationRejectedAt: invitation.invitationRejectedAt,
     emailDeliveryStatus: invitation.emailDeliveryStatus as
       | ListInvitation["emailDeliveryStatus"]
       | null,
     emailDeliveryError: invitation.emailDeliveryError,
-    emailDeliveryProviderId: invitation.emailDeliveryProviderId,
+    emailDeliveryProviderId: invitation.emailDeliveryProviderId as
+      | ListInvitation["emailDeliveryProviderId"]
+      | null,
     emailLastSentAt: invitation.emailLastSentAt,
     role: invitation.role,
     createdAt: invitation.createdAt,

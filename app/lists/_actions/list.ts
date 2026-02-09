@@ -1,19 +1,18 @@
 "use server";
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { eq, not, and, or } from "drizzle-orm";
+import { eq, not, and, or, sql as drizzleSql } from "drizzle-orm";
 import {
-  InvitationStatusEnum,
   ListCollaboratorsTable,
   ListsTable,
   TodosTable,
 } from "@/drizzle/schema";
-import { upsertListOwnerCollaborator } from "@/drizzle/ownerCollaborator";
 import { revokeOpenInvitationsForList } from "@/lib/invitations/service";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { createTaggedList, type List, type ListWithRole } from "@/lib/types";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 import { getCollaborators } from "./collaborators";
 import {
   userCanEditList,
@@ -89,9 +88,7 @@ export async function getList(listId: number): Promise<List> {
  * - Active lists are visible to both owners and collaborators
  * - Archived lists are only visible to owners
  */
-export async function getLists(
-  includeArchived: boolean = false
-): Promise<ListWithRole[]> {
+export async function getLists(includeArchived: boolean = false): Promise<ListWithRole[]> {
   const { user } = await requireAuth();
   const userId = user.id;
   const db = drizzle(sql);
@@ -126,10 +123,7 @@ export async function getLists(
       ListCollaboratorsTable,
       and(
         eq(ListsTable.id, ListCollaboratorsTable.listId),
-        eq(
-          ListCollaboratorsTable.inviteStatus,
-          InvitationStatusEnum.enumValues[1]
-        )
+        eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
       )
     )
     .where(and(userCondition, stateCondition));
@@ -176,7 +170,6 @@ export async function getLists(
 export async function createList(formData: FormData) {
   const { user } = await requireAuth();
   const title = formData.get("title")?.toString();
-
   if (!title) {
     throw new Error("Title is required");
   }
@@ -192,14 +185,31 @@ export async function createList(formData: FormData) {
     })
     .returning();
 
-  const ownerRow = await upsertListOwnerCollaborator(db, {
-    listId: newList.id as List["id"],
-    ownerId: user.id,
-  });
-
-  if (!ownerRow) {
-    throw new Error("Failed to create owner collaborator record");
+  if (!newList) {
+    throw new Error("Failed to create list");
   }
+
+  await db
+    .insert(ListCollaboratorsTable)
+    .values({
+      listId: newList.id,
+      userId: user.id,
+      role: "owner",
+      inviteStatus: INVITATION_STATUS.ACCEPTED,
+      inviteAcceptedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [
+        ListCollaboratorsTable.listId,
+        ListCollaboratorsTable.userId,
+      ],
+      set: {
+        role: "owner",
+        inviteStatus: INVITATION_STATUS.ACCEPTED,
+        inviteAcceptedAt: drizzleSql`COALESCE(${ListCollaboratorsTable.inviteAcceptedAt}, NOW())`,
+        updatedAt: new Date(),
+      },
+    });
 
   // Revalidate to update the UI
   revalidatePath("/lists");
@@ -308,7 +318,6 @@ export async function updateListVisibility(
   visibility: List["visibility"]
 ): Promise<List> {
   const { user } = await requireAuth();
-  console.log("inside updateVisibility");
   const collaborators = await getCollaborators(listId);
 
   if (!isAuthorizedToChangeVisibility(collaborators, user.id)) {

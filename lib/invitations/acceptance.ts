@@ -1,9 +1,10 @@
+import type { List } from "@/lib/types";
 import type { ConsumeInvitationResult } from "./service";
 
 export interface InvitationAcceptanceUiState {
   title: string;
   description: string;
-  listId: number | null;
+  listId: List["id"] | null;
 }
 
 export function getInvitationAcceptanceUiState(
@@ -18,7 +19,7 @@ export function getInvitationAcceptanceUiState(
     };
   }
 
-  if (result.status === "pending_owner_approval_now") {
+  if (result.status === "pending_approval_now") {
     return {
       title: "Awaiting owner approval",
       description:
@@ -36,7 +37,7 @@ export function getInvitationAcceptanceUiState(
     };
   }
 
-  if (result.status === "pending_owner_approval") {
+  if (result.status === "pending_approval") {
     return {
       title: "Owner approval pending",
       description:

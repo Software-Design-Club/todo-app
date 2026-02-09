@@ -13,15 +13,26 @@ const ListPage = async ({ params }: { params: Promise<{ listId: string }> }) => 
     notFound();
   }
 
+  const list = await getList(numericListId);
   const session = await auth();
-  if (!session?.user?.id) {
+  const userId = session?.user?.id ?? null;
+
+  const isPublicActiveList =
+    list.visibility === "public" && list.state === "active";
+
+  if (!userId && isPublicActiveList) {
+    return (
+      <div>
+        <List listId={numericListId} />
+      </div>
+    );
+  }
+
+  if (!userId) {
     redirect("/sign-in");
   }
 
-  const list = await getList(numericListId);
   const collaborators = await getCollaborators(list.id);
-  const userId = session.user.id;
-
   const canView = canViewList(list, collaborators, userId);
 
   if (!canView) {

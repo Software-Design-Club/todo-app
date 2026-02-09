@@ -30,7 +30,7 @@ const UserLists: React.FC<ListsProps> = async ({ currentPath }) => {
             href="/lists/collaborators"
             className="text-sm text-blue-600 hover:underline"
           >
-            Manage Invitations
+            Manage Collaborators
           </Link>
           <CreateListForm />
         </div>

@@ -1,6 +1,8 @@
 import { Resend } from "resend";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import type { WebhookEventPayload } from "resend";
 import { renderInvitationEmail } from "@/app/emails/invitation-email";
+import type { InviteToken, List, ListInvitation } from "@/lib/types";
+import { createTaggedEmailDeliveryProviderId } from "@/lib/types";
 
 interface EmailConfig {
   apiKey: string;
@@ -11,34 +13,35 @@ interface EmailConfig {
 export interface SendInvitationEmailParams {
   toEmail: string;
   inviterName: string;
-  listTitle: string;
-  inviteToken: string;
+  listTitle: List["title"];
+  inviteToken: InviteToken;
   expiresAt: Date;
 }
 
 export interface SendInvitationEmailResult {
   status: "sent" | "failed";
-  providerId: string | null;
+  providerId: ListInvitation["emailDeliveryProviderId"];
   errorMessage: string | null;
 }
 
-export function verifyResendWebhookSignature(params: {
+export function verifyWebhookPayload(params: {
   payload: string;
-  signature: string;
-  secret: string;
-}): boolean {
-  const expectedSignature = createHmac("sha256", params.secret)
-    .update(params.payload)
-    .digest("hex");
+  svixId: string;
+  svixTimestamp: string;
+  svixSignature: string;
+  webhookSecret: string;
+}): WebhookEventPayload {
+  const resend = new Resend(process.env.RESEND_API_KEY?.trim());
 
-  const provided = Buffer.from(params.signature, "utf8");
-  const expected = Buffer.from(expectedSignature, "utf8");
-
-  if (provided.length !== expected.length) {
-    return false;
-  }
-
-  return timingSafeEqual(provided, expected);
+  return resend.webhooks.verify({
+    payload: params.payload,
+    headers: {
+      id: params.svixId,
+      timestamp: params.svixTimestamp,
+      signature: params.svixSignature,
+    },
+    webhookSecret: params.webhookSecret,
+  });
 }
 
 function getEmailConfig(): EmailConfig {
@@ -61,7 +64,7 @@ function getEmailConfig(): EmailConfig {
   return { apiKey, from, appBaseUrl };
 }
 
-export function buildInvitationAcceptUrl(inviteToken: string): string {
+export function buildInvitationAcceptUrl(inviteToken: InviteToken): string {
   const { appBaseUrl } = getEmailConfig();
   const acceptUrl = new URL("/invite", appBaseUrl);
   acceptUrl.searchParams.set("token", inviteToken);
@@ -99,7 +102,9 @@ export async function sendInvitationEmail(
 
   return {
     status: "sent",
-    providerId: response.data?.id ?? null,
+    providerId: response.data?.id
+      ? createTaggedEmailDeliveryProviderId(response.data.id)
+      : null,
     errorMessage: null,
   };
 }

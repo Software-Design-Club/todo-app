@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { List, User } from "@/lib/types";
+import { createTaggedListId, createTaggedUserId } from "@/lib/types";
 import { getInvitationAcceptanceUiState } from "@/lib/invitations/acceptance";
 import { buildSignInRedirectForInvite } from "@/lib/invitations/redirect";
 import {
@@ -21,8 +21,8 @@ describe("invitation acceptance flow", () => {
     const repo = new InMemoryInvitationRepository();
     const created = await createOrRotateInvitation(
       {
-        listId: 42 as List["id"],
-        inviterId: 1 as User["id"],
+        listId: createTaggedListId(42),
+        inviterId: createTaggedUserId(1),
         invitedEmail: "match@example.com",
       },
       repo
@@ -31,7 +31,7 @@ describe("invitation acceptance flow", () => {
     const consumed = await consumeInvitationToken(
       {
         inviteToken: created.inviteToken,
-        userId: 99 as User["id"],
+        userId: createTaggedUserId(99),
         userEmail: "match@example.com",
       },
       repo

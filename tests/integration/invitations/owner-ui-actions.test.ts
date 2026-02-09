@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { ListInvitation, ListUser, User } from "@/lib/types";
+import type { ListInvitation, ListUser } from "@/lib/types";
+import {
+  createTaggedListId,
+  createTaggedListInvitationId,
+  createTaggedUserId,
+  createTaggedUser,
+} from "@/lib/types";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 import { isAuthorizedToEditCollaborators } from "@/app/lists/_actions/permissions";
 import { groupInvitationsForOwnerUi } from "@/lib/invitations/ui";
 
@@ -8,12 +15,12 @@ function buildListUser(params: {
   role: "owner" | "collaborator";
 }): ListUser {
   return {
-    User: {
-      id: params.id as User["id"],
-      email: `user${params.id}@example.com` as User["email"],
-      name: `User ${params.id}` as User["name"],
-    },
-    listId: 1 as ListUser["listId"],
+    User: createTaggedUser({
+      id: params.id,
+      email: `user${params.id}@example.com`,
+      name: `User ${params.id}`,
+    }),
+    listId: createTaggedListId(1),
     Role: params.role,
   };
 }
@@ -23,23 +30,23 @@ function buildInvitation(
   inviteStatus: ListInvitation["inviteStatus"]
 ): ListInvitation {
   return {
-    id: id as ListInvitation["id"],
-    listId: 1 as ListInvitation["listId"],
+    id: createTaggedListInvitationId(id),
+    listId: createTaggedListId(1),
     userId: null,
     inviteStatus,
     invitedEmailNormalized: `invite-${id}@example.com` as ListInvitation["invitedEmailNormalized"],
     inviteTokenHash: null,
     inviteExpiresAt: null,
-    inviterId: 1 as User["id"],
+    inviterId: createTaggedUserId(1),
     inviteSentAt: null,
     inviteAcceptedAt: null,
     inviteRevokedAt: null,
     inviteExpiredAt: null,
-    ownerApprovalRequestedAt: null,
-    ownerApprovedBy: null,
-    ownerApprovedAt: null,
-    ownerRejectedBy: null,
-    ownerRejectedAt: null,
+    invitationApprovalRequestedAt: null,
+    invitationApprovedBy: null,
+    invitationApprovedAt: null,
+    invitationRejectedBy: null,
+    invitationRejectedAt: null,
     emailDeliveryStatus: null,
     emailDeliveryError: null,
     emailDeliveryProviderId: null,
@@ -58,25 +65,25 @@ describe("owner invitation UI actions", () => {
     ];
 
     expect(
-      isAuthorizedToEditCollaborators(collaborators, 1 as User["id"])
+      isAuthorizedToEditCollaborators(collaborators, createTaggedUserId(1))
     ).toBe(true);
     expect(
-      isAuthorizedToEditCollaborators(collaborators, 2 as User["id"])
+      isAuthorizedToEditCollaborators(collaborators, createTaggedUserId(2))
     ).toBe(false);
   });
 
-  it("groups pending and owner-approval invitations for rendering", () => {
+  it("groups pending and approval invitations for rendering", () => {
     const grouped = groupInvitationsForOwnerUi([
-      buildInvitation(1, "sent" as ListInvitation["inviteStatus"]),
+      buildInvitation(1, INVITATION_STATUS.SENT as ListInvitation["inviteStatus"]),
       buildInvitation(
         2,
-        "pending_owner_approval" as ListInvitation["inviteStatus"]
+        INVITATION_STATUS.PENDING_APPROVAL as ListInvitation["inviteStatus"]
       ),
-      buildInvitation(3, "accepted" as ListInvitation["inviteStatus"]),
+      buildInvitation(3, INVITATION_STATUS.ACCEPTED as ListInvitation["inviteStatus"]),
     ]);
 
     expect(grouped.pending).toHaveLength(1);
-    expect(grouped.pendingOwnerApproval).toHaveLength(1);
+    expect(grouped.pendingApproval).toHaveLength(1);
     expect(grouped.terminal).toHaveLength(1);
   });
 });

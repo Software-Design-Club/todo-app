@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getCollaborators } from "@/app/lists/_actions/collaborators";
-import { getInvitationsForList } from "@/app/lists/_actions/invitations";
+import { getCollaboratorsForLists } from "@/app/lists/_actions/collaborators";
 import { getLists } from "@/app/lists/_actions/list";
+import { listInvitationsForLists } from "@/lib/invitations/service";
 import ManageCollaborators from "@/app/lists/_components/manage-collaborators";
 
 export default async function CollaboratorManagementPage() {
@@ -14,23 +14,18 @@ export default async function CollaboratorManagementPage() {
 
   const lists = await getLists();
   const ownerLists = lists.filter((list) => list.userRole === "owner");
+  const listIds = ownerLists.map((list) => list.id);
 
-  const listData = await Promise.all(
-    ownerLists.map(async (list) => {
-      const [collaborators, invitations] = await Promise.all([
-        getCollaborators(list.id),
-        getInvitationsForList({
-          listId: list.id,
-        }),
-      ]);
+  const [collaboratorsMap, invitationsMap] = await Promise.all([
+    getCollaboratorsForLists(listIds),
+    listInvitationsForLists({ listIds }),
+  ]);
 
-      return {
-        list,
-        collaborators,
-        invitations,
-      };
-    })
-  );
+  const listData = ownerLists.map((list) => ({
+    list,
+    collaborators: collaboratorsMap.get(list.id) ?? [],
+    invitations: invitationsMap.get(list.id) ?? [],
+  }));
 
   return (
     <div className="container mx-auto p-4 space-y-6">

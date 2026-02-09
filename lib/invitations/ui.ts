@@ -2,7 +2,7 @@ import type { ListInvitation } from "@/lib/types";
 
 export interface InvitationUiGroups {
   pending: ListInvitation[];
-  pendingOwnerApproval: ListInvitation[];
+  pendingApproval: ListInvitation[];
   terminal: ListInvitation[];
 }
 
@@ -10,8 +10,8 @@ export function groupInvitationsForOwnerUi(
   invitations: ListInvitation[]
 ): InvitationUiGroups {
   const pending = invitations.filter((invitation) => invitation.inviteStatus === "sent");
-  const pendingOwnerApproval = invitations.filter(
-    (invitation) => invitation.inviteStatus === "pending_owner_approval"
+  const pendingApproval = invitations.filter(
+    (invitation) => invitation.inviteStatus === "pending_approval"
   );
   const terminal = invitations.filter(
     (invitation) =>
@@ -22,7 +22,7 @@ export function groupInvitationsForOwnerUi(
 
   return {
     pending,
-    pendingOwnerApproval,
+    pendingApproval,
     terminal,
   };
 }

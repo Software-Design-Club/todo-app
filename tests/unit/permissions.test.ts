@@ -1,133 +1,113 @@
 import { describe, expect, it } from "vitest";
-import { createTaggedList, createTaggedListUser } from "@/lib/types";
 import {
   canBeRemovedAsCollaborator,
   canViewList,
   isAuthorizedToChangeVisibility,
   isAuthorizedToEditCollaborators,
-  isListOwner,
   userCanEditList,
 } from "@/app/lists/_actions/permissions";
+import { createTaggedList, createTaggedListUser, createTaggedUserId } from "@/lib/types";
+
+function buildList(params?: {
+  id?: number;
+  creatorId?: number;
+  visibility?: "private" | "public";
+  state?: "active" | "archived";
+}) {
+  return createTaggedList({
+    id: params?.id ?? 1,
+    title: "Team Tasks",
+    creatorId: params?.creatorId ?? 1,
+    visibility: params?.visibility ?? "private",
+    state: params?.state ?? "active",
+    createdAt: new Date("2026-02-11T00:00:00.000Z"),
+    updatedAt: new Date("2026-02-11T00:00:00.000Z"),
+  });
+}
+
+function buildListUser(params: {
+  id: number;
+  role: "owner" | "collaborator";
+  listId?: number;
+}) {
+  return createTaggedListUser({
+    id: params.id,
+    name: `User ${params.id}`,
+    email: `user${params.id}@example.com`,
+    role: params.role,
+    listId: params.listId ?? 1,
+  });
+}
 
 describe("permissions", () => {
-  const collaborators = [
-    createTaggedListUser({
-      id: 1,
-      name: "User 1",
-      email: "user1@example.com",
-      role: "owner",
-      listId: 1,
-    }),
-    createTaggedListUser({
-      id: 2,
-      name: "User 2",
-      email: "user2@example.com",
-      role: "collaborator",
-      listId: 1,
-    }),
-  ];
+  it("userCanEditList allows owners and collaborators, but not non-members", () => {
+    const collaborators = [
+      buildListUser({ id: 1, role: "owner" }),
+      buildListUser({ id: 2, role: "collaborator" }),
+    ];
 
-  it("allows owners and collaborators to edit list content", () => {
-    expect(userCanEditList(collaborators, collaborators[0].User.id)).toBe(true);
-    expect(userCanEditList(collaborators, collaborators[1].User.id)).toBe(true);
-    expect(
-      userCanEditList(
-        collaborators,
-        createTaggedListUser({
-          id: 3,
-          name: "User 3",
-          email: "user3@example.com",
-          role: "collaborator",
-          listId: 1,
-        }).User.id
-      )
-    ).toBe(false);
+    expect(userCanEditList(collaborators, createTaggedUserId(1))).toBe(true);
+    expect(userCanEditList(collaborators, createTaggedUserId(2))).toBe(true);
+    expect(userCanEditList(collaborators, createTaggedUserId(3))).toBe(false);
     expect(userCanEditList(collaborators, null)).toBe(false);
   });
 
-  it("restricts collaborator-management authorization to owners", () => {
+  it("isAuthorizedToEditCollaborators only allows owners", () => {
+    const collaborators = [
+      buildListUser({ id: 1, role: "owner" }),
+      buildListUser({ id: 2, role: "collaborator" }),
+    ];
+
     expect(
-      isAuthorizedToEditCollaborators(collaborators, collaborators[0].User.id)
+      isAuthorizedToEditCollaborators(collaborators, createTaggedUserId(1))
     ).toBe(true);
     expect(
-      isAuthorizedToEditCollaborators(collaborators, collaborators[1].User.id)
+      isAuthorizedToEditCollaborators(collaborators, createTaggedUserId(2))
     ).toBe(false);
   });
 
-  it("identifies owners correctly", () => {
-    expect(isListOwner(collaborators, collaborators[0].User.id)).toBe(true);
-    expect(isListOwner(collaborators, collaborators[1].User.id)).toBe(false);
-  });
-
-  it("blocks removing owners but allows removing collaborators", () => {
-    expect(canBeRemovedAsCollaborator(collaborators[0])).toBe(false);
-    expect(canBeRemovedAsCollaborator(collaborators[1])).toBe(true);
-  });
-
-  it("restricts visibility changes to owners", () => {
+  it("canBeRemovedAsCollaborator blocks owner removal and allows collaborator removal", () => {
+    expect(canBeRemovedAsCollaborator(buildListUser({ id: 1, role: "owner" }))).toBe(
+      false
+    );
     expect(
-      isAuthorizedToChangeVisibility(collaborators, collaborators[0].User.id)
+      canBeRemovedAsCollaborator(buildListUser({ id: 2, role: "collaborator" }))
+    ).toBe(true);
+  });
+
+  it("isAuthorizedToChangeVisibility only allows owners", () => {
+    const collaborators = [
+      buildListUser({ id: 1, role: "owner" }),
+      buildListUser({ id: 2, role: "collaborator" }),
+    ];
+
+    expect(
+      isAuthorizedToChangeVisibility(collaborators, createTaggedUserId(1))
     ).toBe(true);
     expect(
-      isAuthorizedToChangeVisibility(collaborators, collaborators[1].User.id)
+      isAuthorizedToChangeVisibility(collaborators, createTaggedUserId(2))
     ).toBe(false);
   });
 
-  it("evaluates list viewing rules for active and archived lists", () => {
-    const privateActiveList = createTaggedList({
-      id: 1,
-      title: "Test List",
-      creatorId: 1,
-      visibility: "private",
-      state: "active",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const publicActiveList = createTaggedList({
-      id: 1,
-      title: "Test List",
-      creatorId: 1,
-      visibility: "public",
-      state: "active",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const archivedList = createTaggedList({
-      id: 1,
-      title: "Test List",
-      creatorId: 1,
-      visibility: "private",
-      state: "archived",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  it("canViewList allows private lists only to collaborators", () => {
+    const privateList = buildList({ visibility: "private", state: "active" });
+    const collaborators = [buildListUser({ id: 1, role: "owner" })];
 
-    expect(canViewList(privateActiveList, collaborators, null)).toBe(false);
-    expect(
-      canViewList(privateActiveList, collaborators, collaborators[1].User.id)
-    ).toBe(true);
-    expect(
-      canViewList(
-        privateActiveList,
-        collaborators,
-        createTaggedListUser({
-          id: 3,
-          name: "User 3",
-          email: "user3@example.com",
-          role: "collaborator",
-          listId: 1,
-        }).User.id
-      )
-    ).toBe(false);
+    expect(canViewList(privateList, collaborators, createTaggedUserId(1))).toBe(true);
+    expect(canViewList(privateList, collaborators, createTaggedUserId(9))).toBe(false);
+    expect(canViewList(privateList, collaborators, null)).toBe(false);
+  });
 
-    expect(canViewList(publicActiveList, collaborators, null)).toBe(true);
+  it("canViewList allows public lists to everyone and archived lists only to owners", () => {
+    const collaborators = [
+      buildListUser({ id: 1, role: "owner" }),
+      buildListUser({ id: 2, role: "collaborator" }),
+    ];
+    const publicList = buildList({ visibility: "public", state: "active" });
+    const archivedList = buildList({ visibility: "private", state: "archived" });
 
-    expect(canViewList(archivedList, collaborators, null)).toBe(false);
-    expect(
-      canViewList(archivedList, collaborators, collaborators[0].User.id)
-    ).toBe(true);
-    expect(
-      canViewList(archivedList, collaborators, collaborators[1].User.id)
-    ).toBe(false);
+    expect(canViewList(publicList, collaborators, null)).toBe(true);
+    expect(canViewList(archivedList, collaborators, createTaggedUserId(1))).toBe(true);
+    expect(canViewList(archivedList, collaborators, createTaggedUserId(2))).toBe(false);
   });
 });
