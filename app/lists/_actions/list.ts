@@ -3,7 +3,6 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq, not, and, or } from "drizzle-orm";
 import {
-  InvitationStatusEnum,
   ListCollaboratorsTable,
   ListsTable,
   TodosTable,
@@ -14,6 +13,7 @@ import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
 import { createTaggedList, type List, type ListWithRole } from "@/lib/types";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 import { getCollaborators } from "./collaborators";
 import {
   userCanEditList,
@@ -126,10 +126,7 @@ export async function getLists(
       ListCollaboratorsTable,
       and(
         eq(ListsTable.id, ListCollaboratorsTable.listId),
-        eq(
-          ListCollaboratorsTable.inviteStatus,
-          InvitationStatusEnum.enumValues[1]
-        )
+        eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
       )
     )
     .where(and(userCondition, stateCondition));
@@ -308,7 +305,6 @@ export async function updateListVisibility(
   visibility: List["visibility"]
 ): Promise<List> {
   const { user } = await requireAuth();
-  console.log("inside updateVisibility");
   const collaborators = await getCollaborators(listId);
 
   if (!isAuthorizedToChangeVisibility(collaborators, user.id)) {

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { InvitationStatusEnum } from "@/drizzle/schema";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 
 const repoRoot = process.cwd();
 
@@ -10,7 +11,7 @@ describe("invitation schema migration", () => {
     expect(InvitationStatusEnum.enumValues).toEqual([
       "sent",
       "accepted",
-      "pending_owner_approval",
+      "pending_approval",
       "revoked",
       "expired",
     ]);
@@ -60,10 +61,9 @@ describe("invitation schema migration", () => {
     expect(collaboratorsAction).toContain(
       "ListCollaboratorsTable.inviteStatus"
     );
-    expect(collaboratorsAction).toContain(
-      "InvitationStatusEnum.enumValues[1]"
-    );
+    expect(collaboratorsAction).toContain("INVITATION_STATUS.ACCEPTED");
     expect(listAction).toContain("ListCollaboratorsTable.inviteStatus");
-    expect(listAction).toContain("InvitationStatusEnum.enumValues[1]");
+    expect(listAction).toContain("INVITATION_STATUS.ACCEPTED");
+    expect(INVITATION_STATUS.ACCEPTED).toBe("accepted");
   });
 });

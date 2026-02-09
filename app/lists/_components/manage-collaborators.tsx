@@ -142,8 +142,15 @@ export default function ManageCollaborators({
       });
 
       setInviteEmail("");
-      setError(null);
-      setSuccessMessage(`Invitation sent to ${invitation.invitedEmailNormalized}.`);
+      if (invitation.emailDeliveryStatus === "failed") {
+        setError("Email delivery failed. You can copy the invite link instead.");
+        setSuccessMessage(null);
+      } else {
+        setError(null);
+        setSuccessMessage(
+          `Invitation sent to ${invitation.invitedEmailNormalized}.`
+        );
+      }
     },
     onError: (mutationError: Error) => {
       setSuccessMessage(null);
@@ -178,8 +185,12 @@ export default function ManageCollaborators({
       );
 
       if (copyAfterResend) {
-        await navigator.clipboard.writeText(inviteLink);
-        setSuccessMessage("Invite link copied to clipboard.");
+        try {
+          await navigator.clipboard.writeText(inviteLink);
+          setSuccessMessage("Invite link copied to clipboard.");
+        } catch {
+          setSuccessMessage(`Could not copy to clipboard. Link: ${inviteLink}`);
+        }
       } else {
         setSuccessMessage(
           `Invitation resent to ${invitation.invitedEmailNormalized}.`
@@ -562,13 +573,13 @@ export default function ManageCollaborators({
 
       <div>
         <h3 className="text-md font-semibold mb-2">Owner Approvals</h3>
-        {invitationGroups.pendingOwnerApproval.length === 0 ? (
+        {invitationGroups.pendingApproval.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No invitations are awaiting owner approval.
           </p>
         ) : (
           <ul className="space-y-2 max-h-40 overflow-y-auto">
-            {invitationGroups.pendingOwnerApproval.map((invitation) => (
+            {invitationGroups.pendingApproval.map((invitation) => (
               <li
                 key={invitation.id}
                 className="rounded-md border p-2 text-sm dark:bg-gray-700 dark:border-gray-600"

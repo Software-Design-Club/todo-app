@@ -445,10 +445,10 @@ export async function POST(request: NextRequest) {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `npm run typecheck` passes
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes (webhook tests pass)
-- [ ] `npm run build` succeeds
+- [x] `npm run typecheck` passes
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes (webhook tests pass)
+- [x] `npm run build` succeeds
 
 ---
 
@@ -576,10 +576,10 @@ Since the in-memory repo can't truly simulate `ON CONFLICT`, keep the existing c
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `npm run typecheck` passes
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes (new service tests pass)
-- [ ] `npm run build` succeeds
+- [x] `npm run typecheck` passes
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes (new service tests pass)
+- [x] `npm run build` succeeds
 
 ---
 
@@ -736,10 +736,10 @@ Test the rate limiter in isolation.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `npm run typecheck` passes
-- [ ] `npm run test:unit` passes (validation + rate limit tests)
-- [ ] `npm run test:integration` passes
-- [ ] `npm run build` succeeds
+- [x] `npm run typecheck` passes
+- [x] `npm run test:unit` passes (validation + rate limit tests)
+- [x] `npm run test:integration` passes
+- [x] `npm run build` succeeds
 
 ---
 
@@ -991,11 +991,11 @@ This reduces from 1 + 3N queries to 3 queries total.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run build` succeeds
+- [x] `npm run typecheck` passes
+- [x] `npm run lint` passes
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run build` succeeds
 
 ---
 

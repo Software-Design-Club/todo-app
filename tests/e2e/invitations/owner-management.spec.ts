@@ -1,39 +1,32 @@
 import { expect, test } from "@playwright/test";
-import type { ListInvitation, User } from "../../../lib/types";
-import { groupInvitationsForOwnerUi } from "../../../lib/invitations/ui";
 
-test("owner management grouping includes pending invitation workflows", async () => {
-  const invitation: ListInvitation = {
-    id: 1 as ListInvitation["id"],
-    listId: 1 as ListInvitation["listId"],
-    userId: null,
-    inviteStatus: "sent" as ListInvitation["inviteStatus"],
-    invitedEmailNormalized:
-      "pending@example.com" as ListInvitation["invitedEmailNormalized"],
-    inviteTokenHash: null,
-    inviteExpiresAt: null,
-    inviterId: 1 as User["id"],
-    inviteSentAt: null,
-    inviteAcceptedAt: null,
-    inviteRevokedAt: null,
-    inviteExpiredAt: null,
-    ownerApprovalRequestedAt: null,
-    ownerApprovedBy: null,
-    ownerApprovedAt: null,
-    ownerRejectedBy: null,
-    ownerRejectedAt: null,
-    emailDeliveryStatus: null,
-    emailDeliveryError: null,
-    emailDeliveryProviderId: null,
-    emailLastSentAt: null,
-    role: "collaborator",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+test.describe("invitation flows", () => {
+  test("invite page without token shows invalid invitation message", async ({ page }) => {
+    await page.goto("/invite");
 
-  const grouped = groupInvitationsForOwnerUi([
-    invitation,
-  ]);
+    await expect(
+      page.getByRole("heading", { name: "Invalid invitation" })
+    ).toBeVisible();
+    await expect(
+      page.getByText("The invitation token is missing.")
+    ).toBeVisible();
+  });
 
-  expect(grouped.pending.length).toBe(1);
+  test("invite page with token redirects unauthenticated user to sign-in", async ({ page }) => {
+    await page.goto("/invite?token=test-token-123");
+
+    await page.waitForURL(/\/sign-in/);
+    await expect(
+      page.getByRole("heading", { name: "Sign In" })
+    ).toBeVisible();
+  });
+
+  test("collaborators page requires authentication", async ({ page }) => {
+    await page.goto("/lists/collaborators");
+
+    await page.waitForURL(/\/sign-in/);
+    await expect(
+      page.getByRole("heading", { name: "Sign In" })
+    ).toBeVisible();
+  });
 });

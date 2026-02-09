@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { List, User } from "@/lib/types";
+import { createTaggedListId, createTaggedUserId } from "@/lib/types";
 import {
   approvePendingOwnerInvitation,
   consumeInvitationToken,
   createOrRotateInvitation,
   rejectPendingOwnerInvitation,
+  resendInvitation,
   revokeInvitation,
 } from "@/lib/invitations/service";
 import { InMemoryInvitationRepository } from "./in-memory-repo";
@@ -12,8 +13,8 @@ import { InMemoryInvitationRepository } from "./in-memory-repo";
 describe("invitation service integration", () => {
   it("reuses open rows and rotates tokens for duplicate open invite attempts", async () => {
     const repo = new InMemoryInvitationRepository();
-    const listId = 11 as List["id"];
-    const inviterId = 7 as User["id"];
+    const listId = createTaggedListId(11);
+    const inviterId = createTaggedUserId(7);
 
     const firstInvite = await createOrRotateInvitation(
       { listId, inviterId, invitedEmail: "friend@example.com" },
@@ -29,10 +30,29 @@ describe("invitation service integration", () => {
     expect(secondInvite.inviteToken).not.toBe(firstInvite.inviteToken);
   });
 
+  it("rejects duplicate concurrent createOrRotateInvitation calls with one persisted row", async () => {
+    const repo = new InMemoryInvitationRepository();
+    const listId = createTaggedListId(15);
+    const inviterId = createTaggedUserId(5);
+
+    const [first, second] = await Promise.all([
+      createOrRotateInvitation(
+        { listId, inviterId, invitedEmail: "parallel@example.com" },
+        repo
+      ),
+      createOrRotateInvitation(
+        { listId, inviterId, invitedEmail: "parallel@example.com" },
+        repo
+      ),
+    ]);
+
+    expect(first.invitation.id).toBe(second.invitation.id);
+  });
+
   it("enforces revoke transition against non-open states", async () => {
     const repo = new InMemoryInvitationRepository();
-    const listId = 22 as List["id"];
-    const inviterId = 8 as User["id"];
+    const listId = createTaggedListId(22);
+    const inviterId = createTaggedUserId(8);
 
     const created = await createOrRotateInvitation(
       { listId, inviterId, invitedEmail: "member@example.com" },
@@ -50,11 +70,86 @@ describe("invitation service integration", () => {
     ).rejects.toThrow("Only open invitations can be revoked.");
   });
 
-  it("supports pending-owner-approval approve/reject transitions", async () => {
+  it("prevents resending invitations that are not open", async () => {
     const repo = new InMemoryInvitationRepository();
-    const listId = 33 as List["id"];
-    const inviterId = 9 as User["id"];
-    const ownerId = 10 as User["id"];
+    const listId = createTaggedListId(25);
+    const inviterId = createTaggedUserId(3);
+
+    const created = await createOrRotateInvitation(
+      { listId, inviterId, invitedEmail: "blocked@example.com" },
+      repo
+    );
+
+    await revokeInvitation(
+      { invitationId: created.invitation.id, listId },
+      repo
+    );
+
+    await expect(
+      resendInvitation(
+        { invitationId: created.invitation.id, listId, inviterId },
+        repo
+      )
+    ).rejects.toThrow("Only open invitations can be resent.");
+  });
+
+  it("prevents resending accepted invitations", async () => {
+    const repo = new InMemoryInvitationRepository();
+    const listId = createTaggedListId(26);
+    const inviterId = createTaggedUserId(4);
+
+    const created = await createOrRotateInvitation(
+      { listId, inviterId, invitedEmail: "accepted@example.com" },
+      repo
+    );
+
+    await consumeInvitationToken(
+      {
+        inviteToken: created.inviteToken,
+        userId: createTaggedUserId(99),
+        userEmail: "accepted@example.com",
+      },
+      repo
+    );
+
+    await expect(
+      resendInvitation(
+        { invitationId: created.invitation.id, listId, inviterId },
+        repo
+      )
+    ).rejects.toThrow("Only open invitations can be resent.");
+  });
+
+  it("guards against re-inviting an already accepted collaborator email", async () => {
+    const repo = new InMemoryInvitationRepository();
+    const listId = createTaggedListId(28);
+    const inviterId = createTaggedUserId(12);
+
+    await repo.createInvitation({
+      listId,
+      userId: createTaggedUserId(40),
+      invitedEmailNormalized: "member@example.com",
+      inviterId,
+      role: "collaborator",
+      inviteStatus: "accepted",
+      inviteAcceptedAt: new Date(),
+    });
+
+    await expect(
+      createOrRotateInvitation(
+        { listId, inviterId, invitedEmail: "member@example.com" },
+        repo
+      )
+    ).rejects.toThrow(
+      "This email is already an accepted collaborator on this list."
+    );
+  });
+
+  it("supports pending-approval approve/reject transitions", async () => {
+    const repo = new InMemoryInvitationRepository();
+    const listId = createTaggedListId(33);
+    const inviterId = createTaggedUserId(9);
+    const ownerId = createTaggedUserId(10);
 
     const created = await createOrRotateInvitation(
       { listId, inviterId, invitedEmail: "expected@example.com" },
@@ -64,12 +159,12 @@ describe("invitation service integration", () => {
     const consumed = await consumeInvitationToken(
       {
         inviteToken: created.inviteToken,
-        userId: 99 as User["id"],
+        userId: createTaggedUserId(99),
         userEmail: "different@example.com",
       },
       repo
     );
-    expect(consumed.status).toBe("pending_owner_approval_now");
+    expect(consumed.status).toBe("pending_approval_now");
 
     const approved = await approvePendingOwnerInvitation(
       {

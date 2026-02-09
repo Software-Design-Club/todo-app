@@ -29,6 +29,17 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
   if (!session?.user) {
     redirect(buildSignInRedirectForInvite(token));
   }
+  if (!session.user.email) {
+    return (
+      <div className="mx-auto max-w-xl p-6">
+        <h1 className="text-2xl font-semibold">Account error</h1>
+        <p className="mt-3 text-muted-foreground">
+          Your account is missing an email address. Please sign in with a
+          provider that includes email.
+        </p>
+      </div>
+    );
+  }
 
   const result = await acceptInvitationToken({
     inviteToken: token,

@@ -1,32 +1,29 @@
 "use server";
+
 import { sql } from "@vercel/postgres";
+import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { eq, or, ilike, and } from "drizzle-orm";
-import {
-  InvitationStatusEnum,
-  ListCollaboratorsTable,
-  UsersTable,
-} from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
-import type { List, User, ListUser } from "@/lib/types";
-import { createTaggedUser, createTaggedListUser } from "@/lib/types";
+import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
+import type { List, ListUser, User } from "@/lib/types";
+import { createTaggedListUser, createTaggedUser } from "@/lib/types";
 import {
   canBeRemovedAsCollaborator,
   isAuthorizedToEditCollaborators,
 } from "./permissions";
 import { requireAuth } from "./require-auth";
 
-// Initialize Drizzle client
 const db = drizzle(sql);
 
 export async function searchUsers(searchTerm: string): Promise<User[]> {
   await requireAuth();
-  console.log("[Server Action] Searching users for:", searchTerm);
+
   if (!searchTerm.trim()) {
     return [];
   }
 
-  const lowerSearchTerm = `%${searchTerm.toLowerCase()}%`; // Prepare for ilike
+  const lowerSearchTerm = `%${searchTerm.toLowerCase()}%`;
 
   try {
     const usersFromDb = await db
@@ -42,17 +39,11 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
           ilike(UsersTable.email, lowerSearchTerm)
         )
       )
-      .limit(10); // Add a limit to prevent overly large result sets
+      .limit(10);
 
-    // Map id to string to match the User interface
-    const results: User[] = usersFromDb.map(createTaggedUser);
-
-    return results;
-  } catch (error) {
-    console.error("Database error while searching users:", error);
-    // Optionally, throw a more specific error or return an empty array
-    // throw new Error("Failed to search users due to a database error.");
-    return []; // Return empty array on error to prevent breaking the client
+    return usersFromDb.map(createTaggedUser);
+  } catch {
+    throw new Error("Failed to search users. Please try again.");
   }
 }
 
@@ -61,9 +52,6 @@ export async function addCollaborator(
   listId: List["id"]
 ): Promise<ListUser> {
   const { user: actingUser } = await requireAuth();
-  console.log(
-    `[Server Action] Attempting to add user ${user.id} to list ${listId}.`
-  );
 
   try {
     const collaborators = await getCollaborators(listId);
@@ -71,7 +59,6 @@ export async function addCollaborator(
       throw new Error("Only the list owner can manage collaborators.");
     }
 
-    // Check if the user is already a collaborator
     const existingCollaborator = await db
       .select()
       .from(ListCollaboratorsTable)
@@ -79,60 +66,44 @@ export async function addCollaborator(
         and(
           eq(ListCollaboratorsTable.userId, user.id),
           eq(ListCollaboratorsTable.listId, listId),
-          eq(
-            ListCollaboratorsTable.inviteStatus,
-            InvitationStatusEnum.enumValues[1]
-          )
+          eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
         )
       )
       .limit(1);
 
     if (existingCollaborator.length > 0) {
-      console.log(
-        `User ${user.id} is already a collaborator on list ${listId}.`
-      );
-      // Optionally, throw an error to be caught by useMutation's onError
       throw new Error("User is already a collaborator on this list.");
-      // Or just return if no specific client-side error message is needed for this case
-      // return;
     }
 
-    // Add the new collaborator
-    const result = await db
+    const [inserted] = await db
       .insert(ListCollaboratorsTable)
       .values({
         userId: user.id,
-        listId: listId,
-        inviteStatus: InvitationStatusEnum.enumValues[1],
+        listId,
+        inviteStatus: INVITATION_STATUS.ACCEPTED,
         inviteAcceptedAt: new Date(),
       })
       .returning();
 
-    console.log(
-      `[Server Action] User ${user.id} successfully added as a collaborator to list ${listId}.`
-    );
-
-    // Revalidate the path for the list page to reflect the new collaborator
     revalidatePath(`/lists/${listId}`);
 
-    const insertedUserId = result[0]?.userId;
-    if (!insertedUserId) {
+    if (!inserted?.userId) {
       throw new Error("Failed to persist accepted collaborator membership.");
     }
 
     return createTaggedListUser({
-      id: insertedUserId,
+      id: inserted.userId,
       name: user.name,
       email: user.email,
-      role: result[0].role,
-      listId: result[0].listId,
+      role: inserted.role,
+      listId: inserted.listId,
     });
   } catch (error) {
-    console.error("Database error while adding collaborator:", error);
     if (error instanceof Error) {
       const expectedErrors = [
         "User is already a collaborator on this list.",
         "Only the list owner can manage collaborators.",
+        "Failed to persist accepted collaborator membership.",
       ];
 
       if (expectedErrors.includes(error.message)) {
@@ -148,7 +119,6 @@ export async function getCollaborators(
   listId: List["id"]
 ): Promise<ListUser[]> {
   await requireAuth();
-  console.log("[Server Action] Getting collaborators for list:", listId);
 
   try {
     const collaboratorsFromDb = await db
@@ -164,28 +134,59 @@ export async function getCollaborators(
       .where(
         and(
           eq(ListCollaboratorsTable.listId, listId),
-          eq(
-            ListCollaboratorsTable.inviteStatus,
-            InvitationStatusEnum.enumValues[1]
-          )
+          eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
         )
       );
 
-    // Map id to string to match the User interface
-    const results: ListUser[] = collaboratorsFromDb.map(createTaggedListUser);
+    return collaboratorsFromDb.map(createTaggedListUser);
+  } catch {
+    throw new Error("Failed to load collaborators.");
+  }
+}
 
-    return results;
-  } catch (error) {
-    console.error("Database error while getting collaborators:", error);
-    return []; // Return empty array on error to prevent breaking the client
+export async function getCollaboratorsForLists(
+  listIds: List["id"][]
+): Promise<Map<number, ListUser[]>> {
+  await requireAuth();
+
+  if (listIds.length === 0) {
+    return new Map();
+  }
+
+  try {
+    const rows = await db
+      .select({
+        id: UsersTable.id,
+        name: UsersTable.name,
+        email: UsersTable.email,
+        role: ListCollaboratorsTable.role,
+        listId: ListCollaboratorsTable.listId,
+      })
+      .from(ListCollaboratorsTable)
+      .innerJoin(UsersTable, eq(ListCollaboratorsTable.userId, UsersTable.id))
+      .where(
+        and(
+          inArray(ListCollaboratorsTable.listId, listIds),
+          eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
+        )
+      );
+
+    const result = new Map<number, ListUser[]>();
+    for (const row of rows) {
+      const listId = row.listId;
+      const listCollaborators = result.get(listId) ?? [];
+      listCollaborators.push(createTaggedListUser(row));
+      result.set(listId, listCollaborators);
+    }
+
+    return result;
+  } catch {
+    throw new Error("Failed to load collaborators.");
   }
 }
 
 export async function removeCollaborator(listUser: ListUser): Promise<void> {
   const { user: actingUser } = await requireAuth();
-  console.log(
-    `[Server Action] Attempting to remove user ${listUser.User.id} from list ${listUser.listId}.`
-  );
 
   const collaborators = await getCollaborators(listUser.listId);
   const canManageCollaborators = isAuthorizedToEditCollaborators(
@@ -203,37 +204,19 @@ export async function removeCollaborator(listUser: ListUser): Promise<void> {
   }
 
   try {
-    const result = await db
+    await db
       .delete(ListCollaboratorsTable)
       .where(
         and(
           eq(ListCollaboratorsTable.userId, listUser.User.id),
           eq(ListCollaboratorsTable.listId, listUser.listId),
-          eq(
-            ListCollaboratorsTable.inviteStatus,
-            InvitationStatusEnum.enumValues[1]
-          )
+          eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
         )
       )
       .returning();
 
-    if (result.length === 0) {
-      // This could happen if the collaborator was already removed or never existed.
-      // Depending on requirements, this might not be an error.
-      console.warn(
-        `[Server Action] No collaborator found for user ${listUser.User.id} on list ${listUser.listId} to remove.`
-      );
-      // Optionally, throw an error if it's critical that a record was deleted.
-      // throw new Error("Collaborator not found or already removed.");
-    } else {
-      console.log(
-        `[Server Action] User ${listUser.User.id} successfully removed as a collaborator from list ${listUser.listId}.`
-      );
-    }
-
     revalidatePath(`/lists/${listUser.listId}`);
-  } catch (error) {
-    console.error("Database error while removing collaborator:", error);
+  } catch {
     throw new Error("Failed to remove collaborator due to a database error.");
   }
 }

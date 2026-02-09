@@ -1,8 +1,54 @@
 import type { ListCollaboratorsTable } from "@/drizzle/schema";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 import type { InvitationStatus, List, ListInvitation } from "@/lib/types";
+import { createTaggedListId } from "@/lib/types";
 import type { InvitationRepository } from "@/lib/invitations/service";
 
 type InvitationRow = typeof ListCollaboratorsTable.$inferSelect;
+type InvitationInsert = Omit<
+  typeof ListCollaboratorsTable.$inferInsert,
+  "id" | "createdAt" | "updatedAt"
+>;
+type InvitationUpdate = Partial<Omit<InvitationInsert, "listId">>;
+type InvitationEmail = NonNullable<ListInvitation["invitedEmailNormalized"]>;
+type InvitationTokenHash = NonNullable<ListInvitation["inviteTokenHash"]>;
+type InvitationEmailDeliveryProviderId = NonNullable<
+  ListInvitation["emailDeliveryProviderId"]
+>;
+
+const OPEN_INVITATION_STATUSES: InvitationStatus[] = [
+  INVITATION_STATUS.SENT,
+  INVITATION_STATUS.PENDING_APPROVAL,
+];
+
+function buildRow(id: number, values: InvitationInsert, now: Date): InvitationRow {
+  return {
+    id,
+    listId: values.listId as number,
+    userId: (values.userId ?? null) as number | null,
+    role: values.role ?? "collaborator",
+    inviteStatus: (values.inviteStatus ?? INVITATION_STATUS.ACCEPTED) as InvitationStatus,
+    invitedEmailNormalized: values.invitedEmailNormalized ?? null,
+    inviteTokenHash: values.inviteTokenHash ?? null,
+    inviteExpiresAt: values.inviteExpiresAt ?? null,
+    inviterId: (values.inviterId ?? null) as number | null,
+    inviteSentAt: values.inviteSentAt ?? null,
+    inviteAcceptedAt: values.inviteAcceptedAt ?? null,
+    inviteRevokedAt: values.inviteRevokedAt ?? null,
+    inviteExpiredAt: values.inviteExpiredAt ?? null,
+    invitationApprovalRequestedAt: values.invitationApprovalRequestedAt ?? null,
+    invitationApprovedBy: (values.invitationApprovedBy ?? null) as number | null,
+    invitationApprovedAt: values.invitationApprovedAt ?? null,
+    invitationRejectedBy: (values.invitationRejectedBy ?? null) as number | null,
+    invitationRejectedAt: values.invitationRejectedAt ?? null,
+    emailDeliveryStatus: values.emailDeliveryStatus ?? null,
+    emailDeliveryError: values.emailDeliveryError ?? null,
+    emailDeliveryProviderId: values.emailDeliveryProviderId ?? null,
+    emailLastSentAt: values.emailLastSentAt ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 export class InMemoryInvitationRepository implements InvitationRepository {
   private rows: InvitationRow[] = [];
@@ -10,14 +56,26 @@ export class InMemoryInvitationRepository implements InvitationRepository {
 
   async findOpenByEmail(
     listId: List["id"],
-    invitedEmailNormalized: string
+    invitedEmailNormalized: InvitationEmail
   ): Promise<InvitationRow | null> {
     const row = this.rows.find(
       (candidate) =>
         candidate.listId === listId &&
         candidate.invitedEmailNormalized === invitedEmailNormalized &&
-        (candidate.inviteStatus === "sent" ||
-          candidate.inviteStatus === "pending_owner_approval")
+        OPEN_INVITATION_STATUSES.includes(candidate.inviteStatus)
+    );
+    return row ? { ...row } : null;
+  }
+
+  async findAcceptedByEmail(
+    listId: List["id"],
+    invitedEmailNormalized: InvitationEmail
+  ): Promise<InvitationRow | null> {
+    const row = this.rows.find(
+      (candidate) =>
+        candidate.listId === listId &&
+        candidate.invitedEmailNormalized === invitedEmailNormalized &&
+        candidate.inviteStatus === INVITATION_STATUS.ACCEPTED
     );
     return row ? { ...row } : null;
   }
@@ -32,13 +90,13 @@ export class InMemoryInvitationRepository implements InvitationRepository {
     return row ? { ...row } : null;
   }
 
-  async findByTokenHash(tokenHash: string): Promise<InvitationRow | null> {
+  async findByTokenHash(tokenHash: InvitationTokenHash): Promise<InvitationRow | null> {
     const row = this.rows.find((candidate) => candidate.inviteTokenHash === tokenHash);
     return row ? { ...row } : null;
   }
 
   async findByEmailDeliveryProviderId(
-    providerId: string
+    providerId: InvitationEmailDeliveryProviderId
   ): Promise<InvitationRow | null> {
     const row = this.rows.find(
       (candidate) => candidate.emailDeliveryProviderId === providerId
@@ -46,43 +104,46 @@ export class InMemoryInvitationRepository implements InvitationRepository {
     return row ? { ...row } : null;
   }
 
-  async createInvitation(
-    values: Omit<typeof ListCollaboratorsTable.$inferInsert, "id" | "createdAt" | "updatedAt">
-  ): Promise<InvitationRow> {
-    const now = new Date();
-    const row: InvitationRow = {
-      id: this.nextId++,
-      listId: values.listId as number,
-      userId: (values.userId ?? null) as number | null,
-      role: values.role ?? "collaborator",
-      inviteStatus: (values.inviteStatus ?? "accepted") as InvitationStatus,
-      invitedEmailNormalized: values.invitedEmailNormalized ?? null,
-      inviteTokenHash: values.inviteTokenHash ?? null,
-      inviteExpiresAt: values.inviteExpiresAt ?? null,
-      inviterId: (values.inviterId ?? null) as number | null,
-      inviteSentAt: values.inviteSentAt ?? null,
-      inviteAcceptedAt: values.inviteAcceptedAt ?? null,
-      inviteRevokedAt: values.inviteRevokedAt ?? null,
-      inviteExpiredAt: values.inviteExpiredAt ?? null,
-      ownerApprovalRequestedAt: values.ownerApprovalRequestedAt ?? null,
-      ownerApprovedBy: (values.ownerApprovedBy ?? null) as number | null,
-      ownerApprovedAt: values.ownerApprovedAt ?? null,
-      ownerRejectedBy: (values.ownerRejectedBy ?? null) as number | null,
-      ownerRejectedAt: values.ownerRejectedAt ?? null,
-      emailDeliveryStatus: values.emailDeliveryStatus ?? null,
-      emailDeliveryError: values.emailDeliveryError ?? null,
-      emailDeliveryProviderId: values.emailDeliveryProviderId ?? null,
-      emailLastSentAt: values.emailLastSentAt ?? null,
-      createdAt: now,
-      updatedAt: now,
-    };
+  async createInvitation(values: InvitationInsert): Promise<InvitationRow> {
+    const row = buildRow(this.nextId++, values, new Date());
     this.rows.push(row);
     return { ...row };
   }
 
+  async upsertOpenInvitation(
+    values: InvitationInsert,
+    updateValues: InvitationUpdate
+  ): Promise<{ invitation: InvitationRow; reusedExistingRow: boolean }> {
+    const invitedEmailNormalized = values.invitedEmailNormalized;
+    if (!invitedEmailNormalized) {
+      throw new Error("Cannot upsert invitation without an invited email.");
+    }
+
+    const rowIndex = this.rows.findIndex(
+      (candidate) =>
+        candidate.listId === values.listId &&
+        candidate.invitedEmailNormalized === invitedEmailNormalized &&
+        OPEN_INVITATION_STATUSES.includes(candidate.inviteStatus)
+    );
+
+    if (rowIndex === -1) {
+      const created = buildRow(this.nextId++, values, new Date());
+      this.rows.push(created);
+      return { invitation: { ...created }, reusedExistingRow: false };
+    }
+
+    const updated: InvitationRow = {
+      ...this.rows[rowIndex],
+      ...updateValues,
+      updatedAt: new Date(),
+    };
+    this.rows[rowIndex] = updated;
+    return { invitation: { ...updated }, reusedExistingRow: true };
+  }
+
   async updateInvitation(
     invitationId: ListInvitation["id"],
-    values: Partial<Omit<typeof ListCollaboratorsTable.$inferInsert, "listId">>
+    values: InvitationUpdate
   ): Promise<InvitationRow | null> {
     const rowIndex = this.rows.findIndex((candidate) => candidate.id === invitationId);
     if (rowIndex === -1) {
@@ -101,34 +162,28 @@ export class InMemoryInvitationRepository implements InvitationRepository {
 
   async updateOpenInvitations(
     listId: List["id"],
-    values: Partial<Omit<typeof ListCollaboratorsTable.$inferInsert, "listId">>
+    values: InvitationUpdate
   ): Promise<InvitationRow[]> {
-    const nextRows = this.rows.map((candidate) => {
+    const updatedRows: InvitationRow[] = [];
+
+    this.rows = this.rows.map((candidate) => {
       if (
         candidate.listId !== listId ||
-        (candidate.inviteStatus !== "sent" &&
-          candidate.inviteStatus !== "pending_owner_approval")
+        !OPEN_INVITATION_STATUSES.includes(candidate.inviteStatus)
       ) {
         return candidate;
       }
 
-      return {
+      const updated: InvitationRow = {
         ...candidate,
         ...values,
         updatedAt: new Date(),
       };
+      updatedRows.push(updated);
+      return updated;
     });
 
-    this.rows = nextRows;
-    return nextRows
-      .filter(
-        (candidate) =>
-          candidate.listId === listId &&
-          (candidate.inviteStatus === "revoked" ||
-            candidate.inviteStatus === "sent" ||
-            candidate.inviteStatus === "pending_owner_approval")
-      )
-      .map((row) => ({ ...row }));
+    return updatedRows.map((row) => ({ ...row }));
   }
 
   async listInvitationsByStatus(
@@ -139,6 +194,19 @@ export class InMemoryInvitationRepository implements InvitationRepository {
       .filter(
         (candidate) =>
           candidate.listId === listId && statuses.includes(candidate.inviteStatus)
+      )
+      .map((row) => ({ ...row }));
+  }
+
+  async listInvitationsByListIds(
+    listIds: List["id"][],
+    statuses: InvitationStatus[]
+  ): Promise<InvitationRow[]> {
+    return this.rows
+      .filter(
+        (candidate) =>
+          listIds.includes(createTaggedListId(candidate.listId)) &&
+          statuses.includes(candidate.inviteStatus)
       )
       .map((row) => ({ ...row }));
   }

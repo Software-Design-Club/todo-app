@@ -3,7 +3,7 @@ import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { ListCollaboratorsTable, ListsTable } from "./schema";
 import { upsertListOwnerCollaborator } from "./ownerCollaborator";
-import type { List, User } from "../lib/types";
+import { createTaggedListId, createTaggedUserId } from "../lib/types";
 
 async function backfillListCollaborators() {
   console.log("Starting backfill of ListCollaborators table...");
@@ -11,7 +11,6 @@ async function backfillListCollaborators() {
   const db = drizzle(sql);
 
   try {
-    // Get all lists with their creator information
     const lists = await db
       .select({
         id: ListsTable.id,
@@ -48,10 +47,9 @@ async function backfillListCollaborators() {
 
     for (const list of lists) {
       try {
-        // Upsert the creator as an owner
         await upsertListOwnerCollaborator(db, {
-          listId: list.id as List["id"],
-          ownerId: list.creatorId as User["id"],
+          listId: createTaggedListId(list.id),
+          ownerId: createTaggedUserId(list.creatorId),
         });
 
         console.log(`Upserted owner record for list ${list.id}`);

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyResendWebhookSignature } from "@/lib/email/resend";
+import type { WebhookEventPayload } from "resend";
+import { verifyWebhookPayload } from "@/lib/email/resend";
 import { markInvitationEmailDeliveryByProviderId } from "@/lib/invitations/service";
+import { createTaggedEmailDeliveryProviderId } from "@/lib/types";
 
 const FAILURE_EVENT_TYPES = new Set([
   "email.bounced",
@@ -10,58 +12,55 @@ const FAILURE_EVENT_TYPES = new Set([
 ]);
 
 export async function POST(request: NextRequest) {
-  const rawPayload = await request.text();
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET?.trim();
-
-  if (webhookSecret) {
-    const signatureHeader = request.headers.get("x-resend-signature");
-    if (!signatureHeader) {
-      return NextResponse.json(
-        { error: "Missing webhook signature." },
-        { status: 401 }
-      );
-    }
-
-    const isValid = verifyResendWebhookSignature({
-      payload: rawPayload,
-      signature: signatureHeader,
-      secret: webhookSecret,
-    });
-
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
-    }
+  if (!webhookSecret) {
+    return NextResponse.json(
+      { error: "Webhook secret not configured." },
+      { status: 503 }
+    );
   }
 
-  let payload: Record<string, unknown>;
+  const rawPayload = await request.text();
+  const svixId = request.headers.get("svix-id");
+  const svixTimestamp = request.headers.get("svix-timestamp");
+  const svixSignature = request.headers.get("svix-signature");
+
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return NextResponse.json(
+      { error: "Missing webhook signature headers." },
+      { status: 401 }
+    );
+  }
+
+  let payload: WebhookEventPayload;
   try {
-    payload = JSON.parse(rawPayload) as Record<string, unknown>;
+    payload = verifyWebhookPayload({
+      payload: rawPayload,
+      svixId,
+      svixTimestamp,
+      svixSignature,
+      webhookSecret,
+    });
   } catch {
-    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
   }
 
-  const eventType = String(payload.type ?? "");
-  if (!FAILURE_EVENT_TYPES.has(eventType)) {
+  if (!FAILURE_EVENT_TYPES.has(payload.type)) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  const data = (payload.data ?? {}) as Record<string, unknown>;
-  const providerId =
-    (data.email_id as string | undefined) ??
-    (data.emailId as string | undefined) ??
-    (data.id as string | undefined);
+  const data = payload.data;
+  const providerId = "email_id" in data ? data.email_id : undefined;
 
   if (!providerId) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
   const errorMessage =
-    (data.reason as string | undefined) ??
-    (data.error as string | undefined) ??
-    eventType;
+    ("reason" in data ? (data.reason as string) : undefined) ?? payload.type;
 
   await markInvitationEmailDeliveryByProviderId({
-    providerId,
+    providerId: createTaggedEmailDeliveryProviderId(providerId),
     status: "failed",
     errorMessage,
   });

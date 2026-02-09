@@ -1,22 +1,10 @@
 import SignInForm from "@/app/sign-in/_components/sign-in";
+import { sanitizeRedirectTarget } from "@/lib/validation";
 
 interface SignInPageProps {
   searchParams: Promise<{
     redirectTo?: string;
   }>;
-}
-
-function sanitizeRedirectTarget(redirectTo?: string): string {
-  if (!redirectTo) {
-    return "/";
-  }
-
-  // Prevent open redirects by allowing app-relative paths only.
-  if (!redirectTo.startsWith("/")) {
-    return "/";
-  }
-
-  return redirectTo;
 }
 
 export default async function SignIn({ searchParams }: SignInPageProps) {

@@ -32,7 +32,6 @@ export async function PATCH(
         return new NextResponse("Forbidden", { status: 403 });
       }
     }
-    console.error("Error updating todo:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

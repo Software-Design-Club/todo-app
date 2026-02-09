@@ -1,9 +1,14 @@
-import { sql } from "@vercel/postgres";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { sql as pgSql } from "@vercel/postgres";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { InvitationStatusEnum, ListCollaboratorsTable } from "@/drizzle/schema";
-import type { InvitationStatus, List, ListInvitation, User } from "@/lib/types";
-import { createTaggedListInvitation } from "@/lib/types";
+import { ListCollaboratorsTable } from "@/drizzle/schema";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
+import type { InvitationStatus, InviteToken, List, ListInvitation, User } from "@/lib/types";
+import {
+  createTaggedInvitedEmailNormalized,
+  createTaggedListId,
+  createTaggedListInvitation,
+} from "@/lib/types";
 import {
   generateInvitationToken,
   getInvitationExpiry,
@@ -12,8 +17,16 @@ import {
 } from "./token";
 
 const OPEN_INVITATION_STATUSES: InvitationStatus[] = [
-  "sent",
-  "pending_owner_approval",
+  INVITATION_STATUS.SENT,
+  INVITATION_STATUS.PENDING_APPROVAL,
+];
+
+const ALL_INVITATION_STATUSES: InvitationStatus[] = [
+  INVITATION_STATUS.SENT,
+  INVITATION_STATUS.ACCEPTED,
+  INVITATION_STATUS.PENDING_APPROVAL,
+  INVITATION_STATUS.REVOKED,
+  INVITATION_STATUS.EXPIRED,
 ];
 
 type InvitationRow = typeof ListCollaboratorsTable.$inferSelect;
@@ -24,19 +37,34 @@ type InvitationInsert = Omit<
 >;
 
 type InvitationUpdate = Partial<Omit<InvitationInsert, "listId">>;
+type InvitationEmail = NonNullable<ListInvitation["invitedEmailNormalized"]>;
+type InvitationTokenHash = NonNullable<ListInvitation["inviteTokenHash"]>;
+type InvitationEmailDeliveryProviderId = NonNullable<
+  ListInvitation["emailDeliveryProviderId"]
+>;
 
 export interface InvitationRepository {
   findOpenByEmail(
     listId: List["id"],
-    invitedEmailNormalized: string
+    invitedEmailNormalized: InvitationEmail
+  ): Promise<InvitationRow | null>;
+  findAcceptedByEmail(
+    listId: List["id"],
+    invitedEmailNormalized: InvitationEmail
   ): Promise<InvitationRow | null>;
   findById(
     invitationId: ListInvitation["id"],
     listId: List["id"]
   ): Promise<InvitationRow | null>;
-  findByTokenHash(tokenHash: string): Promise<InvitationRow | null>;
-  findByEmailDeliveryProviderId(providerId: string): Promise<InvitationRow | null>;
+  findByTokenHash(tokenHash: InvitationTokenHash): Promise<InvitationRow | null>;
+  findByEmailDeliveryProviderId(
+    providerId: InvitationEmailDeliveryProviderId
+  ): Promise<InvitationRow | null>;
   createInvitation(values: InvitationInsert): Promise<InvitationRow>;
+  upsertOpenInvitation(
+    values: InvitationInsert,
+    updateValues: InvitationUpdate
+  ): Promise<{ invitation: InvitationRow; reusedExistingRow: boolean }>;
   updateInvitation(
     invitationId: ListInvitation["id"],
     values: InvitationUpdate
@@ -49,14 +77,20 @@ export interface InvitationRepository {
     listId: List["id"],
     statuses: InvitationStatus[]
   ): Promise<InvitationRow[]>;
+  listInvitationsByListIds(
+    listIds: List["id"][],
+    statuses: InvitationStatus[]
+  ): Promise<InvitationRow[]>;
 }
 
+type DatabaseClient = ReturnType<typeof drizzle>;
+
 class DrizzleInvitationRepository implements InvitationRepository {
-  private db = drizzle(sql);
+  constructor(private db: DatabaseClient) {}
 
   async findOpenByEmail(
     listId: List["id"],
-    invitedEmailNormalized: string
+    invitedEmailNormalized: InvitationEmail
   ): Promise<InvitationRow | null> {
     const [row] = await this.db
       .select()
@@ -66,6 +100,25 @@ class DrizzleInvitationRepository implements InvitationRepository {
           eq(ListCollaboratorsTable.listId, listId),
           eq(ListCollaboratorsTable.invitedEmailNormalized, invitedEmailNormalized),
           inArray(ListCollaboratorsTable.inviteStatus, OPEN_INVITATION_STATUSES)
+        )
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findAcceptedByEmail(
+    listId: List["id"],
+    invitedEmailNormalized: InvitationEmail
+  ): Promise<InvitationRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(ListCollaboratorsTable)
+      .where(
+        and(
+          eq(ListCollaboratorsTable.listId, listId),
+          eq(ListCollaboratorsTable.invitedEmailNormalized, invitedEmailNormalized),
+          eq(ListCollaboratorsTable.inviteStatus, INVITATION_STATUS.ACCEPTED)
         )
       )
       .limit(1);
@@ -91,7 +144,7 @@ class DrizzleInvitationRepository implements InvitationRepository {
     return row ?? null;
   }
 
-  async findByTokenHash(tokenHash: string): Promise<InvitationRow | null> {
+  async findByTokenHash(tokenHash: InvitationTokenHash): Promise<InvitationRow | null> {
     const [row] = await this.db
       .select()
       .from(ListCollaboratorsTable)
@@ -102,7 +155,7 @@ class DrizzleInvitationRepository implements InvitationRepository {
   }
 
   async findByEmailDeliveryProviderId(
-    providerId: string
+    providerId: InvitationEmailDeliveryProviderId
   ): Promise<InvitationRow | null> {
     const [row] = await this.db
       .select()
@@ -124,6 +177,48 @@ class DrizzleInvitationRepository implements InvitationRepository {
     }
 
     return created;
+  }
+
+  async upsertOpenInvitation(
+    values: InvitationInsert,
+    updateValues: InvitationUpdate
+  ): Promise<{ invitation: InvitationRow; reusedExistingRow: boolean }> {
+    const invitedEmailNormalized = values.invitedEmailNormalized as
+      | InvitationEmail
+      | null;
+    if (!invitedEmailNormalized) {
+      throw new Error("Cannot upsert invitation without an invited email.");
+    }
+
+    const existingOpenInvite = await this.findOpenByEmail(
+      values.listId as List["id"],
+      invitedEmailNormalized
+    );
+
+    const [invitation] = await this.db
+      .insert(ListCollaboratorsTable)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          ListCollaboratorsTable.listId,
+          ListCollaboratorsTable.invitedEmailNormalized,
+        ],
+        targetWhere: sql`${ListCollaboratorsTable.inviteStatus} IN ('sent', 'pending_approval') AND ${ListCollaboratorsTable.invitedEmailNormalized} IS NOT NULL`,
+        set: {
+          ...updateValues,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    if (!invitation) {
+      throw new Error("Failed to upsert invitation.");
+    }
+
+    return {
+      invitation,
+      reusedExistingRow: Boolean(existingOpenInvite),
+    };
   }
 
   async updateInvitation(
@@ -180,18 +275,42 @@ class DrizzleInvitationRepository implements InvitationRepository {
       )
       .orderBy(desc(ListCollaboratorsTable.updatedAt));
   }
+
+  async listInvitationsByListIds(
+    listIds: List["id"][],
+    statuses: InvitationStatus[]
+  ): Promise<InvitationRow[]> {
+    if (listIds.length === 0 || statuses.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(ListCollaboratorsTable)
+      .where(
+        and(
+          inArray(ListCollaboratorsTable.listId, listIds),
+          inArray(ListCollaboratorsTable.inviteStatus, statuses)
+        )
+      )
+      .orderBy(desc(ListCollaboratorsTable.updatedAt));
+  }
 }
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
+function normalizeEmail(email: string): InvitationEmail {
+  return createTaggedInvitedEmailNormalized(email.trim().toLowerCase());
 }
 
 function getRepository(repo?: InvitationRepository): InvitationRepository {
-  return repo ?? new DrizzleInvitationRepository();
+  return repo ?? new DrizzleInvitationRepository(drizzle(pgSql));
 }
 
 function toTaggedInvitation(invitation: InvitationRow): ListInvitation {
   return createTaggedListInvitation(invitation);
+}
+
+function toInvitationId(id: number): ListInvitation["id"] {
+  return id as ListInvitation["id"];
 }
 
 export interface UpsertInvitationParams {
@@ -202,7 +321,7 @@ export interface UpsertInvitationParams {
 
 export interface UpsertInvitationResult {
   invitation: ListInvitation;
-  inviteToken: string;
+  inviteToken: InviteToken;
   reusedExistingRow: boolean;
 }
 
@@ -214,18 +333,23 @@ export async function createOrRotateInvitation(
   const now = new Date();
   const invitedEmailNormalized = normalizeEmail(params.invitedEmail);
 
-  const { token: inviteToken, tokenHash } = generateInvitationToken();
-  const inviteExpiresAt = getInvitationExpiry(now);
-
-  const existingOpenInvite = await invitationRepo.findOpenByEmail(
+  const existingAccepted = await invitationRepo.findAcceptedByEmail(
     params.listId,
     invitedEmailNormalized
   );
+  if (existingAccepted) {
+    throw new Error(
+      "This email is already an accepted collaborator on this list."
+    );
+  }
 
-  const commonValues: InvitationUpdate = {
+  const { token: inviteToken, tokenHash } = generateInvitationToken();
+  const inviteExpiresAt = getInvitationExpiry(now);
+
+  const updateValues: InvitationUpdate = {
     userId: null,
     role: "collaborator",
-    inviteStatus: InvitationStatusEnum.enumValues[0],
+    inviteStatus: INVITATION_STATUS.SENT,
     invitedEmailNormalized,
     inviteTokenHash: tokenHash,
     inviteExpiresAt,
@@ -234,32 +358,31 @@ export async function createOrRotateInvitation(
     inviteAcceptedAt: null,
     inviteRevokedAt: null,
     inviteExpiredAt: null,
-    ownerApprovalRequestedAt: null,
-    ownerApprovedBy: null,
-    ownerApprovedAt: null,
-    ownerRejectedBy: null,
-    ownerRejectedAt: null,
+    invitationApprovalRequestedAt: null,
+    invitationApprovedBy: null,
+    invitationApprovedAt: null,
+    invitationRejectedBy: null,
+    invitationRejectedAt: null,
     emailDeliveryStatus: null,
     emailDeliveryError: null,
     emailDeliveryProviderId: null,
     emailLastSentAt: null,
   };
 
-  const invitation = existingOpenInvite
-    ? await invitationRepo.updateInvitation(existingOpenInvite.id as ListInvitation["id"], commonValues)
-    : await invitationRepo.createInvitation({
-        ...commonValues,
-        listId: params.listId,
-      } as InvitationInsert);
+  const insertValues: InvitationInsert = {
+    listId: params.listId,
+    ...updateValues,
+  };
 
-  if (!invitation) {
-    throw new Error("Failed to upsert invitation.");
-  }
+  const { invitation, reusedExistingRow } = await invitationRepo.upsertOpenInvitation(
+    insertValues,
+    updateValues
+  );
 
   return {
     invitation: toTaggedInvitation(invitation),
     inviteToken,
-    reusedExistingRow: Boolean(existingOpenInvite),
+    reusedExistingRow,
   };
 }
 
@@ -270,7 +393,7 @@ export async function resendInvitation(
     inviterId: User["id"];
   },
   repo?: InvitationRepository
-): Promise<{ invitation: ListInvitation; inviteToken: string }> {
+): Promise<{ invitation: ListInvitation; inviteToken: InviteToken }> {
   const invitationRepo = getRepository(repo);
   const now = new Date();
   const existingInvite = await invitationRepo.findById(
@@ -281,6 +404,9 @@ export async function resendInvitation(
   if (!existingInvite) {
     throw new Error("Invitation not found.");
   }
+  if (!OPEN_INVITATION_STATUSES.includes(existingInvite.inviteStatus)) {
+    throw new Error("Only open invitations can be resent.");
+  }
 
   const invitedEmailNormalized = existingInvite.invitedEmailNormalized;
   if (!invitedEmailNormalized) {
@@ -290,7 +416,7 @@ export async function resendInvitation(
   const { token: inviteToken, tokenHash } = generateInvitationToken();
   const updatedInvite = await invitationRepo.updateInvitation(params.invitationId, {
     userId: null,
-    inviteStatus: InvitationStatusEnum.enumValues[0],
+    inviteStatus: INVITATION_STATUS.SENT,
     inviterId: params.inviterId,
     inviteTokenHash: tokenHash,
     inviteExpiresAt: getInvitationExpiry(now),
@@ -298,11 +424,11 @@ export async function resendInvitation(
     inviteAcceptedAt: null,
     inviteRevokedAt: null,
     inviteExpiredAt: null,
-    ownerApprovalRequestedAt: null,
-    ownerApprovedBy: null,
-    ownerApprovedAt: null,
-    ownerRejectedBy: null,
-    ownerRejectedAt: null,
+    invitationApprovalRequestedAt: null,
+    invitationApprovedBy: null,
+    invitationApprovedAt: null,
+    invitationRejectedBy: null,
+    invitationRejectedAt: null,
     emailDeliveryStatus: null,
     emailDeliveryError: null,
     emailDeliveryProviderId: null,
@@ -342,7 +468,7 @@ export async function revokeInvitation(
   }
 
   const updatedInvite = await invitationRepo.updateInvitation(params.invitationId, {
-    inviteStatus: InvitationStatusEnum.enumValues[3],
+    inviteStatus: INVITATION_STATUS.REVOKED,
     inviteTokenHash: null,
     inviteExpiresAt: null,
     inviteRevokedAt: now,
@@ -370,7 +496,7 @@ export async function approvePendingOwnerInvitation(
   if (!invite) {
     throw new Error("Invitation not found.");
   }
-  if (invite.inviteStatus !== "pending_owner_approval") {
+  if (invite.inviteStatus !== INVITATION_STATUS.PENDING_APPROVAL) {
     throw new Error("Invitation is not pending owner approval.");
   }
   if (!invite.userId) {
@@ -378,14 +504,14 @@ export async function approvePendingOwnerInvitation(
   }
 
   const updated = await invitationRepo.updateInvitation(params.invitationId, {
-    inviteStatus: InvitationStatusEnum.enumValues[1],
+    inviteStatus: INVITATION_STATUS.ACCEPTED,
     inviteAcceptedAt: now,
     inviteTokenHash: null,
     inviteExpiresAt: null,
-    ownerApprovedBy: params.ownerId,
-    ownerApprovedAt: now,
-    ownerRejectedBy: null,
-    ownerRejectedAt: null,
+    invitationApprovedBy: params.ownerId,
+    invitationApprovedAt: now,
+    invitationRejectedBy: null,
+    invitationRejectedAt: null,
   });
 
   if (!updated) {
@@ -410,17 +536,17 @@ export async function rejectPendingOwnerInvitation(
   if (!invite) {
     throw new Error("Invitation not found.");
   }
-  if (invite.inviteStatus !== "pending_owner_approval") {
+  if (invite.inviteStatus !== INVITATION_STATUS.PENDING_APPROVAL) {
     throw new Error("Invitation is not pending owner approval.");
   }
 
   const updated = await invitationRepo.updateInvitation(params.invitationId, {
-    inviteStatus: InvitationStatusEnum.enumValues[3],
+    inviteStatus: INVITATION_STATUS.REVOKED,
     inviteTokenHash: null,
     inviteExpiresAt: null,
     inviteRevokedAt: now,
-    ownerRejectedBy: params.ownerId,
-    ownerRejectedAt: now,
+    invitationRejectedBy: params.ownerId,
+    invitationRejectedAt: now,
   });
 
   if (!updated) {
@@ -438,12 +564,37 @@ export async function listInvitationsForList(
   repo?: InvitationRepository
 ): Promise<ListInvitation[]> {
   const invitationRepo = getRepository(repo);
-  const statuses = params.statuses ?? InvitationStatusEnum.enumValues;
+  const statuses = params.statuses ?? ALL_INVITATION_STATUSES;
   const invitations = await invitationRepo.listInvitationsByStatus(
     params.listId,
     statuses
   );
   return invitations.map(toTaggedInvitation);
+}
+
+export async function listInvitationsForLists(
+  params: {
+    listIds: List["id"][];
+    statuses?: InvitationStatus[];
+  },
+  repo?: InvitationRepository
+): Promise<Map<List["id"], ListInvitation[]>> {
+  const invitationRepo = getRepository(repo);
+  const statuses = params.statuses ?? ALL_INVITATION_STATUSES;
+  const invitations = await invitationRepo.listInvitationsByListIds(
+    params.listIds,
+    statuses
+  );
+
+  const result = new Map<List["id"], ListInvitation[]>();
+  for (const invitation of invitations) {
+    const listId = createTaggedListId(invitation.listId);
+    const listInvitations = result.get(listId) ?? [];
+    listInvitations.push(toTaggedInvitation(invitation));
+    result.set(listId, listInvitations);
+  }
+
+  return result;
 }
 
 export async function getInvitationByIdForList(
@@ -463,13 +614,13 @@ export async function getInvitationByIdForList(
 
 export type ConsumeInvitationResult =
   | { status: "invalid" }
-  | { status: "revoked" | "expired" | "accepted" | "pending_owner_approval" }
+  | { status: "revoked" | "expired" | "accepted" | "pending_approval" }
   | { status: "accepted_now"; invitation: ListInvitation }
-  | { status: "pending_owner_approval_now"; invitation: ListInvitation };
+  | { status: "pending_approval_now"; invitation: ListInvitation };
 
 export async function consumeInvitationToken(
   params: {
-    inviteToken: string;
+    inviteToken: InviteToken;
     userId: User["id"];
     userEmail: string;
   },
@@ -484,22 +635,22 @@ export async function consumeInvitationToken(
     return { status: "invalid" };
   }
 
-  if (invite.inviteStatus === "revoked") {
+  if (invite.inviteStatus === INVITATION_STATUS.REVOKED) {
     return { status: "revoked" };
   }
-  if (invite.inviteStatus === "accepted") {
+  if (invite.inviteStatus === INVITATION_STATUS.ACCEPTED) {
     return { status: "accepted" };
   }
-  if (invite.inviteStatus === "pending_owner_approval") {
-    return { status: "pending_owner_approval" };
+  if (invite.inviteStatus === INVITATION_STATUS.PENDING_APPROVAL) {
+    return { status: "pending_approval" };
   }
-  if (invite.inviteStatus === "expired") {
+  if (invite.inviteStatus === INVITATION_STATUS.EXPIRED) {
     return { status: "expired" };
   }
 
   if (isInvitationExpired(invite.inviteExpiresAt, now)) {
-    await invitationRepo.updateInvitation(invite.id as ListInvitation["id"], {
-      inviteStatus: InvitationStatusEnum.enumValues[4],
+    await invitationRepo.updateInvitation(toInvitationId(invite.id), {
+      inviteStatus: INVITATION_STATUS.EXPIRED,
       inviteTokenHash: null,
       inviteExpiredAt: now,
     });
@@ -513,28 +664,26 @@ export async function consumeInvitationToken(
   }
 
   const normalizedUserEmail = normalizeEmail(params.userEmail);
-  const status =
+  const status: InvitationStatus =
     normalizedUserEmail === inviteEmail
-      ? (InvitationStatusEnum.enumValues[1] as InvitationStatus)
-      : (InvitationStatusEnum.enumValues[2] as InvitationStatus);
+      ? INVITATION_STATUS.ACCEPTED
+      : INVITATION_STATUS.PENDING_APPROVAL;
 
-  const updated = await invitationRepo.updateInvitation(
-    invite.id as ListInvitation["id"],
-    {
-      userId: params.userId,
-      inviteStatus: status,
-      inviteTokenHash: null,
-      inviteExpiresAt: null,
-      inviteAcceptedAt: status === "accepted" ? now : null,
-      ownerApprovalRequestedAt: status === "pending_owner_approval" ? now : null,
-    }
-  );
+  const updated = await invitationRepo.updateInvitation(toInvitationId(invite.id), {
+    userId: params.userId,
+    inviteStatus: status,
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    inviteAcceptedAt: status === INVITATION_STATUS.ACCEPTED ? now : null,
+    invitationApprovalRequestedAt:
+      status === INVITATION_STATUS.PENDING_APPROVAL ? now : null,
+  });
 
   if (!updated) {
     return { status: "invalid" };
   }
 
-  if (status === "accepted") {
+  if (status === INVITATION_STATUS.ACCEPTED) {
     return {
       status: "accepted_now",
       invitation: toTaggedInvitation(updated),
@@ -542,7 +691,7 @@ export async function consumeInvitationToken(
   }
 
   return {
-    status: "pending_owner_approval_now",
+    status: "pending_approval_now",
     invitation: toTaggedInvitation(updated),
   };
 }
@@ -551,7 +700,7 @@ export async function markInvitationEmailDelivery(
   params: {
     invitationId: ListInvitation["id"];
     status: "sent" | "failed";
-    providerId: string | null;
+    providerId: ListInvitation["emailDeliveryProviderId"];
     errorMessage: string | null;
   },
   repo?: InvitationRepository
@@ -575,7 +724,7 @@ export async function markInvitationEmailDelivery(
 
 export async function markInvitationEmailDeliveryByProviderId(
   params: {
-    providerId: string;
+    providerId: InvitationEmailDeliveryProviderId;
     status: "sent" | "failed";
     errorMessage: string | null;
   },
@@ -590,7 +739,7 @@ export async function markInvitationEmailDeliveryByProviderId(
   }
 
   const updated = await invitationRepo.updateInvitation(
-    existing.id as ListInvitation["id"],
+    toInvitationId(existing.id),
     {
       emailDeliveryStatus: params.status,
       emailDeliveryError: params.errorMessage,
@@ -610,7 +759,7 @@ export async function revokeOpenInvitationsForList(
   const invitationRepo = getRepository(repo);
   const now = new Date();
   const updated = await invitationRepo.updateOpenInvitations(params.listId, {
-    inviteStatus: "revoked",
+    inviteStatus: INVITATION_STATUS.REVOKED,
     inviteTokenHash: null,
     inviteExpiresAt: null,
     inviteRevokedAt: now,

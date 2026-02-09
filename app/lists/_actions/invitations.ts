@@ -12,6 +12,7 @@ import type {
   ListUser,
   User,
 } from "@/lib/types";
+import { createTaggedInviteToken } from "@/lib/types";
 import { getList } from "@/app/lists/_actions/list";
 import { getCollaborators } from "@/app/lists/_actions/collaborators";
 import { buildInvitationAcceptUrl, sendInvitationEmail } from "@/lib/email/resend";
@@ -26,6 +27,8 @@ import {
   resendInvitation,
   revokeInvitation,
 } from "@/lib/invitations/service";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { isValidEmail } from "@/lib/validation";
 import { isAuthorizedToEditCollaborators } from "./permissions";
 import { requireAuth } from "./require-auth";
 
@@ -62,18 +65,32 @@ export async function createInvitationForList(params: {
   listId: List["id"];
   invitedEmail: string;
 }) {
+  const trimmedEmail = params.invitedEmail.trim();
+  if (!isValidEmail(trimmedEmail)) {
+    throw new Error("Please enter a valid email address.");
+  }
+
   const user = await assertOwnerAccess(params.listId);
+  const { allowed } = checkRateLimit({
+    key: `invite:${user.id}`,
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!allowed) {
+    throw new Error("Too many invitations. Please wait before trying again.");
+  }
+
   const list = await getList(params.listId);
   const inviterName = await getInviterName(user.id);
 
   const { invitation, inviteToken } = await createOrRotateInvitation({
     listId: params.listId,
     inviterId: user.id,
-    invitedEmail: params.invitedEmail,
+    invitedEmail: trimmedEmail,
   });
 
   const emailDelivery = await sendInvitationEmail({
-    toEmail: params.invitedEmail.trim().toLowerCase(),
+    toEmail: trimmedEmail.toLowerCase(),
     inviterName,
     listTitle: list.title,
     inviteToken,
@@ -100,6 +117,15 @@ export async function resendInvitationForList(params: {
   listId: List["id"];
 }) {
   const user = await assertOwnerAccess(params.listId);
+  const { allowed } = checkRateLimit({
+    key: `invite:${user.id}`,
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!allowed) {
+    throw new Error("Too many invitations. Please wait before trying again.");
+  }
+
   const list = await getList(params.listId);
   const inviterName = await getInviterName(user.id);
 
@@ -212,7 +238,7 @@ export async function acceptInvitationToken(params: {
   const { user } = await requireAuth();
 
   return consumeInvitationToken({
-    inviteToken: params.inviteToken,
+    inviteToken: createTaggedInviteToken(params.inviteToken),
     userId: user.id,
     userEmail: user.email,
   });
