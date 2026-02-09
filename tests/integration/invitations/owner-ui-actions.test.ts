@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ListInvitation, ListUser, User } from "@/lib/types";
-import { canManageInvitations } from "@/lib/invitations/permissions";
+import { isAuthorizedToEditCollaborators } from "@/app/lists/_actions/permissions";
 import { groupInvitationsForOwnerUi } from "@/lib/invitations/ui";
 
 function buildListUser(params: {
@@ -57,8 +57,12 @@ describe("owner invitation UI actions", () => {
       buildListUser({ id: 2, role: "collaborator" }),
     ];
 
-    expect(canManageInvitations(collaborators, 1 as User["id"])).toBe(true);
-    expect(canManageInvitations(collaborators, 2 as User["id"])).toBe(false);
+    expect(
+      isAuthorizedToEditCollaborators(collaborators, 1 as User["id"])
+    ).toBe(true);
+    expect(
+      isAuthorizedToEditCollaborators(collaborators, 2 as User["id"])
+    ).toBe(false);
   });
 
   it("groups pending and owner-approval invitations for rendering", () => {

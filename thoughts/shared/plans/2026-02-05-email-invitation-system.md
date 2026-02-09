@@ -405,6 +405,8 @@ Expose invitation workflows in both existing list-level controls and a dedicated
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
 
+**Jujutsu Checkpoint**: `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
+
 ---
 
 ## Phase 7: Lifecycle Hooks, Webhook, and Release Hardening

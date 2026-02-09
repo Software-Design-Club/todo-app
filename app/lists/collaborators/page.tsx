@@ -12,8 +12,7 @@ export default async function CollaboratorManagementPage() {
     redirect("/sign-in");
   }
 
-  const userId = session.user.id;
-  const lists = await getLists(userId);
+  const lists = await getLists();
   const ownerLists = lists.filter((list) => list.userRole === "owner");
 
   const listData = await Promise.all(
@@ -22,7 +21,6 @@ export default async function CollaboratorManagementPage() {
         getCollaborators(list.id),
         getInvitationsForList({
           listId: list.id,
-          ownerUserId: userId,
         }),
       ]);
 
@@ -53,7 +51,6 @@ export default async function CollaboratorManagementPage() {
             <h2 className="text-lg font-semibold mb-3">{list.title}</h2>
             <ManageCollaborators
               listId={list.id}
-              ownerUserId={userId}
               initialCollaborators={collaborators}
               initialInvitations={invitations}
             />

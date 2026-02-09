@@ -2,19 +2,17 @@ import { getLists } from "@/app/lists/_actions/list";
 import Link from "next/link";
 import React from "react";
 import CreateListForm from "./create-list";
-import type { User } from "@/lib/types";
 import { UserListsTable } from "./user-lists-table";
 
 interface ListsProps {
   currentPath: string;
-  userId: User["id"];
 }
 
-const UserLists: React.FC<ListsProps> = async ({ currentPath, userId }) => {
+const UserLists: React.FC<ListsProps> = async ({ currentPath }) => {
   // Fetch active and archived lists in parallel
   const [lists, archivedLists] = await Promise.all([
-    getLists(userId, false),
-    getLists(userId, true),
+    getLists(false),
+    getLists(true),
   ]);
 
   return (
@@ -34,11 +32,11 @@ const UserLists: React.FC<ListsProps> = async ({ currentPath, userId }) => {
           >
             Manage Invitations
           </Link>
-          <CreateListForm creatorId={userId} />
+          <CreateListForm />
         </div>
       </div>
 
-      <UserListsTable lists={lists} archivedLists={archivedLists} userId={userId} />
+      <UserListsTable lists={lists} archivedLists={archivedLists} />
     </div>
   );
 };

@@ -21,14 +21,12 @@ import {
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
-  ownerUserId: User["id"];
   initialCollaborators: ListUser[];
   initialInvitations: ListInvitation[];
 }
 
 export default function ManageCollaborators({
   listId,
-  ownerUserId,
   initialCollaborators,
   initialInvitations,
 }: ManageCollaboratorsProps) {
@@ -127,7 +125,6 @@ export default function ManageCollaborators({
     mutationFn: (invitedEmail: string) =>
       createInvitationForList({
         listId,
-        ownerUserId,
         invitedEmail,
       }),
     onSuccess: ({ invitation }) => {
@@ -164,7 +161,6 @@ export default function ManageCollaborators({
       resendInvitationForList({
         invitationId: params.invitationId,
         listId,
-        ownerUserId,
       }).then((response) => ({ ...response, copyAfterResend: params.copyAfterResend })),
     onSuccess: async ({
       invitation,
@@ -204,7 +200,6 @@ export default function ManageCollaborators({
       revokeInvitationForList({
         invitationId,
         listId,
-        ownerUserId,
       }),
     onSuccess: (invitation) => {
       setCurrentInvitations((previousInvitations) =>
@@ -228,7 +223,6 @@ export default function ManageCollaborators({
       approveInvitationForList({
         invitationId,
         listId,
-        ownerUserId,
       }),
     onSuccess: (invitation) => {
       setCurrentInvitations((previousInvitations) =>
@@ -252,7 +246,6 @@ export default function ManageCollaborators({
       rejectInvitationForList({
         invitationId,
         listId,
-        ownerUserId,
       }),
     onSuccess: (invitation) => {
       setCurrentInvitations((previousInvitations) =>

@@ -32,8 +32,6 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
 
   const result = await acceptInvitationToken({
     inviteToken: token,
-    userId: session.user.id,
-    userEmail: session.user.email,
   });
   const uiState = getInvitationAcceptanceUiState(result);
 

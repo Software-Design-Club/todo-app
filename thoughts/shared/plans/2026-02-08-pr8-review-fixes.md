@@ -319,11 +319,11 @@ if (!userCanEditList(collaborators, session.user.id)) {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `npm run typecheck` passes (no type errors from removed props)
-- [ ] `npm run lint` passes
-- [ ] `npm run test:unit` passes (new permission tests + existing)
-- [ ] `npm run test:integration` passes (updated imports for canManageInvitations → isAuthorizedToEditCollaborators)
-- [ ] `npm run build` succeeds
+- [x] `npm run typecheck` passes (no type errors from removed props)
+- [x] `npm run lint` passes
+- [x] `npm run test:unit` passes (new permission tests + existing)
+- [x] `npm run test:integration` passes (updated imports for canManageInvitations → isAuthorizedToEditCollaborators)
+- [x] `npm run build` succeeds
 
 ---
 

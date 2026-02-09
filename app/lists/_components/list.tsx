@@ -68,7 +68,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     if (editableCollaborators) {
       invitations = await getInvitationsForList({
         listId: list.id,
-        ownerUserId: user.id,
       });
     }
   }
@@ -89,7 +88,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
             <EditableListTitle
               list={list}
               editable={editableList}
-              userId={user.id}
               userRole={userRole}
             />
           ) : (
@@ -104,7 +102,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
           {canChangeVisibility && user && (
             <VisibilityToggle
               listId={list.id}
-              userId={user.id}
               initialVisibility={list.visibility}
             />
           )}
@@ -118,7 +115,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
                 <DropdownMenuSeparator />
                 <ManageCollaborators
                   listId={list.id}
-                  ownerUserId={user!.id}
                   initialCollaborators={collaborators}
                   initialInvitations={invitations}
                 />
