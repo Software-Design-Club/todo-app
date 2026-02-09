@@ -15,7 +15,6 @@ import type {
 import { getList } from "@/app/lists/_actions/list";
 import { getCollaborators } from "@/app/lists/_actions/collaborators";
 import { buildInvitationAcceptUrl, sendInvitationEmail } from "@/lib/email/resend";
-import { canManageInvitations } from "@/lib/invitations/permissions";
 import {
   approvePendingOwnerInvitation,
   consumeInvitationToken,
@@ -27,19 +26,23 @@ import {
   resendInvitation,
   revokeInvitation,
 } from "@/lib/invitations/service";
+import { isAuthorizedToEditCollaborators } from "./permissions";
+import { requireAuth } from "./require-auth";
 
-async function assertOwnerAccess(listId: List["id"], userId: User["id"]) {
+async function assertOwnerAccess(listId: List["id"]) {
+  const { user } = await requireAuth();
   const collaborators = await getCollaborators(listId);
-  if (!isOwnerAuthorizedForInvitationActions(collaborators, userId)) {
+  if (!isOwnerAuthorizedForInvitationActions(collaborators, user.id)) {
     throw new Error("Only the list owner can manage invitations.");
   }
+  return user;
 }
 
 function isOwnerAuthorizedForInvitationActions(
   collaborators: ListUser[],
   userId: User["id"]
 ): boolean {
-  return canManageInvitations(collaborators, userId);
+  return isAuthorizedToEditCollaborators(collaborators, userId);
 }
 
 async function getInviterName(inviterId: User["id"]): Promise<string> {
@@ -57,16 +60,15 @@ async function getInviterName(inviterId: User["id"]): Promise<string> {
 
 export async function createInvitationForList(params: {
   listId: List["id"];
-  ownerUserId: User["id"];
   invitedEmail: string;
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  const user = await assertOwnerAccess(params.listId);
   const list = await getList(params.listId);
-  const inviterName = await getInviterName(params.ownerUserId);
+  const inviterName = await getInviterName(user.id);
 
   const { invitation, inviteToken } = await createOrRotateInvitation({
     listId: params.listId,
-    inviterId: params.ownerUserId,
+    inviterId: user.id,
     invitedEmail: params.invitedEmail,
   });
 
@@ -96,16 +98,15 @@ export async function createInvitationForList(params: {
 export async function resendInvitationForList(params: {
   invitationId: ListInvitation["id"];
   listId: List["id"];
-  ownerUserId: User["id"];
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  const user = await assertOwnerAccess(params.listId);
   const list = await getList(params.listId);
-  const inviterName = await getInviterName(params.ownerUserId);
+  const inviterName = await getInviterName(user.id);
 
   const { invitation, inviteToken } = await resendInvitation({
     invitationId: params.invitationId,
     listId: params.listId,
-    inviterId: params.ownerUserId,
+    inviterId: user.id,
   });
 
   const recipientEmail = invitation.invitedEmailNormalized;
@@ -139,9 +140,8 @@ export async function resendInvitationForList(params: {
 export async function revokeInvitationForList(params: {
   invitationId: ListInvitation["id"];
   listId: List["id"];
-  ownerUserId: User["id"];
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  await assertOwnerAccess(params.listId);
 
   const invitation = await revokeInvitation({
     invitationId: params.invitationId,
@@ -155,14 +155,13 @@ export async function revokeInvitationForList(params: {
 export async function approveInvitationForList(params: {
   invitationId: ListInvitation["id"];
   listId: List["id"];
-  ownerUserId: User["id"];
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  const user = await assertOwnerAccess(params.listId);
 
   const invitation = await approvePendingOwnerInvitation({
     invitationId: params.invitationId,
     listId: params.listId,
-    ownerId: params.ownerUserId,
+    ownerId: user.id,
   });
 
   revalidatePath(`/lists/${params.listId}`);
@@ -172,14 +171,13 @@ export async function approveInvitationForList(params: {
 export async function rejectInvitationForList(params: {
   invitationId: ListInvitation["id"];
   listId: List["id"];
-  ownerUserId: User["id"];
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  const user = await assertOwnerAccess(params.listId);
 
   const invitation = await rejectPendingOwnerInvitation({
     invitationId: params.invitationId,
     listId: params.listId,
-    ownerId: params.ownerUserId,
+    ownerId: user.id,
   });
 
   revalidatePath(`/lists/${params.listId}`);
@@ -188,10 +186,9 @@ export async function rejectInvitationForList(params: {
 
 export async function getInvitationsForList(params: {
   listId: List["id"];
-  ownerUserId: User["id"];
   statuses?: InvitationStatus[];
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  await assertOwnerAccess(params.listId);
   return listInvitationsForList({
     listId: params.listId,
     statuses: params.statuses,
@@ -201,9 +198,8 @@ export async function getInvitationsForList(params: {
 export async function getInvitationForList(params: {
   invitationId: ListInvitation["id"];
   listId: List["id"];
-  ownerUserId: User["id"];
 }) {
-  await assertOwnerAccess(params.listId, params.ownerUserId);
+  await assertOwnerAccess(params.listId);
   return getInvitationByIdForList({
     invitationId: params.invitationId,
     listId: params.listId,
@@ -212,8 +208,12 @@ export async function getInvitationForList(params: {
 
 export async function acceptInvitationToken(params: {
   inviteToken: string;
-  userId: User["id"];
-  userEmail: string;
 }) {
-  return consumeInvitationToken(params);
+  const { user } = await requireAuth();
+
+  return consumeInvitationToken({
+    inviteToken: params.inviteToken,
+    userId: user.id,
+    userEmail: user.email,
+  });
 }

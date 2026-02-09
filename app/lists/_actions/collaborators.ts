@@ -10,12 +10,17 @@ import {
 import { revalidatePath } from "next/cache";
 import type { List, User, ListUser } from "@/lib/types";
 import { createTaggedUser, createTaggedListUser } from "@/lib/types";
-import { canBeRemovedAsCollaborator } from "./permissions";
+import {
+  canBeRemovedAsCollaborator,
+  isAuthorizedToEditCollaborators,
+} from "./permissions";
+import { requireAuth } from "./require-auth";
 
 // Initialize Drizzle client
 const db = drizzle(sql);
 
 export async function searchUsers(searchTerm: string): Promise<User[]> {
+  await requireAuth();
   console.log("[Server Action] Searching users for:", searchTerm);
   if (!searchTerm.trim()) {
     return [];
@@ -55,11 +60,17 @@ export async function addCollaborator(
   user: User,
   listId: List["id"]
 ): Promise<ListUser> {
+  const { user: actingUser } = await requireAuth();
   console.log(
     `[Server Action] Attempting to add user ${user.id} to list ${listId}.`
   );
 
   try {
+    const collaborators = await getCollaborators(listId);
+    if (!isAuthorizedToEditCollaborators(collaborators, actingUser.id)) {
+      throw new Error("Only the list owner can manage collaborators.");
+    }
+
     // Check if the user is already a collaborator
     const existingCollaborator = await db
       .select()
@@ -118,14 +129,17 @@ export async function addCollaborator(
     });
   } catch (error) {
     console.error("Database error while adding collaborator:", error);
-    // If it's the specific error we threw, re-throw it for the client
-    if (
-      error instanceof Error &&
-      error.message === "User is already a collaborator on this list."
-    ) {
-      throw error;
+    if (error instanceof Error) {
+      const expectedErrors = [
+        "User is already a collaborator on this list.",
+        "Only the list owner can manage collaborators.",
+      ];
+
+      if (expectedErrors.includes(error.message)) {
+        throw error;
+      }
     }
-    // For other DB errors
+
     throw new Error("Failed to add collaborator due to a database error.");
   }
 }
@@ -133,6 +147,7 @@ export async function addCollaborator(
 export async function getCollaborators(
   listId: List["id"]
 ): Promise<ListUser[]> {
+  await requireAuth();
   console.log("[Server Action] Getting collaborators for list:", listId);
 
   try {
@@ -167,9 +182,21 @@ export async function getCollaborators(
 }
 
 export async function removeCollaborator(listUser: ListUser): Promise<void> {
+  const { user: actingUser } = await requireAuth();
   console.log(
     `[Server Action] Attempting to remove user ${listUser.User.id} from list ${listUser.listId}.`
   );
+
+  const collaborators = await getCollaborators(listUser.listId);
+  const canManageCollaborators = isAuthorizedToEditCollaborators(
+    collaborators,
+    actingUser.id
+  );
+  const isSelfRemoval = Number(actingUser.id) === Number(listUser.User.id);
+
+  if (!canManageCollaborators && !isSelfRemoval) {
+    throw new Error("Only the list owner can manage collaborators.");
+  }
 
   if (!canBeRemovedAsCollaborator(listUser)) {
     throw new Error("User cannot be removed as a collaborator.");

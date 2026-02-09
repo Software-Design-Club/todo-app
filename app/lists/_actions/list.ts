@@ -13,12 +13,13 @@ import { revokeOpenInvitationsForList } from "@/lib/invitations/service";
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
-import { createTaggedList, type List, type ListWithRole, type User } from "@/lib/types";
+import { createTaggedList, type List, type ListWithRole } from "@/lib/types";
 import { getCollaborators } from "./collaborators";
 import {
   userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "./permissions";
+import { requireAuth } from "./require-auth";
 
 export type UsersListTodos = {
   id: number;
@@ -89,9 +90,10 @@ export async function getList(listId: number): Promise<List> {
  * - Archived lists are only visible to owners
  */
 export async function getLists(
-  userId: User["id"],
   includeArchived: boolean = false
 ): Promise<ListWithRole[]> {
+  const { user } = await requireAuth();
+  const userId = user.id;
   const db = drizzle(sql);
 
   // Build base query conditions
@@ -172,18 +174,12 @@ export async function getLists(
  * Creates a new list with the given title for a specific user
  */
 export async function createList(formData: FormData) {
+  const { user } = await requireAuth();
   const title = formData.get("title")?.toString();
-  const creatorIdStr = formData.get("creatorId")?.toString();
 
-  if (!title || !creatorIdStr) {
-    throw new Error("Title and creator ID are required");
+  if (!title) {
+    throw new Error("Title is required");
   }
-
-  const parsedCreatorId = parseInt(creatorIdStr, 10);
-  if (isNaN(parsedCreatorId)) {
-    throw new Error("Invalid creator ID");
-  }
-  const creatorId = parsedCreatorId as User["id"];
 
   const db = drizzle(sql);
 
@@ -192,13 +188,13 @@ export async function createList(formData: FormData) {
     .insert(ListsTable)
     .values({
       title,
-      creatorId,
+      creatorId: user.id,
     })
     .returning();
 
   const ownerRow = await upsertListOwnerCollaborator(db, {
     listId: newList.id as List["id"],
-    ownerId: creatorId,
+    ownerId: user.id,
   });
 
   if (!ownerRow) {
@@ -236,9 +232,9 @@ export async function createList(formData: FormData) {
  */
 export async function updateListTitle(
   listId: List["id"],
-  newTitle: string,
-  userId: User["id"]
+  newTitle: string
 ): Promise<List> {
+  const { user } = await requireAuth();
   try {
     // Validate title - fail fast approach
     const trimmedTitle = newTitle.trim();
@@ -254,7 +250,7 @@ export async function updateListTitle(
     // Check authorization
     const collaborators = await getCollaborators(listId);
 
-    if (!userCanEditList(collaborators, userId)) {
+    if (!userCanEditList(collaborators, user.id)) {
       throw new Error("You do not have permission to edit this list");
     }
 
@@ -309,13 +305,13 @@ export async function updateListTitle(
  */
 export async function updateListVisibility(
   listId: List["id"],
-  visibility: List["visibility"],
-  userId: User["id"]
+  visibility: List["visibility"]
 ): Promise<List> {
+  const { user } = await requireAuth();
   console.log("inside updateVisibility");
   const collaborators = await getCollaborators(listId);
 
-  if (!isAuthorizedToChangeVisibility(collaborators, userId)) {
+  if (!isAuthorizedToChangeVisibility(collaborators, user.id)) {
     throw new Error("Only the list owner can change visibility");
   }
 
@@ -343,12 +339,12 @@ export async function updateListVisibility(
  * Archives a list (owner only)
  */
 export async function archiveList(
-  listId: List["id"],
-  userId: User["id"]
+  listId: List["id"]
 ): Promise<List> {
+  const { user } = await requireAuth();
   const list = await getList(listId);
 
-  if (Number(list.creatorId) !== Number(userId)) {
+  if (Number(list.creatorId) !== Number(user.id)) {
     throw new Error("Only the list owner can archive this list");
   }
 
@@ -383,12 +379,12 @@ export async function archiveList(
  * Unarchives a list (owner only)
  */
 export async function unarchiveList(
-  listId: List["id"],
-  userId: User["id"]
+  listId: List["id"]
 ): Promise<List> {
+  const { user } = await requireAuth();
   const list = await getList(listId);
 
-  if (Number(list.creatorId) !== Number(userId)) {
+  if (Number(list.creatorId) !== Number(user.id)) {
     throw new Error("Only the list owner can unarchive this list");
   }
 
@@ -420,12 +416,12 @@ export async function unarchiveList(
  * This action is irreversible - todos and collaborator records are deleted via cascade
  */
 export async function deleteList(
-  listId: List["id"],
-  userId: User["id"]
+  listId: List["id"]
 ): Promise<void> {
+  const { user } = await requireAuth();
   const list = await getList(listId);
 
-  if (Number(list.creatorId) !== Number(userId)) {
+  if (Number(list.creatorId) !== Number(user.id)) {
     throw new Error("Only the list owner can delete this list");
   }
 

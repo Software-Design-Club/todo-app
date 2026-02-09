@@ -13,20 +13,18 @@ const ListPage = async ({ params }: { params: Promise<{ listId: string }> }) => 
     notFound();
   }
 
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/sign-in");
+  }
+
   const list = await getList(numericListId);
   const collaborators = await getCollaborators(list.id);
-  const session = await auth();
-  const userId = session?.user?.id ?? null;
+  const userId = session.user.id;
 
   const canView = canViewList(list, collaborators, userId);
 
   if (!canView) {
-    // Private list - not authorized
-    if (!userId) {
-      // Not logged in - redirect to sign-in
-      redirect("/sign-in");
-    }
-    // Logged in but not a collaborator - 404
     notFound();
   }
 
