@@ -116,3 +116,18 @@ Schema defined in `drizzle/schema.ts`. Key tables:
 - `TodosTable` - individual todo items
 
 Run migrations with `npx drizzle-kit push`.
+
+## Known Issues
+
+### ESM Module Warning on Dev Server
+
+When running `npm run dev`, you may see this warning in the console:
+
+```
+(node:xxxxx) Warning: To load an ES module, set "type": "module" in the package.json or use the .mjs extension.
+```
+
+**Cause**: This is a known compatibility issue between Next.js and Drizzle ORM. Drizzle ORM is published as an ES module (`"type": "module"` in its package.json), but Next.js server compilation uses Node.js workers that attempt to `require()` it, triggering the warning.
+
+**Impact**: The warning is cosmetic and does not affect functionality. Your app compiles and runs correctly.
+
