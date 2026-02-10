@@ -77,8 +77,7 @@ If the user's feedback requires understanding new code patterns or validating as
    - **thoughts-analyzer** - To extract insights from documents
 
    **Be EXTREMELY specific about directories**:
-   - If the change involves "WUI", specify `humanlayer-wui/` directory
-   - If it involves "daemon", specify `hld/` directory
+   - Specify the exact directory path for the component being changed
    - Include full path context in prompts
 
 3. **Read any new files identified by research**:
@@ -131,9 +130,9 @@ Get user confirmation before proceeding.
 
 ### Step 5: Sync and Review
 
-1. **Sync the updated plan**:
-   - Run `humanlayer thoughts sync`
-   - This ensures changes are properly indexed
+1. **Commit the updated plan**:
+   - Run `jj commit -m "plan: update [plan name]"` to commit the changes
+   - This ensures changes are properly tracked
 
 2. **Present the changes made**:
    ```
@@ -195,7 +194,7 @@ When updating success criteria, always maintain the two-category structure:
 
 1. **Automated Verification** (can be run by execution agents):
    - Commands that can be run: `make test`, `npm run lint`, etc.
-   - Prefer `make` commands: `make -C humanlayer-wui check` instead of `cd humanlayer-wui && bun run fmt`
+   - Prefer `npm run` commands for verification
    - Specific files that should exist
    - Code compilation/type checking
 

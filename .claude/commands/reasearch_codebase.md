@@ -59,9 +59,9 @@ Then wait for the user's research query.
    - Use the **web-search-researcher** agent for external documentation and resources
    - IF you use web-research agents, instruct them to return LINKS with their findings, and please INCLUDE those links in your final report
 
-   **For Linear tickets (if relevant):**
-   - Use the **linear-ticket-reader** agent to get full details of a specific ticket
-   - Use the **linear-searcher** agent to find related tickets or historical context
+   **For roadmap context (if relevant):**
+   - Check `plan/backlog.md` for feature roadmap and planned work
+   - Look for related items in the backlog that provide context for the research topic
 
    The key is to use these agents intelligently:
    - Start with locator agents to find what exists
@@ -161,8 +161,8 @@ Then wait for the user's research query.
      - Create permalinks: `https://github.com/{owner}/{repo}/blob/{commit}/{file}#L{line}`
    - Replace local file references with permalinks in the document
 
-8. **Sync and present findings:**
-   - Run `humanlayer thoughts sync` to sync the thoughts directory
+8. **Commit and present findings:**
+   - Run `jj commit -m "research: [brief topic description]"` to commit the initial research document
    - Present a concise summary of findings to the user
    - Include key file references for easy navigation
    - Ask if they have follow-up questions or need clarification
