@@ -93,6 +93,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ## Project Documentation
 
 - [`/plan/backlog.md`](./plan/backlog.md) - Development backlog with epics and tickets
+- [`/plan/email-invitation-runbook.md`](./plan/email-invitation-runbook.md) - Deployment and troubleshooting runbook for invitation flows
 - [`/agent-os/product/mission.md`](./agent-os/product/mission.md) - Full product mission and vision
 - [`/agent-os/product/tech-stack.md`](./agent-os/product/tech-stack.md) - Detailed technical decisions
 

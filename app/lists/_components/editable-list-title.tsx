@@ -4,13 +4,12 @@ import { useState, useMemo } from "react";
 import { Button } from "@/ui/button";
 import { toast } from "sonner";
 import { updateListTitle } from "@/app/lists/_actions/list";
-import type { List, User } from "@/lib/types";
+import type { List } from "@/lib/types";
 import { RoleBadge, type UserRole } from "@/components/ui/role-badge";
 
 interface EditableListTitleProps {
   list: List;
   editable: boolean;
-  userId: User["id"];
   userRole: UserRole;
 }
 
@@ -19,7 +18,6 @@ const MAX_TITLE_LENGTH = 255;
 export default function EditableListTitle({
   list,
   editable,
-  userId,
   userRole,
 }: EditableListTitleProps) {
   const [title, setTitle] = useState<List["title"]>(list.title);
@@ -52,7 +50,7 @@ export default function EditableListTitle({
     setError(null);
 
     try {
-      await updateListTitle(list.id, title as string, userId);
+      await updateListTitle(list.id, title as string);
       setIsEditing(false);
       toast.success("List title updated");
     } catch (err) {

@@ -4,9 +4,11 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  index,
   pgEnum,
   integer,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const userStatusEnum = pgEnum("status", ["active", "deleted"]);
 
@@ -51,6 +53,14 @@ export const CollaboratorRoleEnum = pgEnum("collaborator_role", [
   "collaborator",
 ]);
 
+export const InvitationStatusEnum = pgEnum("invitation_status", [
+  "sent",
+  "accepted",
+  "pending_approval",
+  "revoked",
+  "expired",
+]);
+
 export const ListCollaboratorsTable = pgTable(
   "list_collaborators",
   {
@@ -59,18 +69,62 @@ export const ListCollaboratorsTable = pgTable(
       .references(() => ListsTable.id, { onDelete: "cascade" })
       .notNull(),
     userId: integer("userId")
-      .references(() => UsersTable.id)
-      .notNull(),
+      .references(() => UsersTable.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
     role: CollaboratorRoleEnum("role").default("collaborator").notNull(),
+    inviteStatus: InvitationStatusEnum("inviteStatus")
+      .default("accepted")
+      .notNull(),
+    invitedEmailNormalized: text("invitedEmailNormalized"),
+    inviteTokenHash: text("inviteTokenHash"),
+    inviteExpiresAt: timestamp("inviteExpiresAt"),
+    inviterId: integer("inviterId").references(() => UsersTable.id),
+    inviteSentAt: timestamp("inviteSentAt"),
+    inviteAcceptedAt: timestamp("inviteAcceptedAt"),
+    inviteRevokedAt: timestamp("inviteRevokedAt"),
+    inviteExpiredAt: timestamp("inviteExpiredAt"),
+    invitationApprovalRequestedAt: timestamp("invitationApprovalRequestedAt"),
+    invitationApprovedBy: integer("invitationApprovedBy").references(() => UsersTable.id),
+    invitationApprovedAt: timestamp("invitationApprovedAt"),
+    invitationRejectedBy: integer("invitationRejectedBy").references(() => UsersTable.id),
+    invitationRejectedAt: timestamp("invitationRejectedAt"),
+    emailDeliveryStatus: text("emailDeliveryStatus"),
+    emailDeliveryError: text("emailDeliveryError"),
+    emailDeliveryProviderId: text("emailDeliveryProviderId"),
+    emailLastSentAt: timestamp("emailLastSentAt"),
   },
   (collaborators) => {
     return {
+      // NOTE: This unique index on (listId, userId) allows duplicate NULL userId values
+      // because PostgreSQL treats each NULL as distinct in unique indexes.
+      // Since userId became nullable for invitation rows, invitation uniqueness now relies on:
+      // - list_collaborators_accepted_membership_unique
+      // - list_collaborators_open_invite_email_unique
       pk: uniqueIndex("list_collaborators_pk").on(
         collaborators.listId,
         collaborators.userId
       ),
+      acceptedMembershipUnique: uniqueIndex(
+        "list_collaborators_accepted_membership_unique"
+      )
+        .on(collaborators.listId, collaborators.userId)
+        .where(
+          sql`${collaborators.inviteStatus} = 'accepted' AND ${collaborators.userId} IS NOT NULL`
+        ),
+      openInviteEmailUnique: uniqueIndex(
+        "list_collaborators_open_invite_email_unique"
+      )
+        .on(collaborators.listId, collaborators.invitedEmailNormalized)
+        .where(
+          sql`${collaborators.inviteStatus} IN ('sent', 'pending_approval') AND ${collaborators.invitedEmailNormalized} IS NOT NULL`
+        ),
+      inviteTokenHashIndex: index("list_collaborators_invite_token_hash_idx").on(
+        collaborators.inviteTokenHash
+      ),
+      emailDeliveryProviderIdIndex: index(
+        "list_collaborators_email_delivery_provider_id_idx"
+      ).on(collaborators.emailDeliveryProviderId),
     };
   }
 );

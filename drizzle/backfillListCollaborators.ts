@@ -1,5 +1,8 @@
+import "./envConfig";
 import { sql } from "@vercel/postgres";
+import { isNull, ne, or, sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
+import { pathToFileURL } from "node:url";
 import { ListsTable, ListCollaboratorsTable } from "./schema";
 
 async function backfillListCollaborators() {
@@ -8,7 +11,6 @@ async function backfillListCollaborators() {
   const db = drizzle(sql);
 
   try {
-    // Get all lists with their creator information
     const lists = await db
       .select({
         id: ListsTable.id,
@@ -18,17 +20,19 @@ async function backfillListCollaborators() {
 
     console.log(`Found ${lists.length} lists to backfill`);
 
-    let upsertedCount = 0;
+    let normalizedCount = 0;
 
     for (const list of lists) {
       try {
         // Upsert the creator as an owner
-        await db
+        const normalizedRows = await db
           .insert(ListCollaboratorsTable)
           .values({
             listId: list.id,
             userId: list.creatorId,
             role: "owner",
+            inviteStatus: "accepted",
+            inviteAcceptedAt: new Date(),
           })
           .onConflictDoUpdate({
             target: [
@@ -37,27 +41,48 @@ async function backfillListCollaborators() {
             ],
             set: {
               role: "owner",
+              inviteStatus: "accepted",
+              inviteAcceptedAt: drizzleSql`COALESCE(${ListCollaboratorsTable.inviteAcceptedAt}, NOW())`,
               updatedAt: new Date(),
             },
+            // Idempotence: skip update when row is already in the desired owner+accepted state.
+            where: or(
+              ne(ListCollaboratorsTable.role, "owner"),
+              ne(ListCollaboratorsTable.inviteStatus, "accepted"),
+              isNull(ListCollaboratorsTable.inviteAcceptedAt)
+            ),
           });
 
-        console.log(`Upserted owner record for list ${list.id}`);
-        upsertedCount++;
+        const rowCount = normalizedRows.rowCount ?? 0;
+
+        if (rowCount > 0) {
+          console.log(`Normalized owner record for list ${list.id}`);
+          normalizedCount += rowCount;
+        }
       } catch (error) {
         console.error(`Error processing list ${list.id}:`, error);
       }
     }
 
     console.log(`Backfill completed!`);
-    console.log(`- Upserted: ${upsertedCount} records`);
+    console.log(`- Normalized: ${normalizedCount} records`);
   } catch (error) {
     console.error("Error during backfill:", error);
     throw error;
   }
 }
 
+function isExecutedDirectly() {
+  const entrypoint = process.argv[1];
+  if (!entrypoint) {
+    return false;
+  }
+
+  return import.meta.url === pathToFileURL(entrypoint).href;
+}
+
 // Run the backfill if this script is executed directly
-if (require.main === module) {
+if (isExecutedDirectly()) {
   backfillListCollaborators()
     .then(() => {
       console.log("Backfill script completed successfully");

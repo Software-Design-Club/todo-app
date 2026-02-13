@@ -5,7 +5,7 @@ import { createList } from "@/app/lists/_actions/list";
 import { Button } from "@/ui/button";
 import { toast } from "sonner";
 
-export default function CreateListForm({ creatorId }: { creatorId: number }) {
+export default function CreateListForm() {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
 
@@ -18,7 +18,6 @@ export default function CreateListForm({ creatorId }: { creatorId: number }) {
     }
     // Create FormData manually
     const formData = new FormData();
-    formData.set("creatorId", creatorId.toString());
     formData.set("title", title);
 
     createList(formData);

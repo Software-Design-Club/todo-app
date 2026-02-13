@@ -3,18 +3,16 @@
 import { Switch } from "@/components/ui/switch";
 import { Lock, Globe } from "lucide-react";
 import { useState } from "react";
-import type { List, User } from "@/lib/types";
+import type { List } from "@/lib/types";
 import { updateListVisibility } from "@/app/lists/_actions/list";
 
 interface VisibilityToggleProps {
   listId: List["id"];
-  userId: User["id"];
   initialVisibility: List["visibility"];
 }
 
 export function VisibilityToggle({
   listId,
-  userId,
   initialVisibility,
 }: VisibilityToggleProps) {
   const [visibility, setVisibility] = useState(initialVisibility);
@@ -28,7 +26,7 @@ export function VisibilityToggle({
     ) as List["visibility"];
     setIsPending(true);
     try {
-      await updateListVisibility(listId, newVisibility, userId);
+      await updateListVisibility(listId, newVisibility);
       setVisibility(newVisibility);
     } catch (error) {
       console.error("Failed to update visibility:", error);
