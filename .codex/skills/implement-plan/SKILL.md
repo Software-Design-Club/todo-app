@@ -5,24 +5,66 @@ description: Implement an approved plan from thoughts/shared/plans, phase by pha
 
 # Implement Plan
 
-## Overview
-Execute a plan reliably by following phases, verifying results, and updating the plan file as work completes.
+You are tasked with implementing an approved technical plan from `thoughts/shared/plans/`. These plans contain phases with specific changes and success criteria.
 
-## Workflow
-1. If no plan path is provided, ask for one.
-2. Read the plan and all referenced files fully.
-3. Create a todo list and implement phase by phase.
-4. After each phase, run automated checks from the plan and fix issues before continuing.
-5. Update plan checkboxes as sections complete.
-6. Pause for manual verification when required; do not mark manual steps complete without user confirmation.
+## Getting Started
 
-## Mismatch Handling
-If the plan conflicts with reality:
-- Stop and describe the mismatch (expected vs found, why it matters).
-- Ask how to proceed before deviating.
+When given a plan path:
+- Read the plan completely and check for any existing checkmarks (- [x])
+- Read the original ticket and all files mentioned in the plan
+- **Read files fully** - never use limit/offset parameters, you need complete context
+- Think deeply about how the pieces fit together
+- Create a todo list to track your progress
+- Start implementing if you understand what needs to be done
 
-## Verification Format
-After a phase completes:
-- List automated checks that passed.
-- List manual verification steps to run.
-- Wait for user confirmation before continuing.
+If no plan path provided, ask for one.
+
+## Implementation Philosophy
+
+Plans are carefully designed, but reality can be messy. Your job is to:
+- Follow the plan's intent while adapting to what you find
+- Implement each phase fully before moving to the next
+- Verify your work makes sense in the broader codebase context
+- Update checkboxes in the plan as you complete sections
+
+When things don't match the plan exactly, think about why and communicate clearly. The plan is your guide, but your judgment matters too.
+
+If you encounter a mismatch:
+- STOP and think deeply about why the plan can't be followed
+- Present the issue clearly:
+  ```
+  Issue in Phase [N]:
+  Expected: [what the plan says]
+  Found: [actual situation]
+  Why this matters: [explanation]
+
+  How should I proceed?
+  ```
+
+## Verification Approach
+
+After implementing a phase:
+- Run the success criteria checks (usually `make check test` covers everything)
+- Fix any issues before proceeding
+- Update your progress in both the plan and your todos
+- Check off completed items in the plan file itself using Edit
+
+
+
+## If You Get Stuck
+
+When something isn't working as expected:
+- First, make sure you've read and understood all the relevant code
+- Consider if the codebase has evolved since the plan was written
+- Present the mismatch clearly and ask for guidance
+
+Use sub-tasks sparingly - mainly for targeted debugging or exploring unfamiliar territory.
+
+## Resuming Work
+
+If the plan has existing checkmarks:
+- Trust that completed work is done
+- Pick up from the first unchecked item
+- Verify previous work only if something seems off
+
+Remember: You're implementing a solution, not just checking boxes. Keep the end goal in mind and maintain forward momentum.

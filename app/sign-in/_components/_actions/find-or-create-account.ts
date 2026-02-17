@@ -3,7 +3,9 @@ import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
 import { ListsTable, TodosTable, UsersTable } from "@/drizzle/schema";
+import { upsertListOwnerCollaborator } from "@/drizzle/ownerCollaborator";
 import { createTaggedUser } from "@/lib/types";
+import type { List, User } from "@/lib/types";
 
 interface FindOrCreateAccountParams {
   email: string;
@@ -33,6 +35,15 @@ export async function findOrCreateAccount(
       .insert(ListsTable)
       .values({ title: "My first list", creatorId: newUser.id })
       .returning();
+
+    const ownerRow = await upsertListOwnerCollaborator(db, {
+      listId: newList.id as List["id"],
+      ownerId: newUser.id as User["id"],
+    });
+
+    if (!ownerRow) {
+      throw new Error("Failed to create owner collaborator record");
+    }
 
     await db
       .insert(TodosTable)
