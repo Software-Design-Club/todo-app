@@ -22,7 +22,7 @@ import {
   userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
-import { RoleBadge, type UserRole } from "@/components/ui/role-badge";
+import { RoleBadge, type DisplayUserRole } from "@/components/ui/role-badge";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -39,7 +39,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   let editableList = false;
   let editableCollaborators = false;
   let canChangeVisibility = false;
-  let userRole: UserRole | undefined = undefined;
+  let userRole: DisplayUserRole | undefined = undefined;
 
   const user = session?.user;
   if (user) {
