@@ -23,7 +23,7 @@ import {
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
 import { RoleBadge } from "@/components/ui/role-badge";
-import { type DisplayUserRole, type UserRole } from "@/lib/types";
+import { type DisplayUserRole } from "@/lib/types";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -60,10 +60,10 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     );
 
     if (currentUserCollaborator) {
-      userRole = currentUserCollaborator.Role as DisplayUserRole;
+      userRole = currentUserCollaborator.Role;
     } else {
       // Logged in but not a collaborator — viewing a public list
-      userRole = "viewer" as DisplayUserRole;
+      userRole = "viewer";
     }
   }
 
@@ -79,12 +79,12 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           {VisibilityIcon}
-          {editableList && user ? (
+          {editableList && user && userRole && userRole !== "viewer" ? (
             <EditableListTitle
               list={list}
               editable={editableList}
               userId={user.id}
-              userRole={userRole as UserRole}
+              userRole={userRole}
             />
           ) : (
             <div className="flex flex-wrap items-center gap-2">
