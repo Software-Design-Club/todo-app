@@ -43,6 +43,10 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   let userRole: DisplayUserRole | undefined = undefined;
 
   const user = session?.user;
+  const currentUserCollaborator = user
+    ? collaborators.find((collab) => collab.User.id === user.id)
+    : undefined;
+
   if (user) {
     editableList = userCanEditList(collaborators, user.id);
     editableCollaborators = isAuthorizedToEditCollaborators(
@@ -52,11 +56,6 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     canChangeVisibility = isAuthorizedToChangeVisibility(
       collaborators,
       user.id
-    );
-
-    // Determine user's role from collaborators array
-    const currentUserCollaborator = collaborators.find(
-      (collab) => collab.User.id === user.id
     );
 
     if (currentUserCollaborator) {
@@ -78,12 +77,12 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           {VisibilityIcon}
-          {editableList && user && userRole ? (
+          {editableList && user && currentUserCollaborator ? (
             <EditableListTitle
               list={list}
               editable={editableList}
               userId={user.id}
-              userRole={userRole}
+              userRole={toDisplayUserRole(currentUserCollaborator.Role)}
             />
           ) : (
             <div className="flex flex-wrap items-center gap-2">
