@@ -22,7 +22,7 @@ import {
   userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
-import type { UserRole } from "@/components/ui/role-badge";
+import { RoleBadge, type UserRole } from "@/components/ui/role-badge";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -39,7 +39,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   let editableList = false;
   let editableCollaborators = false;
   let canChangeVisibility = false;
-  let userRole: UserRole = "collaborator";
+  let userRole: UserRole | undefined = undefined;
 
   const user = session?.user;
   if (user) {
@@ -60,6 +60,9 @@ const List: React.FC<ListProps> = async ({ listId }) => {
 
     if (currentUserCollaborator) {
       userRole = currentUserCollaborator.Role;
+    } else {
+      // Logged in but not a collaborator — viewing a public list
+      userRole = "viewer";
     }
   }
 
@@ -80,10 +83,13 @@ const List: React.FC<ListProps> = async ({ listId }) => {
               list={list}
               editable={editableList}
               userId={user.id}
-              userRole={userRole}
+              userRole={userRole!}
             />
           ) : (
-            <h2 className="text-2xl font-bold">{list.title}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-bold">{list.title}</h2>
+              {user && userRole && <RoleBadge role={userRole} />}
+            </div>
           )}
         </div>
         <div className="flex items-center space-x-4">
