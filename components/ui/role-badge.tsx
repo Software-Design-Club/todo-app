@@ -1,6 +1,9 @@
 import * as React from "react";
-import { Badge } from "./badge";
+import { Badge, badgeVariants } from "./badge";
+import { type VariantProps } from "class-variance-authority";
 import { type DisplayUserRole } from "@/lib/types";
+
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
 export interface RoleBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   role?: DisplayUserRole;
@@ -12,7 +15,7 @@ const RoleBadge = React.forwardRef<HTMLDivElement, RoleBadgeProps>(
       return null;
     }
 
-    const badgeVariant =
+    const badgeVariant: BadgeVariant =
       role === "owner" ? "primary" :
       role === "collaborator" ? "secondary" : "default";
 
