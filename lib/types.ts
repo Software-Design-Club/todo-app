@@ -12,7 +12,7 @@ export type ListState = (typeof ListStateEnum.enumValues)[number];
 export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], "UserRole">;
 export type DisplayUserRole = Tagged<UnwrapTagged<UserRole> | "viewer", "DisplayUserRole">;
 export const VIEWER_ROLE: DisplayUserRole = "viewer" as DisplayUserRole;
-export const toDisplayUserRole = (role: UserRole): DisplayUserRole => role as DisplayUserRole;
+export const toDisplayUserRole = (role: UserRole): DisplayUserRole => role as unknown as DisplayUserRole;
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
