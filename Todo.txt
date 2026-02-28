@@ -26,8 +26,8 @@ Todos:
 - [x] User can see lists they are a collaborator on their lists view
 - [x] User can edit the title of a list they are a collaborator on
 - [x] User can change lists visibility. Private lists are only visible to the creator and collaborators. Public lists are visible to everyone.
-- [ ] User can delete/archive a list
-- [ ] Creator/Collaborator can share a link to a list if its public
+- [x] User can delete/archive a list
+- [x] Creator/Collaborator can share a link to a list if its public
 - [ ] User can invite someone who is not signed up to the app to a list - Send email to invitee
 - [ ] Creator/Collaborator can assign todos to collaborators on a list
 - [ ] ??Creator can move todos to a different list
