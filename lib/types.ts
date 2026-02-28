@@ -10,7 +10,7 @@ import { Tagged } from "type-fest";
 export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
 export type ListState = (typeof ListStateEnum.enumValues)[number];
 export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], "UserRole">;
-export type DisplayUserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number] | "viewer", "DisplayUserRole">;
+export type DisplayUserRole = UserRole | "viewer";
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
