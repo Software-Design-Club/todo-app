@@ -9,6 +9,8 @@ import { Tagged } from "type-fest";
 
 export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
 export type ListState = (typeof ListStateEnum.enumValues)[number];
+export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], "UserRole">;
+export type DisplayUserRole = UserRole | "viewer";
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
@@ -21,7 +23,7 @@ export type List = {
 };
 
 export type ListWithRole = List & {
-  userRole: (typeof CollaboratorRoleEnum.enumValues)[number];
+  userRole: UserRole;
 };
 
 export type User = {
@@ -34,7 +36,7 @@ export type User = {
 export type ListUser = {
   User: User;
   listId: List["id"];
-  Role: (typeof CollaboratorRoleEnum.enumValues)[number];
+  Role: UserRole;
 };
 
 export const createTaggedList = (
@@ -87,6 +89,6 @@ export const createTaggedListUser = (listUser: {
       email: listUser.email,
     }),
     listId: listUser.listId as List["id"],
-    Role: listUser.role,
+    Role: listUser.role as UserRole,
   };
 };

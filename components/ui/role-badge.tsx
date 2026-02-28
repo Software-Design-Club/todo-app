@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Badge } from "./badge";
+import { type UserRole, type DisplayUserRole } from "@/lib/types";
 
-export type UserRole = "owner" | "collaborator";
-export type DisplayUserRole = UserRole | "viewer";
+export type { UserRole, DisplayUserRole };
 
 export interface RoleBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   role?: DisplayUserRole;

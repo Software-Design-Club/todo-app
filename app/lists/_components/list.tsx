@@ -22,7 +22,8 @@ import {
   userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
-import { RoleBadge, type DisplayUserRole } from "@/components/ui/role-badge";
+import { RoleBadge } from "@/components/ui/role-badge";
+import { type DisplayUserRole, type UserRole } from "@/lib/types";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -83,7 +84,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
               list={list}
               editable={editableList}
               userId={user.id}
-              userRole={userRole!}
+              userRole={userRole as UserRole}
             />
           ) : (
             <div className="flex flex-wrap items-center gap-2">
