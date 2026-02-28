@@ -46,6 +46,7 @@ This revision is automation-first: after initial environment setup, phase comple
 - Keep strict email-match on acceptance; mismatch requires owner approval.
 - Keep existing dropdown workflow and add a dedicated collaborator management page.
 - Keep GitHub auth provider for MVP.
+- Use tagged types from `lib/types.ts` whenever practical for function/module boundaries (especially IDs and domain inputs/outputs) instead of raw primitives.
 
 ## What We're NOT Doing
 - Adding new auth providers.
@@ -63,8 +64,12 @@ Use incremental vertical slices:
 6. Expand owner UX for invitation operations.
 7. Tie invite lifecycle into archive/delete and finalize release hardening.
 
+Cross-cutting implementation rule:
+- For all new or modified invitation/collaborator modules, prefer tagged types from `lib/types.ts` at API boundaries (server actions, helpers, services, and UI props) whenever feasible.
+- Only use raw primitives internally where required by low-level libraries or SQL adapters.
+
 ## Version Control Workflow (Jujutsu)
-- Before Phase 1, create the feature bookmark: `jj bookmark create codex/email-invitation-system` (or move an existing bookmark with `jj bookmark set codex/email-invitation-system -r @`).
+- Before Phase 1, create the feature bookmark: `jj bookmark create implement-email-invitation-system` (or move an existing bookmark with `jj bookmark set implement-email-invitation-system -r @`).
 - After each phase, make exactly one `jj` commit with a one-sentence message.
 - Use these checkpoint commit commands:
 1. `jj commit -m "Phase 1: Enforce owner collaborator invariants and add environment verification scaffolding."`
@@ -89,11 +94,14 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 - `app/lists/_actions/list.ts`
 - `app/sign-in/_components/_actions/find-or-create-account.ts`
 - `drizzle/backfillListCollaborators.ts`
+- `drizzle/ownerCollaborator.ts`
+- `lib/types.ts`
 
 **Changes**:
 - Ensure list creation always creates/upserts an owner row in `list_collaborators`.
 - Reuse one helper for owner-upsert logic from both list creation paths.
 - Keep backfill script for historical rows and make it idempotent.
+- Ensure `drizzle/ownerCollaborator.ts` uses tagged IDs from `lib/types.ts` for helper inputs/outputs whenever feasible (instead of raw `number` IDs).
 
 #### 2. Environment guardrails
 **Files**:
@@ -108,10 +116,11 @@ Prepare the app so invitation features can rely on stable collaborator ownership
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Owner row is created/upserted when creating new lists (automated test or assertion).
-- [ ] `npm run verify:env` fails when required keys are missing.
-- [ ] `npm run verify:env` passes when keys are present.
-- [ ] `npm run typecheck` passes.
+- [x] Owner row is created/upserted when creating new lists (automated test or assertion).
+- [x] `drizzle/ownerCollaborator.ts` helper surface uses tagged types from `lib/types.ts` for IDs wherever feasible.
+- [x] `npm run verify:env` fails when required keys are missing.
+- [x] `npm run verify:env` passes when keys are present.
+- [x] `npm run typecheck` passes.
 
 #### Manual Verification
 - [ ] Required invitation/env values are configured in local and deployment environments.
@@ -163,13 +172,13 @@ Add the missing test infrastructure so all subsequent phases can be automaticall
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:unit` executes successfully.
-- [ ] `npm run test:integration` executes successfully.
-- [ ] `npm run test:e2e:smoke` executes successfully.
-- [ ] `npm run verify:all` executes successfully.
+- [x] `npm run test:unit` executes successfully.
+- [x] `npm run test:integration` executes successfully.
+- [x] `npm run test:e2e:smoke` executes successfully.
+- [x] `npm run verify:all` executes successfully.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 2: Bootstrap unit, integration, and e2e test harness tooling and scripts."`
 
@@ -220,12 +229,12 @@ Extend `list_collaborators` to represent both accepted collaborators and pending
 - [ ] Migration applies cleanly on a fresh DB.
 - [ ] Migration applies cleanly on existing DB state.
 - [ ] Backfill results in zero legacy rows with invalid invite status.
-- [ ] Existing collaborator list screens still render accepted users only.
-- [ ] `npm run test:integration` passes schema/backfill tests.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] Existing collaborator list screens still render accepted users only.
+- [x] `npm run test:integration` passes schema/backfill tests.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 3: Extend collaborator schema for invitation lifecycle with migration and backfill coverage."`
 
@@ -277,14 +286,14 @@ Add server-side invitation lifecycle operations and transactional email integrat
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:unit` passes invitation domain tests.
-- [ ] `npm run test:integration` passes invitation action/service tests.
-- [ ] Duplicate open invite reuses row and rotates token.
-- [ ] Revoke/approve/reject transitions are enforced by role and current status.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] `npm run test:unit` passes invitation domain tests.
+- [x] `npm run test:integration` passes invitation action/service tests.
+- [x] Duplicate open invite reuses row and rotates token.
+- [x] Revoke/approve/reject transitions are enforced by role and current status.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 4: Implement invitation domain services and Resend email dispatch with automated tests."`
 
@@ -332,13 +341,13 @@ Implement invite-link handling with deterministic outcomes across auth states.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:integration` passes token validation and state rendering tests.
-- [ ] `npm run test:e2e:smoke` covers unauthenticated redirect and resumed acceptance.
-- [ ] Authenticated matching-email flow creates accepted collaborator membership.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] `npm run test:integration` passes token validation and state rendering tests.
+- [x] `npm run test:e2e:smoke` covers unauthenticated redirect and resumed acceptance.
+- [x] Authenticated matching-email flow creates accepted collaborator membership.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 5: Add invite acceptance route and sign-in continuation with integration and e2e coverage."`
 
@@ -385,14 +394,16 @@ Expose invitation workflows in both existing list-level controls and a dedicated
 ### Success Criteria
 
 #### Automated Verification
-- [ ] Owner-only access enforced for invite operations.
-- [ ] Collaborator/non-owner attempts fail with clear server errors.
-- [ ] Pending invites and accepted collaborators are rendered correctly.
-- [ ] `npm run test:integration` and `npm run test:e2e:smoke` pass relevant invite management scenarios.
-- [ ] `npm run typecheck` and `npm run lint` pass.
+- [x] Owner-only access enforced for invite operations.
+- [x] Collaborator/non-owner attempts fail with clear server errors.
+- [x] Pending invites and accepted collaborators are rendered correctly.
+- [x] `npm run test:integration` and `npm run test:e2e:smoke` pass relevant invite management scenarios.
+- [x] `npm run typecheck` and `npm run lint` pass.
 
 #### Manual Verification
-- [ ] None required.
+- [x] None required.
+
+**Jujutsu Checkpoint**: `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
 
 **Jujutsu Checkpoint**: `jj commit -m "Phase 6: Deliver owner invitation management UI flows with automated verification."`
 
@@ -435,9 +446,9 @@ Make invitation state resilient to list lifecycle events and finalize release re
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `npm run test:integration` confirms archive/delete invalidates open invites.
-- [ ] `npm run test:integration` confirms webhook failure metadata persistence.
-- [ ] `npm run verify:all` passes in CI/local.
+- [x] `npm run test:integration` confirms archive/delete invalidates open invites.
+- [x] `npm run test:integration` confirms webhook failure metadata persistence.
+- [x] `npm run verify:all` passes in CI/local.
 
 #### Manual Verification
 - [ ] Optional post-deploy production smoke for real provider behavior; not a phase gate.

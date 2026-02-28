@@ -37,20 +37,17 @@ import {
   deleteList,
 } from "@/app/lists/_actions/list";
 import { toast } from "sonner";
-import type { User } from "@/lib/types";
 
 type FilterOption = "all" | "owner" | "collaborator" | "archived";
 
 interface UserListsTableProps {
   lists: ListWithRole[];
   archivedLists: ListWithRole[];
-  userId: User["id"];
 }
 
 export function UserListsTable({
   lists,
   archivedLists,
-  userId,
 }: UserListsTableProps) {
   // State for sorting
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -80,7 +77,7 @@ export function UserListsTable({
   const handleArchive = React.useCallback(
     async (list: ListWithRole) => {
       try {
-        await archiveList(list.id, userId);
+        await archiveList(list.id);
         toast.success(`"${list.title}" has been archived`);
       } catch (error) {
         toast.error(
@@ -88,13 +85,13 @@ export function UserListsTable({
         );
       }
     },
-    [userId]
+    []
   );
 
   const handleUnarchive = React.useCallback(
     async (list: ListWithRole) => {
       try {
-        await unarchiveList(list.id, userId);
+        await unarchiveList(list.id);
         toast.success(`"${list.title}" has been restored`);
       } catch (error) {
         toast.error(
@@ -102,7 +99,7 @@ export function UserListsTable({
         );
       }
     },
-    [userId]
+    []
   );
 
   const handleDeleteClick = (list: ListWithRole) => {
@@ -114,7 +111,7 @@ export function UserListsTable({
     if (!listToDelete) return;
 
     try {
-      await deleteList(listToDelete.id, userId);
+      await deleteList(listToDelete.id);
       toast.success(`"${listToDelete.title}" has been permanently deleted`);
     } catch (error) {
       toast.error(

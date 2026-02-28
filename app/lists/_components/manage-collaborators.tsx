@@ -1,33 +1,46 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import type { User, List, ListUser } from "@/lib/types";
+import type { User, List, ListInvitation, ListUser } from "@/lib/types";
 import { CollaboratorListItem } from "./collaborator-list-item";
 import {
   searchUsers,
   addCollaborator,
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
+import {
+  createInvitationForList,
+  resendInvitationForList,
+  revokeInvitationForList,
+  approveInvitationForList,
+  rejectInvitationForList,
+} from "@/app/lists/_actions/invitations";
+import { INVITATION_STATUS } from "@/lib/invitations/constants";
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
   initialCollaborators: ListUser[];
+  initialInvitations?: ListInvitation[];
 }
 
 export default function ManageCollaborators({
   listId,
   initialCollaborators,
+  initialInvitations = [],
 }: ManageCollaboratorsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedUserToAdd, setSelectedUserToAdd] = useState<User | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentCollaborators, setCurrentCollaborators] =
     useState<ListUser[]>(initialCollaborators);
+  const [currentInvitations, setCurrentInvitations] =
+    useState<ListInvitation[]>(initialInvitations);
 
   useEffect(() => {
     setCurrentCollaborators(initialCollaborators);
@@ -78,7 +91,11 @@ export default function ManageCollaborators({
   });
 
   const removeCollaboratorMutation = useMutation({
-    mutationFn: (listUser: ListUser) => removeCollaborator(listUser),
+    mutationFn: (listUser: ListUser) =>
+      removeCollaborator({
+        listId: listUser.listId,
+        collaboratorUserId: listUser.User.id,
+      }),
     onSuccess: (_, listUser: ListUser) => {
       const removedUser = currentCollaborators.find(
         (c) => c.User.id === listUser.User.id
@@ -102,6 +119,181 @@ export default function ManageCollaborators({
         }`
       );
       setSuccessMessage(null);
+    },
+  });
+
+  const createInvitationMutation = useMutation({
+    mutationFn: (invitedEmail: string) =>
+      createInvitationForList({
+        listId,
+        invitedEmail,
+      }),
+    onSuccess: (data) => {
+      if (!data?.invitation) {
+        setSuccessMessage(null);
+        setError("Invitation created but response was invalid.");
+        return;
+      }
+      const { invitation } = data;
+
+      setCurrentInvitations((previousInvitations) => {
+        const inviteIndex = previousInvitations.findIndex(
+          (existingInvite) => existingInvite.id === invitation.id
+        );
+        if (inviteIndex === -1) {
+          return [invitation, ...previousInvitations];
+        }
+
+        const nextInvitations = [...previousInvitations];
+        nextInvitations[inviteIndex] = invitation;
+        return nextInvitations;
+      });
+
+      setInviteEmail("");
+      if (invitation.emailDeliveryStatus === "failed") {
+        setError("Email delivery failed. You can copy the invite link instead.");
+        setSuccessMessage(null);
+      } else {
+        setError(null);
+        setSuccessMessage(
+          `Invitation sent to ${invitation.invitedEmailNormalized}.`
+        );
+      }
+    },
+    onError: (mutationError: Error) => {
+      setSuccessMessage(null);
+      setError(
+        mutationError.message || "Failed to send invitation. Please try again."
+      );
+    },
+  });
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: (params: {
+      invitationId: ListInvitation["id"];
+      copyAfterResend?: boolean;
+    }) =>
+      resendInvitationForList({
+        invitationId: params.invitationId,
+        listId,
+      }).then((response) => ({ ...response, copyAfterResend: params.copyAfterResend })),
+    onSuccess: async (data) => {
+      if (!data?.invitation || !data.inviteLink) {
+        setSuccessMessage(null);
+        setError("Invitation resent but response was invalid.");
+        return;
+      }
+      const { invitation, inviteLink, copyAfterResend } = data;
+
+      setCurrentInvitations((previousInvitations) =>
+        previousInvitations.map((existingInvite) =>
+          existingInvite.id === invitation.id ? invitation : existingInvite
+        )
+      );
+
+      if (copyAfterResend) {
+        try {
+          await navigator.clipboard.writeText(inviteLink);
+          setSuccessMessage("Invite link copied to clipboard.");
+        } catch {
+          setSuccessMessage(`Could not copy to clipboard. Link: ${inviteLink}`);
+        }
+      } else {
+        setSuccessMessage(
+          `Invitation resent to ${invitation.invitedEmailNormalized}.`
+        );
+      }
+      setError(null);
+    },
+    onError: (mutationError: Error) => {
+      setSuccessMessage(null);
+      setError(
+        mutationError.message || "Failed to resend invitation. Please try again."
+      );
+    },
+  });
+
+  const revokeInvitationMutation = useMutation({
+    mutationFn: (invitationId: ListInvitation["id"]) =>
+      revokeInvitationForList({
+        invitationId,
+        listId,
+      }),
+    onSuccess: (invitation) => {
+      if (!invitation) {
+        setSuccessMessage(null);
+        setError("Invitation revoked but response was invalid.");
+        return;
+      }
+      setCurrentInvitations((previousInvitations) =>
+        previousInvitations.map((existingInvite) =>
+          existingInvite.id === invitation.id ? invitation : existingInvite
+        )
+      );
+      setError(null);
+      setSuccessMessage("Invitation revoked.");
+    },
+    onError: (mutationError: Error) => {
+      setSuccessMessage(null);
+      setError(
+        mutationError.message || "Failed to revoke invitation. Please try again."
+      );
+    },
+  });
+
+  const approveInvitationMutation = useMutation({
+    mutationFn: (invitationId: ListInvitation["id"]) =>
+      approveInvitationForList({
+        invitationId,
+        listId,
+      }),
+    onSuccess: (invitation) => {
+      if (!invitation) {
+        setSuccessMessage(null);
+        setError("Invitation approved but response was invalid.");
+        return;
+      }
+      setCurrentInvitations((previousInvitations) =>
+        previousInvitations.map((existingInvite) =>
+          existingInvite.id === invitation.id ? invitation : existingInvite
+        )
+      );
+      setError(null);
+      setSuccessMessage("Invitation approved.");
+    },
+    onError: (mutationError: Error) => {
+      setSuccessMessage(null);
+      setError(
+        mutationError.message || "Failed to approve invitation. Please try again."
+      );
+    },
+  });
+
+  const rejectInvitationMutation = useMutation({
+    mutationFn: (invitationId: ListInvitation["id"]) =>
+      rejectInvitationForList({
+        invitationId,
+        listId,
+      }),
+    onSuccess: (invitation) => {
+      if (!invitation) {
+        setSuccessMessage(null);
+        setError("Invitation rejected but response was invalid.");
+        return;
+      }
+      setCurrentInvitations((previousInvitations) =>
+        previousInvitations.map((existingInvite) =>
+          existingInvite.id === invitation.id ? invitation : existingInvite
+        )
+      );
+      setError(null);
+      setSuccessMessage("Invitation rejected.");
+    },
+    onError: (mutationError: Error) => {
+      setSuccessMessage(null);
+      setError(
+        mutationError.message || "Failed to reject invitation. Please try again."
+      );
     },
   });
 
@@ -154,6 +346,28 @@ export default function ManageCollaborators({
     clearMessages();
     removeCollaboratorMutation.mutate(listUser);
   };
+
+  const handleCreateInvitation = () => {
+    if (inviteEmail.trim()) {
+      clearMessages();
+      createInvitationMutation.mutate(inviteEmail.trim());
+    }
+  };
+
+  const invitationGroups = useMemo(() => {
+    const pending: ListInvitation[] = [];
+    const pendingApproval: ListInvitation[] = [];
+
+    for (const invitation of currentInvitations) {
+      if (invitation.inviteStatus === INVITATION_STATUS.SENT) {
+        pending.push(invitation);
+      } else if (invitation.inviteStatus === INVITATION_STATUS.PENDING_APPROVAL) {
+        pendingApproval.push(invitation);
+      }
+    }
+
+    return { pending, pendingApproval };
+  }, [currentInvitations]);
 
   useEffect(() => {
     clearMessages();
@@ -304,6 +518,137 @@ export default function ManageCollaborators({
               Cancel
             </Button>
           </div>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-md font-semibold mb-2">Invite by Email</h3>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(event) => setInviteEmail(event.target.value)}
+            placeholder="user@example.com"
+            className="border border-gray-300 p-2 rounded-md text-sm flex-grow focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            disabled={createInvitationMutation.isPending}
+          />
+          <Button
+            onClick={handleCreateInvitation}
+            disabled={
+              createInvitationMutation.isPending || !inviteEmail.trim().length
+            }
+            size="sm"
+          >
+            {createInvitationMutation.isPending ? "Inviting..." : "Invite"}
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-md font-semibold mb-2">Pending Invitations</h3>
+        {invitationGroups.pending.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No pending email invitations.
+          </p>
+        ) : (
+          <ul className="space-y-2 max-h-40 overflow-y-auto">
+            {invitationGroups.pending.map((invitation) => (
+              <li
+                key={invitation.id}
+                className="rounded-md border p-2 text-sm dark:bg-gray-700 dark:border-gray-600"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{invitation.invitedEmailNormalized}</p>
+                    <p className="text-xs text-muted-foreground">
+                      status: {invitation.inviteStatus}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        resendInvitationMutation.mutate({
+                          invitationId: invitation.id,
+                        })
+                      }
+                      disabled={resendInvitationMutation.isPending}
+                    >
+                      Resend
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        resendInvitationMutation.mutate({
+                          invitationId: invitation.id,
+                          copyAfterResend: true,
+                        })
+                      }
+                      disabled={resendInvitationMutation.isPending}
+                    >
+                      Copy Link
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        revokeInvitationMutation.mutate(invitation.id)
+                      }
+                      disabled={revokeInvitationMutation.isPending}
+                    >
+                      Revoke
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-md font-semibold mb-2">Owner Approvals</h3>
+        {invitationGroups.pendingApproval.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No invitations are awaiting owner approval.
+          </p>
+        ) : (
+          <ul className="space-y-2 max-h-40 overflow-y-auto">
+            {invitationGroups.pendingApproval.map((invitation) => (
+              <li
+                key={invitation.id}
+                className="rounded-md border p-2 text-sm dark:bg-gray-700 dark:border-gray-600"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{invitation.invitedEmailNormalized}</p>
+                    <p className="text-xs text-muted-foreground">
+                      requested user id: {invitation.userId ?? "unknown"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => approveInvitationMutation.mutate(invitation.id)}
+                      disabled={approveInvitationMutation.isPending}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => rejectInvitationMutation.mutate(invitation.id)}
+                      disabled={rejectInvitationMutation.isPending}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

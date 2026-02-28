@@ -298,7 +298,7 @@ After structure approval:
    - Adjust technical approach
    - Clarify success criteria (both automated and manual)
    - Add/remove scope items
-   - After making changes, run `jj commit -m "plan: update [plan name]"` again
+   - After making changes, jj commit with one sentence description of the changes to the plan
 
 4. **Continue refining** until the user is satisfied
 

@@ -69,6 +69,7 @@ This repository uses **Jujutsu (jj)** for version control instead of Git.
 - Use `jj` commands instead of `git` commands
 - Jujutsu provides a more intuitive interface for managing changes
 - Consult the Jujutsu documentation for workflow commands
+- **Before pushing**, always run `jj log --limit 15` to identify the active bookmark. Move that bookmark forward to `@` and push it — **never assume `main`**.
 
 ## Additional Documentation
 

@@ -14,19 +14,28 @@ const ListPage = async ({ params }: { params: Promise<{ listId: string }> }) => 
   }
 
   const list = await getList(numericListId);
-  const collaborators = await getCollaborators(list.id);
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
+  const isPublicActiveList =
+    list.visibility === "public" && list.state === "active";
+
+  if (!userId && isPublicActiveList) {
+    return (
+      <div>
+        <List listId={numericListId} />
+      </div>
+    );
+  }
+
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const collaborators = await getCollaborators(list.id);
   const canView = canViewList(list, collaborators, userId);
 
   if (!canView) {
-    // Private list - not authorized
-    if (!userId) {
-      // Not logged in - redirect to sign-in
-      redirect("/sign-in");
-    }
-    // Logged in but not a collaborator - 404
     notFound();
   }
 

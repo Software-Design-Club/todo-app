@@ -1,11 +1,17 @@
 import { List, ListUser, User } from "@/lib/types";
-import { CollaboratorRoleEnum } from "@/drizzle/schema";
+import { COLLABORATOR_ROLE } from "@/lib/invitations/constants";
 
 const ALLOWED_TO_EDIT_COLLABORATORS_ROLES = [
-  CollaboratorRoleEnum.enumValues[0],
+  COLLABORATOR_ROLE.OWNER,
 ];
-const ALLOWED_TO_EDIT_LIST_ROLES = [...CollaboratorRoleEnum.enumValues];
-type CollaboratorRole = (typeof CollaboratorRoleEnum.enumValues)[number];
+const ALLOWED_TO_EDIT_LIST_ROLES = [
+  COLLABORATOR_ROLE.OWNER,
+  COLLABORATOR_ROLE.COLLABORATOR,
+];
+type CollaboratorRole = (typeof ALLOWED_TO_EDIT_LIST_ROLES)[number];
+
+// Permission functions represent distinct capabilities, not ownership checks.
+// Multiple functions may share implementation today but can diverge independently.
 
 export function userCanEditList(
   collaborators: ListUser[],
@@ -32,8 +38,18 @@ export function isAuthorizedToEditCollaborators(
     (collaborator) =>
       collaborator.User.id === userId &&
       ALLOWED_TO_EDIT_COLLABORATORS_ROLES.includes(
-        collaborator.Role as (typeof CollaboratorRoleEnum.enumValues)[0]
+        collaborator.Role as (typeof ALLOWED_TO_EDIT_COLLABORATORS_ROLES)[number]
       )
+  );
+}
+
+export function isListOwner(
+  collaborators: ListUser[],
+  userId: User["id"]
+): boolean {
+  return collaborators.some(
+    (collaborator) =>
+      collaborator.User.id === userId && collaborator.Role === "owner"
   );
 }
 
@@ -73,4 +89,3 @@ export function canViewList(
   if (!userId) return false;
   return collaborators.some((c) => c.User.id === userId);
 }
-

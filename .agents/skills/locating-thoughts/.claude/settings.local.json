@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__acp__Bash",
+      "Bash(jj bookmark create:*)",
+      "Bash(jj describe:*)",
+      "Bash(jj git push:*)",
+      "Bash(jj status:*)",
+      "Bash(jj bookmark list:*)",
+      "Bash(jj new:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)"
+    ]
+  }
+}
