@@ -23,7 +23,7 @@ import {
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
 import { RoleBadge } from "@/components/ui/role-badge";
-import { type DisplayUserRole, VIEWER_ROLE } from "@/lib/types";
+import { type DisplayUserRole, VIEWER_ROLE, toDisplayUserRole } from "@/lib/types";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -60,7 +60,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     );
 
     if (currentUserCollaborator) {
-      userRole = currentUserCollaborator.Role;
+      userRole = toDisplayUserRole(currentUserCollaborator.Role);
     } else {
       // Logged in but not a collaborator — viewing a public list
       userRole = VIEWER_ROLE;
