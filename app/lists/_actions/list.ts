@@ -132,17 +132,17 @@ export async function getLists(
 
     // Determine user's role for this list
     // Owner role takes precedence if user is the creator
-    let userRole: "owner" | "collaborator";
+    let userRole: UserRole;
 
     if (list.creatorId === userId) {
       // User is the creator, so they are the owner
-      userRole = "owner";
+      userRole = "owner" as UserRole;
     } else if (collaborator && collaborator.userId === userId) {
       // User is a collaborator (and not the creator)
-      userRole = collaborator.role;
+      userRole = collaborator.role as UserRole;
     } else {
       // Fallback to collaborator (should not happen with proper where clause)
-      userRole = "collaborator";
+      userRole = "collaborator" as UserRole;
     }
 
     // Only add the list once, with the determined role
@@ -150,7 +150,7 @@ export async function getLists(
       // If we haven't seen this list yet, or if this is the owner role (which takes precedence)
       listMap.set(list.id, {
         ...createTaggedList(list),
-        userRole: userRole as UserRole,
+        userRole,
       });
     }
   }
