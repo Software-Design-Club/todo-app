@@ -10,9 +10,9 @@ import { Tagged, UnwrapTagged } from "type-fest";
 export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
 export type ListState = (typeof ListStateEnum.enumValues)[number];
 export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], "UserRole">;
-export type DisplayUserRole = Tagged<UnwrapTagged<UserRole> | "viewer", "DisplayUserRole">;
+export type DisplayUserRole = Tagged<UnwrapTagged<UserRole> | "viewer", "UserRole">;
 export const VIEWER_ROLE: DisplayUserRole = "viewer" as DisplayUserRole;
-export const toDisplayUserRole = (role: UserRole): DisplayUserRole => role as unknown as DisplayUserRole;
+export const toDisplayUserRole = (role: UserRole): DisplayUserRole => role;
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
