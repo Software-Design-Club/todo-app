@@ -10,7 +10,7 @@ import { Tagged } from "type-fest";
 export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
 export type ListState = (typeof ListStateEnum.enumValues)[number];
 export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], "UserRole">;
-export type DisplayUserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number] | "viewer", "UserRole">;
+export type DisplayUserRole = UserRole | Tagged<"viewer", "UserRole">;
 export const VIEWER_ROLE: DisplayUserRole = "viewer" as DisplayUserRole;
 
 export type List = {
