@@ -10,7 +10,7 @@ import {
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
-import { createTaggedList, type List, type ListWithRole, type User } from "@/lib/types";
+import { createTaggedList, type List, type ListWithRole, type User, type UserRole } from "@/lib/types";
 import { getCollaborators } from "./collaborators";
 import {
   userCanEditList,
@@ -150,7 +150,7 @@ export async function getLists(
       // If we haven't seen this list yet, or if this is the owner role (which takes precedence)
       listMap.set(list.id, {
         ...createTaggedList(list),
-        userRole,
+        userRole: userRole as UserRole,
       });
     }
   }

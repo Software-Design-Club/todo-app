@@ -3,7 +3,7 @@
 import * as React from "react";
 import { ColumnDef, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/ui/data-table";
-import { ListWithRole } from "@/lib/types";
+import { ListWithRole, toDisplayUserRole } from "@/lib/types";
 import { RoleBadge } from "@/components/ui/role-badge";
 import { Button } from "@/ui/button";
 import {
@@ -171,7 +171,7 @@ export function UserListsTable({
           const list = row.original;
           return (
             <div className="text-center">
-              <RoleBadge role={list.userRole} />
+              <RoleBadge role={toDisplayUserRole(list.userRole)} />
             </div>
           );
         },
