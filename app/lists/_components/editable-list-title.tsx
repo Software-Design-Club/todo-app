@@ -5,13 +5,14 @@ import { Button } from "@/ui/button";
 import { toast } from "sonner";
 import { updateListTitle } from "@/app/lists/_actions/list";
 import type { List, User } from "@/lib/types";
-import { RoleBadge, type UserRole } from "@/components/ui/role-badge";
+import { RoleBadge } from "@/components/ui/role-badge";
+import { type DisplayUserRole } from "@/lib/types";
 
 interface EditableListTitleProps {
   list: List;
   editable: boolean;
   userId: User["id"];
-  userRole: UserRole;
+  userRole: DisplayUserRole;
 }
 
 const MAX_TITLE_LENGTH = 255;
