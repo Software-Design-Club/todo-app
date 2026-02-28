@@ -60,10 +60,10 @@ const List: React.FC<ListProps> = async ({ listId }) => {
     );
 
     if (currentUserCollaborator) {
-      userRole = currentUserCollaborator.Role;
+      userRole = currentUserCollaborator.Role as DisplayUserRole;
     } else {
       // Logged in but not a collaborator — viewing a public list
-      userRole = "viewer";
+      userRole = "viewer" as DisplayUserRole;
     }
   }
 
