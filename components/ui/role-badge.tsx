@@ -1,10 +1,12 @@
 import * as React from "react";
-import { Badge } from "./badge";
+import { Badge, badgeVariants } from "./badge";
+import { type VariantProps } from "class-variance-authority";
+import { type DisplayUserRole } from "@/lib/types";
 
-export type UserRole = "owner" | "collaborator";
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
 export interface RoleBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  role?: UserRole;
+  role?: DisplayUserRole;
 }
 
 const RoleBadge = React.forwardRef<HTMLDivElement, RoleBadgeProps>(
@@ -12,20 +14,14 @@ const RoleBadge = React.forwardRef<HTMLDivElement, RoleBadgeProps>(
     if (role === undefined) {
       return null;
     }
-    // Map role variants to Badge theme variants
-    const variantMap: Record<UserRole, "primary" | "secondary"> = {
-      owner: "primary",
-      collaborator: "secondary",
-    };
 
-    // Map role to display text
-    const textMap: Record<UserRole, string> = {
-      owner: "Owner",
-      collaborator: "Collaborator",
-    };
+    const badgeVariant: BadgeVariant =
+      role === "owner" ? "primary" :
+      role === "collaborator" ? "secondary" : "default";
 
-    const badgeVariant = variantMap[role];
-    const badgeText = textMap[role];
+    const badgeText =
+      role === "owner" ? "Owner" :
+      role === "collaborator" ? "Collaborator" : "Viewer";
 
     return (
       <Badge ref={ref} variant={badgeVariant} className={className} {...props}>

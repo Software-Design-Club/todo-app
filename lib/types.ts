@@ -5,10 +5,14 @@ import {
   ListVisibilityEnum,
   ListStateEnum,
 } from "@/drizzle/schema";
-import { Tagged } from "type-fest";
+import { Tagged, UnwrapTagged } from "type-fest";
 
 export type ListVisibility = (typeof ListVisibilityEnum.enumValues)[number];
 export type ListState = (typeof ListStateEnum.enumValues)[number];
+export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], "UserRole">;
+export type DisplayUserRole = Tagged<UnwrapTagged<UserRole> | "viewer", "UserRole">;
+export const VIEWER_ROLE: DisplayUserRole = "viewer" as DisplayUserRole;
+export const toDisplayUserRole = (role: UserRole): DisplayUserRole => role;
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
@@ -21,7 +25,7 @@ export type List = {
 };
 
 export type ListWithRole = List & {
-  userRole: (typeof CollaboratorRoleEnum.enumValues)[number];
+  userRole: UserRole;
 };
 
 export type User = {
@@ -34,7 +38,7 @@ export type User = {
 export type ListUser = {
   User: User;
   listId: List["id"];
-  Role: (typeof CollaboratorRoleEnum.enumValues)[number];
+  Role: UserRole;
 };
 
 export const createTaggedList = (
@@ -87,6 +91,6 @@ export const createTaggedListUser = (listUser: {
       email: listUser.email,
     }),
     listId: listUser.listId as List["id"],
-    Role: listUser.role,
+    Role: listUser.role as UserRole,
   };
 };

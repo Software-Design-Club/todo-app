@@ -22,7 +22,8 @@ import {
   userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
-import type { UserRole } from "@/components/ui/role-badge";
+import { RoleBadge } from "@/components/ui/role-badge";
+import { type DisplayUserRole, VIEWER_ROLE, toDisplayUserRole } from "@/lib/types";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -39,9 +40,13 @@ const List: React.FC<ListProps> = async ({ listId }) => {
   let editableList = false;
   let editableCollaborators = false;
   let canChangeVisibility = false;
-  let userRole: UserRole = "collaborator";
+  let userRole: DisplayUserRole | undefined = undefined;
 
   const user = session?.user;
+  const currentUserCollaborator = user
+    ? collaborators.find((collab) => collab.User.id === user.id)
+    : undefined;
+
   if (user) {
     editableList = userCanEditList(collaborators, user.id);
     editableCollaborators = isAuthorizedToEditCollaborators(
@@ -53,13 +58,10 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       user.id
     );
 
-    // Determine user's role from collaborators array
-    const currentUserCollaborator = collaborators.find(
-      (collab) => collab.User.id === user.id
-    );
-
     if (currentUserCollaborator) {
-      userRole = currentUserCollaborator.Role;
+      userRole = toDisplayUserRole(currentUserCollaborator.Role);
+    } else if (list.visibility === "public" && list.state === "active") {
+      userRole = VIEWER_ROLE;
     }
   }
 
@@ -75,15 +77,18 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           {VisibilityIcon}
-          {editableList && user ? (
+          {editableList && user && currentUserCollaborator ? (
             <EditableListTitle
               list={list}
               editable={editableList}
               userId={user.id}
-              userRole={userRole}
+              userRole={toDisplayUserRole(currentUserCollaborator.Role)}
             />
           ) : (
-            <h2 className="text-2xl font-bold">{list.title}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-bold">{list.title}</h2>
+              {user && userRole && <RoleBadge role={userRole} />}
+            </div>
           )}
         </div>
         <div className="flex items-center space-x-4">

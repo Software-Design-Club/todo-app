@@ -10,7 +10,7 @@ import {
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
-import { createTaggedList, type List, type ListWithRole, type User } from "@/lib/types";
+import { createTaggedList, type List, type ListWithRole, type User, type UserRole } from "@/lib/types";
 import { getCollaborators } from "./collaborators";
 import {
   userCanEditList,
@@ -132,17 +132,17 @@ export async function getLists(
 
     // Determine user's role for this list
     // Owner role takes precedence if user is the creator
-    let userRole: "owner" | "collaborator";
+    let userRole: UserRole;
 
     if (list.creatorId === userId) {
       // User is the creator, so they are the owner
-      userRole = "owner";
+      userRole = "owner" as UserRole;
     } else if (collaborator && collaborator.userId === userId) {
       // User is a collaborator (and not the creator)
-      userRole = collaborator.role;
+      userRole = collaborator.role as UserRole;
     } else {
       // Fallback to collaborator (should not happen with proper where clause)
-      userRole = "collaborator";
+      userRole = "collaborator" as UserRole;
     }
 
     // Only add the list once, with the determined role
