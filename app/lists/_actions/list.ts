@@ -10,12 +10,14 @@ import {
 import { notFound } from "next/navigation";
 import { Todo } from "@/app/lists/_actions/todo";
 import { revalidatePath } from "next/cache";
-import { createTaggedList, type List, type ListWithRole, type User, type UserRole } from "@/lib/types";
-import { getCollaborators } from "./collaborators";
 import {
-  userCanEditList,
-  isAuthorizedToChangeVisibility,
-} from "./permissions";
+  createTaggedList,
+  type List,
+  type ListWithRole,
+  type User,
+} from "@/lib/types";
+import { getCollaborators } from "./collaborators";
+import { userCanEditList, isAuthorizedToChangeVisibility } from "./permissions";
 
 export type UsersListTodos = {
   id: number;
@@ -27,7 +29,7 @@ export type UsersListTodos = {
 };
 
 export async function getListWithTodos(
-  listId: number
+  listId: number,
 ): Promise<UsersListTodos> {
   const db = drizzle(sql);
 
@@ -36,7 +38,7 @@ export async function getListWithTodos(
     .from(ListsTable)
     .leftJoin(TodosTable, eq(ListsTable.id, TodosTable.listId))
     .where(
-      and(eq(ListsTable.id, listId), not(eq(TodosTable.status, "deleted")))
+      and(eq(ListsTable.id, listId), not(eq(TodosTable.status, "deleted"))),
     );
 
   const todos = listsWithTodos
@@ -87,14 +89,14 @@ export async function getList(listId: number): Promise<List> {
  */
 export async function getLists(
   userId: User["id"],
-  includeArchived: boolean = false
+  includeArchived: boolean = false,
 ): Promise<ListWithRole[]> {
   const db = drizzle(sql);
 
   // Build base query conditions
   const userCondition = or(
     eq(ListsTable.creatorId, userId),
-    eq(ListCollaboratorsTable.userId, userId)
+    eq(ListCollaboratorsTable.userId, userId),
   );
 
   // For archived lists, only show to owners
@@ -104,7 +106,7 @@ export async function getLists(
     // Only show archived lists owned by user
     stateCondition = and(
       eq(ListsTable.state, "archived"),
-      eq(ListsTable.creatorId, userId)
+      eq(ListsTable.creatorId, userId),
     );
   } else {
     // Show only active lists
@@ -119,7 +121,7 @@ export async function getLists(
     .from(ListsTable)
     .leftJoin(
       ListCollaboratorsTable,
-      eq(ListsTable.id, ListCollaboratorsTable.listId)
+      eq(ListsTable.id, ListCollaboratorsTable.listId),
     )
     .where(and(userCondition, stateCondition));
 
@@ -132,17 +134,17 @@ export async function getLists(
 
     // Determine user's role for this list
     // Owner role takes precedence if user is the creator
-    let userRole: UserRole;
+    let userRole: (typeof ListCollaboratorsTable.$inferSelect)["role"];
 
     if (list.creatorId === userId) {
       // User is the creator, so they are the owner
-      userRole = "owner" as UserRole;
+      userRole = "owner";
     } else if (collaborator && collaborator.userId === userId) {
       // User is a collaborator (and not the creator)
-      userRole = collaborator.role as UserRole;
+      userRole = collaborator.role;
     } else {
       // Fallback to collaborator (should not happen with proper where clause)
-      userRole = "collaborator" as UserRole;
+      userRole = "collaborator";
     }
 
     // Only add the list once, with the determined role
@@ -150,7 +152,7 @@ export async function getLists(
       // If we haven't seen this list yet, or if this is the owner role (which takes precedence)
       listMap.set(list.id, {
         ...createTaggedList(list),
-        userRole,
+        userRole: userRole as ListWithRole["userRole"],
       });
     }
   }
@@ -218,7 +220,7 @@ export async function createList(formData: FormData) {
 export async function updateListTitle(
   listId: List["id"],
   newTitle: string,
-  userId: User["id"]
+  userId: User["id"],
 ): Promise<List> {
   try {
     // Validate title - fail fast approach
@@ -291,7 +293,7 @@ export async function updateListTitle(
 export async function updateListVisibility(
   listId: List["id"],
   visibility: List["visibility"],
-  userId: User["id"]
+  userId: User["id"],
 ): Promise<List> {
   console.log("inside updateVisibility");
   const collaborators = await getCollaborators(listId);
@@ -325,7 +327,7 @@ export async function updateListVisibility(
  */
 export async function archiveList(
   listId: List["id"],
-  userId: User["id"]
+  userId: User["id"],
 ): Promise<List> {
   const list = await getList(listId);
 
@@ -361,7 +363,7 @@ export async function archiveList(
  */
 export async function unarchiveList(
   listId: List["id"],
-  userId: User["id"]
+  userId: User["id"],
 ): Promise<List> {
   const list = await getList(listId);
 
@@ -398,7 +400,7 @@ export async function unarchiveList(
  */
 export async function deleteList(
   listId: List["id"],
-  userId: User["id"]
+  userId: User["id"],
 ): Promise<void> {
   const list = await getList(listId);
 
