@@ -9,6 +9,7 @@ Every affected phase now includes:
 - Strict `SPEC -> RED -> GREEN -> REFACTOR` sequencing with exactly one new failing test per loop.
 - Test sequencing that is one test at a time, but cumulative coverage that must span the whole contract before the phase is complete.
 - Capability-based authorization language for invitation and collaborator-management actions.
+- Explicit invitation-domain type definitions before the contracts that use them, using branded identifiers, secrets, URLs, and discriminated unions to rule out mixed states.
 
 All contracts in this plan are deterministic unless a contract explicitly says otherwise.
 
@@ -21,6 +22,7 @@ All contracts in this plan are deterministic unless a contract explicitly says o
 6. Authorization contracts are capability-based. Use `user allowed to invite collaborators to this list` and `user allowed to manage collaborators for this list` instead of binding the spec to a specific role unless the role itself is the domain requirement.
 7. Prefer domain types over raw primitives whenever the type system can express the business rule.
 8. If existing implementation conflicts with a newly written contract, rewrite the changed behavior from the contract instead of adapting tests to incidental behavior.
+9. Define new invitation-domain types before the first contract that uses them, and prefer branded or discriminated forms that make illegal states unrepresentable.
 
 ## Overview
 Implement roadmap item 5 from `agent-os/product/roadmap.md:26` by adding email-based collaborator invitations with secure one-time tokens, sign-in continuation, and collaborator-management controls.
@@ -106,12 +108,59 @@ Make owner membership and invitation environment validation explicit, testable c
 
 ### Specifications
 
+#### Type Definitions
+```ts
+import type { Tagged } from "type-fest";
+
+type ListId = List["id"];
+type UserId = User["id"];
+type ListTitle = List["title"];
+
+type EmailAddress = Tagged<string, "EmailAddress">;
+type NormalizedEmailAddress = Tagged<string, "NormalizedEmailAddress">;
+type SafeAppPath = Tagged<`/${string}`, "SafeAppPath">;
+type AppBaseUrl =
+  | Tagged<`http://${string}`, "AppBaseUrl">
+  | Tagged<`https://${string}`, "AppBaseUrl">;
+
+type InvitationId = Tagged<number, "InvitationId">;
+type InvitationSecret = Tagged<string, "InvitationSecret">;
+type InvitationSecretHash = Tagged<string, "InvitationSecretHash">;
+type InvitationExpiry = Tagged<Date, "InvitationExpiry">;
+type InvitationResolvedAt = Tagged<Date, "InvitationResolvedAt">;
+type DeliveryAttemptedAt = Tagged<Date, "DeliveryAttemptedAt">;
+type ProviderMessageId = Tagged<string, "ProviderMessageId">;
+
+type ResendApiKey = Tagged<string, "ResendApiKey">;
+type ResendWebhookSecret = Tagged<string, "ResendWebhookSecret">;
+type EmailFromAddress = Tagged<string, "EmailFromAddress">;
+type ResendErrorMessage = Tagged<string, "ResendErrorMessage">;
+type ResendErrorName = Tagged<string, "ResendErrorName">;
+
+type CreateListInput = {
+  title: ListTitle;
+  creatorId: UserId;
+  visibility?: ListVisibility;
+};
+
+type AuthenticatedUser = Pick<User, "id" | "email" | "name">;
+
+type OwnerCollaboratorUpsertResult = "inserted" | "repaired" | "unchanged";
+
+type InvitationEnv = {
+  resendApiKey: ResendApiKey;
+  emailFrom: EmailFromAddress;
+  appBaseUrl: AppBaseUrl;
+  resendWebhookSecret?: ResendWebhookSecret;
+};
+```
+
 #### Contract 1.1: Owner collaborator invariant
 ```ts
 upsertOwnerCollaborator(input: {
   listId: ListId;
   ownerId: UserId;
-}): Promise<"inserted" | "repaired" | "unchanged">
+}): Promise<OwnerCollaboratorUpsertResult>
 ```
 Effects:
 - If the list and user exist, then after return exactly one `list_collaborators` row exists for `(listId, ownerId)` with `role = "owner"` and `inviteStatus = "accepted"`.
@@ -146,12 +195,7 @@ Effects:
 
 #### Contract 1.4: Invitation environment is validated before use
 ```ts
-verifyInvitationEnv(env: NodeJS.ProcessEnv): {
-  resendApiKey: string;
-  emailFrom: string;
-  appBaseUrl: string;
-  resendWebhookSecret?: string;
-}
+verifyInvitationEnv(env: NodeJS.ProcessEnv): InvitationEnv
 ```
 Effects:
 - Returns a normalized configuration object iff all required invitation settings are present and syntactically valid.
@@ -369,16 +413,83 @@ Extend `list_collaborators` so the schema can represent accepted memberships and
 
 ### Specifications
 
-#### Contract 3.1: Invitation lifecycle data model
+#### Type Definitions
 ```ts
-type InviteStatus =
-  | "sent"
-  | "accepted"
-  | "pending_approval"
-  | "revoked"
-  | "expired";
+type AcceptedInvitationStatus = Tagged<"accepted", "AcceptedInvitationStatus">;
+type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
+type PendingApprovalInvitationStatus = Tagged<
+  "pending_approval",
+  "PendingApprovalInvitationStatus"
+>;
+type OpenInvitationStatus =
+  | SentInvitationStatus
+  | PendingApprovalInvitationStatus;
+type RevokedInvitationStatus = Tagged<"revoked", "RevokedInvitationStatus">;
+type ExpiredInvitationStatus = Tagged<"expired", "ExpiredInvitationStatus">;
+type TerminalInvitationStatus =
+  | RevokedInvitationStatus
+  | ExpiredInvitationStatus;
+type InvitationLifecycleStatus =
+  | AcceptedInvitationStatus
+  | OpenInvitationStatus
+  | TerminalInvitationStatus;
+
+type AcceptedMembershipRow = {
+  kind: "accepted_membership";
+  invitationId: InvitationId;
+  listId: ListId;
+  userId: UserId;
+  role: UserRole;
+  inviteStatus: AcceptedInvitationStatus;
+};
+
+type OpenInvitationRow = {
+  kind: "open_invitation";
+  invitationId: InvitationId;
+  listId: ListId;
+  userId: null;
+  role: UserRole;
+  inviteStatus: OpenInvitationStatus;
+  invitedEmailNormalized: NormalizedEmailAddress;
+  invitationSecretHash: InvitationSecretHash;
+  expiresAt: InvitationExpiry;
+  inviterId: UserId;
+};
+
+type TerminalInvitationRow = {
+  kind: "terminal_invitation";
+  invitationId: InvitationId;
+  listId: ListId;
+  userId: null;
+  role: UserRole;
+  inviteStatus: TerminalInvitationStatus;
+  invitedEmailNormalized: NormalizedEmailAddress;
+  lastIssuedSecretHash: InvitationSecretHash;
+  lastExpiresAt: InvitationExpiry;
+  inviterId: UserId;
+  resolvedAt: InvitationResolvedAt;
+};
+
+type InvitationLifecycleRow =
+  | AcceptedMembershipRow
+  | OpenInvitationRow
+  | TerminalInvitationRow;
+
+type AcceptedCollaborator = ListUser & {
+  collaboratorId: InvitationId;
+  inviteStatus: AcceptedInvitationStatus;
+};
+
+type BackfillReport = {
+  scanned: number;
+  updated: number;
+  unchanged: number;
+};
 ```
+
+#### Contract 3.1: Invitation lifecycle data model
 Effects:
+- The schema projects invitation rows through `InvitationLifecycleRow`, whose `kind` discriminator and branded `inviteStatus` values rule out mixed accepted/open/terminal states at the type level.
 - Rows with `inviteStatus = "accepted"` represent usable collaborator memberships.
 - Rows with `inviteStatus = "sent"` or `inviteStatus = "pending_approval"` represent open invitations rather than accepted membership.
 - Rows with `inviteStatus = "revoked"` or `inviteStatus = "expired"` are terminal and cannot later be accepted.
@@ -503,6 +614,43 @@ Define the end-to-end workflow for inviting someone to a list up to the point wh
 
 ### Workflow Specification
 
+#### Type Definitions
+```ts
+type AbsoluteInvitationUrl =
+  | Tagged<`http://${string}`, "AbsoluteInvitationUrl">
+  | Tagged<`https://${string}`, "AbsoluteInvitationUrl">;
+
+type InvitationSendAcceptedResponse = {
+  data: { id: ProviderMessageId };
+  error: null;
+};
+
+type InvitationSendRejectedResponse = {
+  data: null;
+  error: {
+    message: ResendErrorMessage;
+    name?: ResendErrorName;
+  };
+};
+
+type ResendSendResponse =
+  | InvitationSendAcceptedResponse
+  | InvitationSendRejectedResponse;
+
+type PersistedSentInvitation = {
+  invitationId: InvitationId;
+  inviteStatus: SentInvitationStatus;
+  expiresAt: InvitationExpiry;
+  wasRotated: boolean;
+};
+
+type InviteCollaboratorWorkflowResult = {
+  invitationId: InvitationId;
+  acceptanceUrl: AbsoluteInvitationUrl;
+  resendResponse: ResendSendResponse;
+};
+```
+
 #### Contract 4.1: Invite collaborator workflow
 ```ts
 inviteCollaboratorWorkflow(input: {
@@ -510,11 +658,7 @@ inviteCollaboratorWorkflow(input: {
   inviterId: UserId;
   invitedEmail: EmailAddress;
   now: Date;
-}): Promise<{
-  invitationId: InvitationId;
-  acceptanceUrl: string;
-  resendResponse: ResendSendResponse;
-}>
+}): Promise<InviteCollaboratorWorkflowResult>
 ```
 Effects:
 - Requires `inviterId` to identify a user who is allowed to invite collaborators to `listId`.
@@ -569,12 +713,7 @@ issueInvitation(input: {
   invitedEmail: EmailAddress;
   secretHash: InvitationSecretHash;
   now: Date;
-}): Promise<{
-  invitationId: InvitationId;
-  status: "sent";
-  expiresAt: Date;
-  wasRotated: boolean;
-}>
+}): Promise<PersistedSentInvitation>
 ```
 Effects:
 - Persists exactly one open invite for `(listId, invitedEmailNormalized)`.
@@ -584,9 +723,9 @@ Effects:
 #### Contract 4.6: Invitation URL construction
 ```ts
 buildInvitationAcceptanceUrl(input: {
-  appBaseUrl: string;
+  appBaseUrl: AppBaseUrl;
   secret: InvitationSecret;
-}): string
+}): AbsoluteInvitationUrl
 ```
 Effects:
 - Returns the canonical app URL for `/invite?token=...`.
@@ -596,7 +735,7 @@ Effects:
 ```ts
 sendInvitationEmail(input: {
   invitationId: InvitationId;
-  acceptanceUrl: string;
+  acceptanceUrl: AbsoluteInvitationUrl;
 }): Promise<ResendSendResponse>
 ```
 Effects:
@@ -729,15 +868,61 @@ Interpret Resend's immediate send responses, persist delivery outcomes, and auth
 - Resend webhook authentication uses the raw request body, the `svix-id`, `svix-timestamp`, and `svix-signature` headers, and the webhook signing secret.
 - Delivery-response handling in this phase must support at least `email.failed`, `email.bounced`, `email.delivery_delayed`, and `email.complained`.
 
-```ts
-type ResendSendResponse =
-  | { data: { id: string }; error: null }
-  | { data: null; error: { message: string; name?: string } };
+### Type Definitions
 
+```ts
 type ResendWebhookHeaders = {
-  "svix-id": string;
-  "svix-timestamp": string;
-  "svix-signature": string;
+  "svix-id": Tagged<string, "ResendSvixId">;
+  "svix-timestamp": Tagged<string, "ResendSvixTimestamp">;
+  "svix-signature": Tagged<string, "ResendSvixSignature">;
+};
+
+type SupportedResendWebhookEventType = Tagged<
+  | "email.failed"
+  | "email.bounced"
+  | "email.delivery_delayed"
+  | "email.complained",
+  "SupportedResendWebhookEventType"
+>;
+
+type UnsupportedResendWebhookEventType = Tagged<
+  string,
+  "UnsupportedResendWebhookEventType"
+>;
+
+type ResendWebhookEventType =
+  | SupportedResendWebhookEventType
+  | UnsupportedResendWebhookEventType;
+
+type SupportedResendWebhookEvent = {
+  type: SupportedResendWebhookEventType;
+  data: {
+    email_id: ProviderMessageId;
+  };
+};
+
+type UnsupportedResendWebhookEvent = {
+  type: UnsupportedResendWebhookEventType;
+  data: {
+    email_id?: ProviderMessageId | null;
+  };
+};
+
+type ResendWebhookEvent =
+  | SupportedResendWebhookEvent
+  | UnsupportedResendWebhookEvent;
+
+type InvitationDeliveryResult =
+  | { kind: "accepted_for_delivery"; providerMessageId: ProviderMessageId }
+  | {
+      kind: "send_failed";
+      providerErrorMessage: ResendErrorMessage;
+      providerErrorName?: ResendErrorName;
+    };
+
+type AuthenticatedWebhookResult = {
+  verifiedEventType: ResendWebhookEventType;
+  persistence: "updated" | "ignored";
 };
 ```
 
@@ -748,15 +933,8 @@ type ResendWebhookHeaders = {
 handleInvitationSendResponseWorkflow(input: {
   invitationId: InvitationId;
   resendResponse: ResendSendResponse;
-  attemptedAt: Date;
-}): Promise<
-  | { kind: "accepted_for_delivery"; providerMessageId: string }
-  | {
-      kind: "send_failed";
-      providerErrorMessage: string;
-      providerErrorName?: string;
-    }
->
+  attemptedAt: DeliveryAttemptedAt;
+}): Promise<InvitationDeliveryResult>
 ```
 Effects:
 - Interprets the raw Resend `{ data, error }` response according to the official API contract.
@@ -769,10 +947,7 @@ Effects:
 handleAuthenticatedResendWebhookWorkflow(input: {
   rawBody: string;
   headers: ResendWebhookHeaders;
-}): Promise<{
-  verifiedEventType: ResendWebhookEventType;
-  persistence: "updated" | "ignored";
-}>
+}): Promise<AuthenticatedWebhookResult>
 ```
 Effects:
 - Rejects webhook requests whose signature cannot be verified from the raw body, `svix-*` headers, and configured signing secret.
@@ -785,13 +960,7 @@ Effects:
 ```ts
 normalizeResendSendResponse(
   response: ResendSendResponse,
-): 
-  | { kind: "accepted_for_delivery"; providerMessageId: string }
-  | {
-      kind: "send_failed";
-      providerErrorMessage: string;
-      providerErrorName?: string;
-    }
+): InvitationDeliveryResult
 ```
 Effects:
 - Maps the official Resend `{ data, error }` shape into the invitation domain result.
@@ -801,14 +970,8 @@ Effects:
 ```ts
 recordInvitationSendResult(input: {
   invitationId: InvitationId;
-  result:
-    | { kind: "accepted_for_delivery"; providerMessageId: string }
-    | {
-        kind: "send_failed";
-        providerErrorMessage: string;
-        providerErrorName?: string;
-      };
-  attemptedAt: Date;
+  result: InvitationDeliveryResult;
+  attemptedAt: DeliveryAttemptedAt;
 }): Promise<void>
 ```
 Effects:
@@ -821,7 +984,7 @@ Effects:
 verifyResendWebhookSignature(input: {
   rawBody: string;
   headers: ResendWebhookHeaders;
-  signingSecret: string;
+  signingSecret: ResendWebhookSecret;
 }): ResendWebhookEvent
 ```
 Effects:
@@ -963,21 +1126,46 @@ Define the end-to-end workflow for consuming an invite link across logged-out, m
 
 ### Workflow Specification
 
+#### Type Definitions
+```ts
+type AcceptedInvitationResolution = {
+  kind: "accepted";
+  listId: ListId;
+};
+
+type PendingApprovalInvitationResolution = {
+  kind: "pending_approval";
+  listId: ListId;
+};
+
+type TerminalInvitationResolution =
+  | { kind: "invalid" }
+  | { kind: "expired" }
+  | { kind: "revoked" }
+  | { kind: "already_resolved" };
+
+type ResolveInviteAcceptanceResult =
+  | AcceptedInvitationResolution
+  | PendingApprovalInvitationResolution
+  | TerminalInvitationResolution;
+
+type AcceptInvitationWorkflowResult =
+  | { kind: "redirect_to_sign_in"; redirectTo: SafeAppPath }
+  | ResolveInviteAcceptanceResult;
+
+type InvitePageOutcome = Exclude<
+  ResolveInviteAcceptanceResult,
+  AcceptedInvitationResolution
+>;
+```
+
 #### Contract 6.1: Accept invitation workflow
 ```ts
 acceptInvitationWorkflow(input: {
   invitationSecret: InvitationSecret;
   viewer: AuthenticatedUser | null;
   now: Date;
-}): Promise<
-  | { kind: "redirect_to_sign_in"; redirectTo: SafeAppPath }
-  | { kind: "accepted"; listId: ListId }
-  | { kind: "pending_approval"; listId: ListId }
-  | { kind: "invalid" }
-  | { kind: "expired" }
-  | { kind: "revoked" }
-  | { kind: "already_resolved" }
->
+}): Promise<AcceptInvitationWorkflowResult>
 ```
 Effects:
 - If the secret does not identify an open invitation, returns the correct terminal outcome without mutating unrelated invitations.
@@ -1011,14 +1199,7 @@ resolveInviteAcceptance(input: {
   invitationSecret: InvitationSecret;
   viewer: AuthenticatedUser;
   now: Date;
-}): Promise<
-  | { kind: "accepted"; listId: ListId }
-  | { kind: "pending_approval"; listId: ListId }
-  | { kind: "invalid" }
-  | { kind: "expired" }
-  | { kind: "revoked" }
-  | { kind: "already_resolved" }
->
+}): Promise<ResolveInviteAcceptanceResult>
 ```
 Effects:
 - Accepts on exact email match.
@@ -1027,7 +1208,7 @@ Effects:
 
 #### Contract 6.5: Invite page outcome rendering
 Effects:
-- `/invite?token=...` renders an explicit user-facing state for `invalid`, `expired`, `revoked`, `already_resolved`, and `pending_approval`.
+- `/invite?token=...` renders an explicit user-facing state for every `InvitePageOutcome`: `invalid`, `expired`, `revoked`, `already_resolved`, and `pending_approval`.
 - The page does not silently redirect away from those terminal states.
 
 ### Contract Coverage Checklist
@@ -1141,6 +1322,64 @@ Define the end-to-end workflow for users who are allowed to manage collaborators
 
 ### Workflow Specification
 
+#### Type Definitions
+```ts
+type SentInvitationSummary = {
+  kind: "sent";
+  invitationId: InvitationId;
+  listId: ListId;
+  invitedEmailNormalized: NormalizedEmailAddress;
+  expiresAt: InvitationExpiry;
+};
+
+type PendingApprovalInvitationSummary = {
+  kind: "pending_approval";
+  invitationId: InvitationId;
+  listId: ListId;
+  invitedEmailNormalized: NormalizedEmailAddress;
+  expiresAt: InvitationExpiry;
+};
+
+type InvitationSummary =
+  | SentInvitationSummary
+  | PendingApprovalInvitationSummary;
+
+type ActorCollaboratorCapabilities = {
+  canResend: boolean;
+  canRevoke: boolean;
+  canCopyLink: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+};
+
+type InvitationAction =
+  | { kind: "resend"; invitationId: InvitationId }
+  | { kind: "revoke"; invitationId: InvitationId }
+  | { kind: "copy_link"; invitationId: InvitationId }
+  | { kind: "approve"; invitationId: InvitationId }
+  | { kind: "reject"; invitationId: InvitationId };
+
+type SentInvitationAction = Extract<
+  InvitationAction,
+  { kind: "resend" | "revoke" | "copy_link" }
+>;
+
+type PendingApprovalInvitationAction = Extract<
+  InvitationAction,
+  { kind: "approve" | "reject" }
+>;
+
+type CollaboratorManagementListView = {
+  list: ListWithRole;
+  acceptedCollaborators: ReadonlyArray<AcceptedCollaborator>;
+  invitations: ReadonlyArray<InvitationSummary>;
+};
+
+type CollaboratorManagementViewData = {
+  manageableLists: ReadonlyArray<CollaboratorManagementListView>;
+};
+```
+
 #### Contract 7.1: Collaborator management workflow
 ```ts
 loadCollaboratorManagementWorkflow(input: {
@@ -1182,10 +1421,16 @@ Effects:
 
 #### Contract 7.4: Invitation action availability mapping
 ```ts
-getAvailableInvitationActions(input: {
-  invitation: InvitationSummary;
+getAvailableInvitationActions<
+  TInvitation extends InvitationSummary,
+>(input: {
+  invitation: TInvitation;
   actorCapabilities: ActorCollaboratorCapabilities;
-}): InvitationAction[]
+}): ReadonlyArray<
+  TInvitation extends PendingApprovalInvitationSummary
+    ? PendingApprovalInvitationAction
+    : SentInvitationAction
+>
 ```
 Effects:
 - Returns only the actions valid for the invitation's current state and the actor's capabilities.
@@ -1317,6 +1562,13 @@ Define the workflows that invalidate invitation state when list lifecycle change
 
 ### Workflow Specifications
 
+#### Type Definitions
+```ts
+type InvitationInvalidationTerminalStatus =
+  | RevokedInvitationStatus
+  | ExpiredInvitationStatus;
+```
+
 #### Contract 8.1: Archive workflow invalidates open invites
 ```ts
 archiveListWorkflow(input: {
@@ -1347,7 +1599,7 @@ Effects:
 invalidateOpenInvitesForList(input: {
   listId: ListId;
   now: Date;
-  terminalStatus: "revoked" | "expired";
+  terminalStatus: InvitationInvalidationTerminalStatus;
 }): Promise<number>
 ```
 Effects:
