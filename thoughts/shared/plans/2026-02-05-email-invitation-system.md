@@ -97,6 +97,13 @@ jj commit \
 ### Goal
 Make owner membership and invitation environment validation explicit, testable contracts.
 
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 1.1 through 1.4 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest production change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first representative test in this phase passes. After each green step, identify the next unchecked contract effect, error, or non-effect from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
+
 ### Specifications
 
 #### Contract 1.1: Owner collaborator invariant
@@ -152,11 +159,37 @@ Effects:
 - Rejects invalid values by naming the offending key and reason.
 - Accepts only `http` or `https` application base URLs.
 
-### Contract Coverage Inventory
-- Contract 1.1 coverage must accumulate tests for the `"inserted"`, `"repaired"`, and `"unchanged"` outcomes, owner-row visibility through the accepted-collaborator read path, duplicate-prevention on repeated calls, isolation from unrelated collaborator rows, and both `ListNotFoundError` and `UserNotFoundError`.
-- Contract 1.2 coverage must accumulate tests proving the caller cannot observe successful list creation before accepted owner membership is present and that the accepted owner row is visible on the same read path used elsewhere in the app.
-- Contract 1.3 coverage must accumulate tests proving every existing list is repaired, the repair report reflects inserted/repaired/unchanged work accurately, and repeated runs do not create rows or change final state after the first successful pass.
-- Contract 1.4 coverage must accumulate tests for normalized success output, each missing required key being named, invalid-value failures naming the offending key and reason, `http` acceptance, `https` acceptance, and rejection of non-HTTP(S) base URLs while keeping `resendWebhookSecret` optional.
+### Contract Coverage Checklist
+#### Contract 1.1 checklist
+- [ ] Verifies the `"inserted"` outcome.
+- [ ] Verifies the `"repaired"` outcome.
+- [ ] Verifies the `"unchanged"` outcome.
+- [ ] Verifies the owner row is visible through the same accepted-collaborator read path used elsewhere in the app.
+- [ ] Verifies repeated calls do not create duplicate accepted owner memberships for the same `(listId, ownerId)`.
+- [ ] Verifies unrelated collaborator rows are not modified.
+- [ ] Verifies `ListNotFoundError`.
+- [ ] Verifies `UserNotFoundError`.
+
+#### Contract 1.2 checklist
+- [ ] Verifies successful `createList` is not observable before accepted owner membership exists.
+- [ ] Verifies the accepted owner row created by `createList` is visible through the same read path used elsewhere in the app.
+
+#### Contract 1.3 checklist
+- [ ] Verifies every existing list is repaired to have an accepted owner collaborator row.
+- [ ] Verifies the repair report accounts for inserted work accurately.
+- [ ] Verifies the repair report accounts for repaired work accurately.
+- [ ] Verifies the repair report accounts for unchanged work accurately.
+- [ ] Verifies repeated runs do not create extra collaborator rows.
+- [ ] Verifies repeated runs do not change final database state after the first successful pass.
+
+#### Contract 1.4 checklist
+- [ ] Verifies normalized success output.
+- [ ] Verifies each missing required key is named in the failure.
+- [ ] Verifies invalid values name the offending key and reason.
+- [ ] Verifies `http` base URLs are accepted.
+- [ ] Verifies `https` base URLs are accepted.
+- [ ] Verifies non-HTTP(S) base URLs are rejected.
+- [ ] Verifies `resendWebhookSecret` remains optional.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contracts 1.1 and 1.2.
@@ -177,7 +210,7 @@ Effects:
 16. `RED`: Add one failing unit test for one syntactically invalid `APP_BASE_URL`.
 17. `GREEN`: Implement URL validation.
 18. `REFACTOR`: Keep error reporting precise.
-19. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 1.1 through 1.4 is covered.
+19. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 1.1 through 1.4 is checked.
 
 ### Files
 - `app/lists/_actions/list.ts`
@@ -189,6 +222,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated unit and integration suites for Contracts 1.1 through 1.4 cover every documented output, error case, and side effect.
 - [ ] `npm run verify:env` passes for a valid env file.
 - [ ] `npm run typecheck` passes.
@@ -201,6 +235,13 @@ Effects:
 
 ### Goal
 Create stable test commands whose behavior is itself specified and verifiable before invitation work depends on them.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 2.1 through 2.5 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest harness or script change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first smoke test or first command-success case passes. After each green step, identify the next unchecked command outcome or harness guarantee from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Specifications
 
@@ -243,12 +284,33 @@ Effects:
 - Each of the unit, integration, and e2e layers contains at least one intentionally minimal contract test that fails when that harness is misconfigured.
 - These tests assert harness operability only.
 
-### Contract Coverage Inventory
-- Contract 2.1 coverage must accumulate tests for successful unit-suite execution, non-zero exit on unit-test failure, non-zero exit when the unit harness cannot start, and proof that the command does not also execute integration or e2e suites.
-- Contract 2.2 coverage must accumulate tests for successful integration-suite execution, non-zero exit on integration-test failure, and non-zero exit when the integration harness cannot start.
-- Contract 2.3 coverage must accumulate tests for successful e2e smoke execution, non-zero exit on smoke failure, and non-zero exit when the e2e harness cannot start.
-- Contract 2.4 coverage must accumulate tests for the fixed command order, all-green success, and failure propagation when any prerequisite command exits non-zero.
-- Contract 2.5 coverage must accumulate tests proving each harness has a minimal operability check that fails when that layer is misconfigured.
+### Contract Coverage Checklist
+#### Contract 2.1 checklist
+- [ ] Verifies `npm run test:unit` exits `0` when all unit tests pass.
+- [ ] Verifies `npm run test:unit` exits non-zero when a unit test fails.
+- [ ] Verifies `npm run test:unit` exits non-zero when the unit harness cannot start.
+- [ ] Verifies `npm run test:unit` does not run integration tests.
+- [ ] Verifies `npm run test:unit` does not run e2e tests.
+
+#### Contract 2.2 checklist
+- [ ] Verifies `npm run test:integration` exits `0` when all integration tests pass.
+- [ ] Verifies `npm run test:integration` exits non-zero when an integration test fails.
+- [ ] Verifies `npm run test:integration` exits non-zero when the integration harness cannot start.
+
+#### Contract 2.3 checklist
+- [ ] Verifies `npm run test:e2e:smoke` exits `0` when the smoke scenarios pass.
+- [ ] Verifies `npm run test:e2e:smoke` exits non-zero when a smoke scenario fails.
+- [ ] Verifies `npm run test:e2e:smoke` exits non-zero when the e2e harness cannot start.
+
+#### Contract 2.4 checklist
+- [ ] Verifies `verify:all` runs commands in the fixed order.
+- [ ] Verifies `verify:all` exits `0` when every prerequisite command succeeds.
+- [ ] Verifies `verify:all` exits non-zero when any prerequisite command fails.
+
+#### Contract 2.5 checklist
+- [ ] Verifies the unit layer has a minimal operability test that fails when the unit harness is misconfigured.
+- [ ] Verifies the integration layer has a minimal operability test that fails when the integration harness is misconfigured.
+- [ ] Verifies the e2e layer has a minimal operability test that fails when the e2e harness is misconfigured.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contract 2.1.
@@ -267,7 +329,7 @@ Effects:
 14. `RED`: Add one failing command-order assertion or command-chain failure case.
 15. `GREEN`: Implement the smallest `verify:all` script that satisfies the contract.
 16. `REFACTOR`: Remove script duplication while keeping command order fixed.
-17. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 2.1 through 2.5 is covered.
+17. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 2.1 through 2.5 is checked.
 
 ### Files
 - `package.json`
@@ -280,6 +342,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated test suite for Contracts 2.1 through 2.5 covers every documented command outcome and harness behavior.
 - [ ] `npm run test:unit` passes.
 - [ ] `npm run test:integration` passes.
@@ -294,6 +357,13 @@ Effects:
 
 ### Goal
 Extend `list_collaborators` so the schema can represent accepted memberships and pending invitations without breaking existing accepted-collaborator read paths.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 3.1 through 3.5 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest schema, migration, query, or backfill change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first migration test or first read-path test passes. After each green step, identify the next unchecked invariant, uniqueness rule, or non-effect from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Specifications
 
@@ -342,12 +412,40 @@ Effects:
 - After return, no legacy row remains without a valid invitation lifecycle state.
 - Running the backfill repeatedly is idempotent.
 
-### Contract Coverage Inventory
-- Contract 3.1 coverage must accumulate tests proving accepted rows remain usable memberships, open states remain non-membership invites, and terminal states cannot later transition into acceptance.
-- Contract 3.2 coverage must accumulate tests for accepted-row `userId` requirements, required fields on open invites, `userId = null` support for email-only invites, and rejection or repair of impossible mixed-state rows during migration/backfill.
-- Contract 3.3 coverage must accumulate tests for accepted-membership uniqueness, open-invite uniqueness by normalized email, and the ability to issue a fresh invite after a prior invite reaches a terminal state.
-- Contract 3.4 coverage must accumulate tests proving `getCollaborators` returns only accepted collaborators, excludes each non-accepted invite status, and still returns rows backed by concrete user records.
-- Contract 3.5 coverage must accumulate tests proving legacy rows are normalized, no row is left without a lifecycle state, and rerunning the backfill is idempotent.
+### Contract Coverage Checklist
+#### Contract 3.1 checklist
+- [ ] Verifies accepted rows remain usable memberships.
+- [ ] Verifies `sent` rows remain non-membership invites.
+- [ ] Verifies `pending_approval` rows remain non-membership invites.
+- [ ] Verifies `revoked` rows cannot later transition into acceptance.
+- [ ] Verifies `expired` rows cannot later transition into acceptance.
+
+#### Contract 3.2 checklist
+- [ ] Verifies accepted rows require a non-null `userId`.
+- [ ] Verifies open invites require a non-null normalized invited email.
+- [ ] Verifies open invites require a non-null token hash.
+- [ ] Verifies open invites require a non-null expiry.
+- [ ] Verifies open invites require a non-null inviter id.
+- [ ] Verifies email-only invites can be represented with `userId = null` before acceptance.
+- [ ] Verifies impossible mixed-state rows are rejected or repaired during migration/backfill.
+
+#### Contract 3.3 checklist
+- [ ] Verifies there is at most one accepted membership for any `(listId, userId)`.
+- [ ] Verifies there is at most one open invite for any `(listId, invitedEmailNormalized)` among open states.
+- [ ] Verifies a fresh invite can be issued after a prior invite for the same list and email reaches a terminal state.
+
+#### Contract 3.4 checklist
+- [ ] Verifies `getCollaborators` returns only accepted collaborators.
+- [ ] Verifies `getCollaborators` excludes `sent` rows.
+- [ ] Verifies `getCollaborators` excludes `pending_approval` rows.
+- [ ] Verifies `getCollaborators` excludes `revoked` rows.
+- [ ] Verifies `getCollaborators` excludes `expired` rows.
+- [ ] Verifies returned collaborator rows still have concrete user records.
+
+#### Contract 3.5 checklist
+- [ ] Verifies legacy rows are normalized to valid lifecycle states.
+- [ ] Verifies no legacy row remains without a lifecycle state after backfill.
+- [ ] Verifies rerunning the backfill is idempotent.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contracts 3.1 and 3.2.
@@ -366,7 +464,7 @@ Effects:
 14. `RED`: Add one failing integration test proving one legacy row is normalized to `accepted`.
 15. `GREEN`: Implement the smallest backfill change.
 16. `REFACTOR`: Preserve idempotence and reporting clarity.
-17. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 3.1 through 3.5 is covered.
+17. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 3.1 through 3.5 is checked.
 
 ### Files
 - `drizzle/schema.ts`
@@ -379,6 +477,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated integration suite for Contracts 3.1 through 3.5 covers every documented row-state invariant, uniqueness rule, and accepted-read-path behavior.
 - [ ] `npm run test:integration` passes.
 - [ ] `npm run typecheck` and `npm run lint` pass.
@@ -391,6 +490,13 @@ Effects:
 
 ### Goal
 Define the end-to-end workflow for inviting someone to a list up to the point where Resend returns its immediate send response.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 4.1 through 4.7 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest workflow, persistence, permission, token, or email-boundary change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first happy-path invite test passes. After each green step, identify the next unchecked workflow effect, error, send-attempt guarantee, or non-effect from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Workflow Specification
 
@@ -495,14 +601,51 @@ Effects:
 - Attempts exactly one provider send per invocation.
 - Returns the raw Resend `{ data, error }` response without translating it into domain state.
 
-### Contract Coverage Inventory
-- Contract 4.1 coverage must accumulate tests for permission denial, missing-list failure, single-open-invite persistence, persisted invite fields, acceptance URL generation from the authoritative secret, exactly one send attempt per invocation, raw Resend response passthrough, and secret rotation invalidating any prior open invite for the same list and email.
-- Contract 4.2 coverage must accumulate tests for both allowed and denied actors and for the guarantee that the permission check does not mutate collaborator or invitation state.
-- Contract 4.3 coverage must accumulate tests proving the generated secret is non-empty and remains opaque bearer material to callers.
-- Contract 4.4 coverage must accumulate tests proving equal secrets hash equally and that persisted lookups remain stable within one deployment.
-- Contract 4.5 coverage must accumulate tests for first-time invite persistence, single-open-invite enforcement, secret rotation over an existing open invite, and the guarantee that issuing does not send email.
-- Contract 4.6 coverage must accumulate tests for canonical `/invite?token=...` construction and absolute URL generation from the configured base URL.
-- Contract 4.7 coverage must accumulate tests for pre-send env validation, exactly one provider send attempt, and raw `{ data, error }` passthrough for both accepted and failed send attempts.
+### Contract Coverage Checklist
+#### Contract 4.1 checklist
+- [ ] Verifies `InvitationPermissionDeniedError`.
+- [ ] Verifies `ListNotFoundError`.
+- [ ] Verifies exactly one open invite exists for `(listId, invitedEmailNormalized)` after success.
+- [ ] Verifies the persisted invite stores the hashed secret.
+- [ ] Verifies the persisted invite stores the expiry.
+- [ ] Verifies the persisted invite stores the inviter id.
+- [ ] Verifies the persisted invite stores the normalized email.
+- [ ] Verifies the persisted invite stores `inviteStatus = "sent"`.
+- [ ] Verifies the returned acceptance URL uses the authoritative one-time secret.
+- [ ] Verifies the workflow attempts exactly one email send per invocation.
+- [ ] Verifies the raw Resend response is returned unchanged.
+- [ ] Verifies rotating an existing open invite makes the previously issued secret unusable.
+- [ ] Verifies rotating an existing open invite makes the returned secret authoritative.
+
+#### Contract 4.2 checklist
+- [ ] Verifies allowed actors pass the permission check.
+- [ ] Verifies denied actors raise `InvitationPermissionDeniedError`.
+- [ ] Verifies the permission check does not mutate collaborator state.
+- [ ] Verifies the permission check does not mutate invitation state.
+
+#### Contract 4.3 checklist
+- [ ] Verifies the generated secret is non-empty.
+- [ ] Verifies the caller receives opaque bearer material rather than a structured secret contract.
+
+#### Contract 4.4 checklist
+- [ ] Verifies equal secrets hash identically.
+- [ ] Verifies persisted lookup behavior remains stable within one deployment.
+
+#### Contract 4.5 checklist
+- [ ] Verifies first-time invite persistence.
+- [ ] Verifies the single-open-invite invariant is enforced.
+- [ ] Verifies issuing over an existing open invite rotates the authoritative secret.
+- [ ] Verifies issuing an invite does not send email.
+
+#### Contract 4.6 checklist
+- [ ] Verifies the canonical `/invite?token=...` URL is produced.
+- [ ] Verifies the returned invitation URL is absolute and based on the configured base URL.
+
+#### Contract 4.7 checklist
+- [ ] Verifies required email configuration is validated before provider delivery.
+- [ ] Verifies exactly one provider send attempt occurs per invocation.
+- [ ] Verifies a successful raw `{ data, error }` response is returned unchanged.
+- [ ] Verifies a failed raw `{ data, error }` response is returned unchanged.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contract 4.2.
@@ -539,7 +682,7 @@ Effects:
 32. `RED`: Add one failing integration test proving the whole invite workflow still creates the invite and returns a failed raw Resend response when the send attempt fails.
 33. `GREEN`: Implement the smallest workflow behavior needed for the failed-send path.
 34. `REFACTOR`: Keep workflow orchestration consistent across both outcomes.
-35. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 4.1 through 4.7 is covered.
+35. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 4.1 through 4.7 is checked.
 
 ### Files
 - `lib/invitations/token.ts` (new)
@@ -553,6 +696,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated unit and integration suites for Contracts 4.1 through 4.7 cover every documented output, error case, and side effect, including both successful and failed send-attempt outcomes.
 - [ ] `npm run test:unit` passes.
 - [ ] `npm run test:integration` passes.
@@ -566,6 +710,13 @@ Effects:
 
 ### Goal
 Interpret Resend's immediate send responses, persist delivery outcomes, and authenticate webhook events before they can mutate invitation delivery state.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 5.1 through 5.7 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest normalization, persistence, verification, or route change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first successful send-response or signed-webhook test passes. After each green step, identify the next unchecked delivery outcome, verification outcome, or persistence guarantee from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Resend Research Notes
 - The official Resend send API returns an object shaped like `{ data, error }`.
@@ -696,14 +847,46 @@ Effects:
 - Uses Contract 5.5 before any invitation-delivery mutation occurs.
 - Returns a non-success response for invalid signatures and malformed payloads.
 
-### Contract Coverage Inventory
-- Contract 5.1 coverage must accumulate tests for accepted-for-delivery normalization plus persistence, send-failed normalization plus persistence, and the guarantee that immediate response handling does not mutate invitation-recipient state.
-- Contract 5.2 coverage must accumulate tests for signature rejection, supported-event persistence after successful verification, and `"ignored"` results for valid but uncorrelatable events.
-- Contract 5.3 coverage must accumulate tests for successful normalization, failed normalization, and rejection of impossible mixed `{ data, error }` states.
-- Contract 5.4 coverage must accumulate tests proving provider message ids are stored for correlated delivery events and provider error details are stored for immediate failures.
-- Contract 5.5 coverage must accumulate tests for successful signature verification returning the event payload and `InvalidWebhookSignatureError` on missing or invalid signature material.
-- Contract 5.6 coverage must accumulate tests for each supported delivery event type, plus ignored outcomes for unsupported or uncorrelatable verified events.
-- Contract 5.7 coverage must accumulate tests proving raw-body verification order is preserved and that invalid signatures and malformed payloads both return non-success responses.
+### Contract Coverage Checklist
+#### Contract 5.1 checklist
+- [ ] Verifies an accepted-for-delivery response is normalized correctly.
+- [ ] Verifies an accepted-for-delivery response is persisted against the invitation.
+- [ ] Verifies a send-failed response is normalized correctly.
+- [ ] Verifies a send-failed response is persisted against the invitation.
+- [ ] Verifies immediate response handling does not mutate invitation-recipient state.
+
+#### Contract 5.2 checklist
+- [ ] Verifies invalid signatures are rejected.
+- [ ] Verifies supported events are persisted after successful verification.
+- [ ] Verifies valid but uncorrelatable events return `"ignored"`.
+
+#### Contract 5.3 checklist
+- [ ] Verifies successful normalization of `{ data: { id }, error: null }`.
+- [ ] Verifies failed normalization of `{ data: null, error }`.
+- [ ] Verifies impossible mixed `{ data, error }` states are rejected.
+
+#### Contract 5.4 checklist
+- [ ] Verifies provider message ids are stored for accepted-for-delivery results.
+- [ ] Verifies provider failure details are stored for immediate send failures.
+
+#### Contract 5.5 checklist
+- [ ] Verifies successful signature verification returns the event payload.
+- [ ] Verifies missing signature material raises `InvalidWebhookSignatureError`.
+- [ ] Verifies invalid signature material raises `InvalidWebhookSignatureError`.
+
+#### Contract 5.6 checklist
+- [ ] Verifies `email.failed` events are persisted when correlatable.
+- [ ] Verifies `email.bounced` events are persisted when correlatable.
+- [ ] Verifies `email.delivery_delayed` events are persisted when correlatable.
+- [ ] Verifies `email.complained` events are persisted when correlatable.
+- [ ] Verifies unsupported verified events return `"ignored"`.
+- [ ] Verifies uncorrelatable verified events return `"ignored"`.
+
+#### Contract 5.7 checklist
+- [ ] Verifies the route reads the raw body in a way that preserves signature verification.
+- [ ] Verifies signature verification occurs before any invitation-delivery mutation.
+- [ ] Verifies invalid signatures return a non-success response.
+- [ ] Verifies malformed payloads return a non-success response.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contract 5.3.
@@ -739,7 +922,7 @@ Effects:
 31. `RED`: Add one failing integration test proving a signed webhook request updates the correlated invitation delivery record.
 32. `GREEN`: Implement the smallest authenticated webhook route.
 33. `REFACTOR`: Keep webhook verification and persistence loosely coupled.
-34. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 5.1 through 5.7 is covered.
+34. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 5.1 through 5.7 is checked.
 
 ### Files
 - `lib/email/resend.ts`
@@ -751,6 +934,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated unit and integration suites for Contracts 5.1 through 5.7 cover every documented successful and failed immediate-send outcome, signature-verification outcome, supported webhook event, and persistence side effect.
 - [ ] `npm run test:unit` passes.
 - [ ] `npm run test:integration` passes.
@@ -764,6 +948,13 @@ Effects:
 
 ### Goal
 Define the end-to-end workflow for consuming an invite link across logged-out, matched-email, mismatched-email, and terminal invite states.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 6.1 through 6.5 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest acceptance, redirect, persistence, or route change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first acceptance-path or sign-in-continuation test passes. After each green step, identify the next unchecked invite outcome, redirect guarantee, or non-effect from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Workflow Specification
 
@@ -834,12 +1025,44 @@ Effects:
 - `/invite?token=...` renders an explicit user-facing state for `invalid`, `expired`, `revoked`, `already_resolved`, and `pending_approval`.
 - The page does not silently redirect away from those terminal states.
 
-### Contract Coverage Inventory
-- Contract 6.1 coverage must accumulate tests for invalid-secret handling without unrelated mutation, logged-out redirect with safe continuation, matched-email acceptance with immediate collaborator access, mismatched-email transition to `pending_approval`, and one-time-token behavior across consumed, revoked, and expired secrets.
-- Contract 6.2 coverage must accumulate tests for safe internal-path acceptance and fallback behavior for absolute URLs, cross-origin targets, and malformed redirect values.
-- Contract 6.3 coverage must accumulate tests proving continuation targets preserve the same invite token path without emitting absolute or cross-origin URLs.
-- Contract 6.4 coverage must accumulate tests for each outcome branch: `accepted`, `pending_approval`, `invalid`, `expired`, `revoked`, and `already_resolved`.
-- Contract 6.5 coverage must accumulate tests proving each terminal and pending state renders explicitly and that the invite page does not silently redirect away from those outcomes.
+### Contract Coverage Checklist
+#### Contract 6.1 checklist
+- [ ] Verifies invalid secrets return the correct terminal outcome.
+- [ ] Verifies invalid-secret handling does not mutate unrelated invitations.
+- [ ] Verifies logged-out viewers receive a sign-in redirect with a safe continuation target.
+- [ ] Verifies matching-email viewers accept the invitation successfully.
+- [ ] Verifies matching-email acceptance makes collaborator access observable immediately.
+- [ ] Verifies mismatched-email viewers transition the invitation to `pending_approval`.
+- [ ] Verifies reused consumed secrets do not create a second acceptance.
+- [ ] Verifies reused revoked secrets do not create a second acceptance.
+- [ ] Verifies reused expired secrets do not create a second acceptance.
+
+#### Contract 6.2 checklist
+- [ ] Verifies safe internal app-relative paths are accepted.
+- [ ] Verifies absolute redirect targets fall back to the default safe path.
+- [ ] Verifies cross-origin redirect targets fall back to the default safe path.
+- [ ] Verifies malformed redirect targets fall back to the default safe path.
+
+#### Contract 6.3 checklist
+- [ ] Verifies continuation targets preserve the same invite token path.
+- [ ] Verifies continuation targets do not emit absolute URLs.
+- [ ] Verifies continuation targets do not emit cross-origin URLs.
+
+#### Contract 6.4 checklist
+- [ ] Verifies the `accepted` outcome.
+- [ ] Verifies the `pending_approval` outcome.
+- [ ] Verifies the `invalid` outcome.
+- [ ] Verifies the `expired` outcome.
+- [ ] Verifies the `revoked` outcome.
+- [ ] Verifies the `already_resolved` outcome.
+
+#### Contract 6.5 checklist
+- [ ] Verifies the invite page renders an explicit `invalid` state.
+- [ ] Verifies the invite page renders an explicit `expired` state.
+- [ ] Verifies the invite page renders an explicit `revoked` state.
+- [ ] Verifies the invite page renders an explicit `already_resolved` state.
+- [ ] Verifies the invite page renders an explicit `pending_approval` state.
+- [ ] Verifies the invite page does not silently redirect away from those outcomes.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contract 6.2.
@@ -874,7 +1097,7 @@ Effects:
 30. `RED`: Add one failing e2e test proving the logged-out browser flow resumes the same invite after sign-in.
 31. `GREEN`: Implement the smallest route and sign-in wiring needed for the browser flow.
 32. `REFACTOR`: Simplify route mapping without changing outcomes.
-33. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 6.1 through 6.5 is covered.
+33. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 6.1 through 6.5 is checked.
 
 ### Files
 - `app/invite/page.tsx` (new)
@@ -887,6 +1110,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated unit, integration, and e2e suites for Contracts 6.1 through 6.5 cover every documented invite-acceptance outcome, redirect outcome, and side effect.
 - [ ] `npm run test:unit` passes.
 - [ ] `npm run test:integration` passes.
@@ -901,6 +1125,13 @@ Effects:
 
 ### Goal
 Define the end-to-end workflow for users who are allowed to manage collaborators so they can view collaborator state and act on invitations without introducing authorization leaks or N+1 query behavior.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 7.1 through 7.6 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest permission, data-loading, workflow, or UI wiring change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first management-page or first action-wiring test passes. After each green step, identify the next unchecked authorization rule, view-data guarantee, action-availability rule, or UI outcome from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Workflow Specification
 
@@ -965,13 +1196,50 @@ Effects:
 - Send, resend, revoke, approve, reject, and copy-link flows use the server contracts from Phases 4, 5, and 6 as the source of truth.
 - Client code does not assume a state transition succeeded until the corresponding server contract reports success.
 
-### Contract Coverage Inventory
-- Contract 7.1 coverage must accumulate tests proving the workflow returns only lists manageable by the actor, includes accepted collaborators plus open and `pending_approval` invitations, and exposes enough authoritative state to drive every collaborator-management action.
-- Contract 7.2 coverage must accumulate tests for both allowed and denied actors and for the guarantee that the permission check does not mutate collaborator or invitation state.
-- Contract 7.3 coverage must accumulate tests for complete manageable-list data loading, bounded query count as list count grows, exclusion of unauthorized lists, and preservation of authoritative identifiers for later actions.
-- Contract 7.4 coverage must accumulate tests proving action availability is constrained by both invitation state and actor capability and never offers forbidden actions.
-- Contract 7.5 coverage must accumulate tests for sign-in redirect when unauthenticated, authorized rendering for managers, and absence of collaborator-management data leakage to authenticated users without access.
-- Contract 7.6 coverage must accumulate tests for resend, revoke, approve, reject, send, and copy-link flows all remaining server-authoritative from initiation through visible UI outcome.
+### Contract Coverage Checklist
+#### Contract 7.1 checklist
+- [ ] Verifies the workflow returns only lists manageable by the actor.
+- [ ] Verifies the workflow includes accepted collaborators needed for management views.
+- [ ] Verifies the workflow includes open invites needed for management views.
+- [ ] Verifies the workflow includes `pending_approval` invites needed for management views.
+- [ ] Verifies the returned state is sufficient to drive resend actions.
+- [ ] Verifies the returned state is sufficient to drive revoke actions.
+- [ ] Verifies the returned state is sufficient to drive copy-link actions.
+- [ ] Verifies the returned state is sufficient to drive approve actions.
+- [ ] Verifies the returned state is sufficient to drive reject actions.
+
+#### Contract 7.2 checklist
+- [ ] Verifies allowed actors pass the collaborator-management permission check.
+- [ ] Verifies denied actors raise `CollaboratorManagementPermissionDeniedError`.
+- [ ] Verifies the permission check does not mutate collaborator state.
+- [ ] Verifies the permission check does not mutate invitation state.
+
+#### Contract 7.3 checklist
+- [ ] Verifies manageable-list data loading includes all required manageable lists.
+- [ ] Verifies manageable-list data loading includes accepted collaborators.
+- [ ] Verifies manageable-list data loading includes open invites.
+- [ ] Verifies manageable-list data loading includes `pending_approval` invites.
+- [ ] Verifies query count remains bounded as the number of manageable lists grows.
+- [ ] Verifies unauthorized lists are excluded.
+- [ ] Verifies authoritative identifiers needed for later actions are preserved.
+
+#### Contract 7.4 checklist
+- [ ] Verifies available actions are constrained by invitation state.
+- [ ] Verifies available actions are constrained by actor capability.
+- [ ] Verifies forbidden actions are never offered.
+
+#### Contract 7.5 checklist
+- [ ] Verifies unauthenticated users are redirected to sign-in.
+- [ ] Verifies authenticated managers see the collaborator-management route rendered with authorized data.
+- [ ] Verifies authenticated users without access do not receive unauthorized collaborator-management data.
+
+#### Contract 7.6 checklist
+- [ ] Verifies send flows remain server-authoritative from initiation through visible UI outcome.
+- [ ] Verifies resend flows remain server-authoritative from initiation through visible UI outcome.
+- [ ] Verifies revoke flows remain server-authoritative from initiation through visible UI outcome.
+- [ ] Verifies approve flows remain server-authoritative from initiation through visible UI outcome.
+- [ ] Verifies reject flows remain server-authoritative from initiation through visible UI outcome.
+- [ ] Verifies copy-link flows remain server-authoritative from initiation through visible UI outcome.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contract 7.2.
@@ -1003,7 +1271,7 @@ Effects:
 27. `RED`: Add one failing e2e test proving an allowed manager can approve a `pending_approval` invite.
 28. `GREEN`: Implement the smallest UI wiring for approval.
 29. `REFACTOR`: Repeat one test at a time for revoke, reject, and copy-link flows.
-30. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 7.1 through 7.6 is covered.
+30. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 7.1 through 7.6 is checked.
 
 ### Files
 - `app/lists/_components/manage-collaborators.tsx`
@@ -1017,6 +1285,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated unit, integration, and e2e suites for Contracts 7.1 through 7.6 cover every documented authorization rule, view-data rule, action-availability rule, bounded-query requirement, and UI action outcome.
 - [ ] `npm run test:unit` passes.
 - [ ] `npm run test:integration` passes.
@@ -1031,6 +1300,13 @@ Effects:
 
 ### Goal
 Define the workflows that invalidate invitation state when list lifecycle changes occur and finalize the release gate around those contracts.
+
+### Phase Execution Rules
+- Treat this phase as incomplete until every checkbox in the Contract Coverage Checklist for Contracts 8.1 through 8.4 is checked off by the accumulated test suite.
+- Treat every contract in this phase as requiring at least one explicit verifying test that was added by following this phase's Specification-Driven TDD Workflow.
+- Move in single-behavior loops only: write exactly one new failing contract test, make only the smallest lifecycle, invalidation, verification, or documentation change needed to pass it, then refactor without changing observable behavior.
+- Do not stop after the first archive or delete invalidation test passes. After each green step, identify the next unchecked invalidation guarantee, non-effect, or release-gate requirement from this phase and start the next failing test for that specific gap.
+- If work resumes mid-phase, begin by listing which Contract Coverage Checklist boxes are already checked, which verifying test satisfies each checked box, and continue with the first unchecked box.
 
 ### Workflow Specifications
 
@@ -1076,11 +1352,28 @@ Effects:
 - `npm run verify:all` remains the sole release gate.
 - The release runbook documents required env vars, schema migration order, backfill order, rollback switch, and email-delivery troubleshooting steps.
 
-### Contract Coverage Inventory
-- Contract 8.1 coverage must accumulate tests proving archive success is not observable before all open invites for the archived list reach a terminal state, accepted collaborators remain accepted, and unrelated lists are untouched.
-- Contract 8.2 coverage must accumulate tests proving previously issued invitation secrets become unusable after delete success and that the delete workflow does not leave a post-success token-validity race.
-- Contract 8.3 coverage must accumulate tests for moving every open invite on one list to the requested terminal state while leaving accepted collaborators and other lists unchanged.
-- Contract 8.4 coverage must accumulate tests or documentation checks proving `verify:all` remains the sole release gate and the runbook covers env vars, migration order, backfill order, rollback switch, and delivery troubleshooting.
+### Contract Coverage Checklist
+#### Contract 8.1 checklist
+- [ ] Verifies archive success is not observable before all open invites for the archived list reach a terminal state.
+- [ ] Verifies accepted collaborators remain accepted after archive.
+- [ ] Verifies unrelated lists are untouched by archive-time invite invalidation.
+
+#### Contract 8.2 checklist
+- [ ] Verifies previously issued invitation secrets become unusable after delete success.
+- [ ] Verifies the delete workflow does not leave a post-success token-validity race.
+
+#### Contract 8.3 checklist
+- [ ] Verifies every open invite for the target list is moved to the requested terminal state.
+- [ ] Verifies accepted collaborators are left unchanged by invalidation.
+- [ ] Verifies invitations for other lists are left unchanged by invalidation.
+
+#### Contract 8.4 checklist
+- [ ] Verifies `npm run verify:all` remains the sole release gate.
+- [ ] Verifies the runbook documents required env vars.
+- [ ] Verifies the runbook documents schema migration order.
+- [ ] Verifies the runbook documents backfill order.
+- [ ] Verifies the runbook documents the rollback switch.
+- [ ] Verifies the runbook documents email-delivery troubleshooting steps.
 
 ### Specification-Driven TDD Workflow
 1. `SPEC`: Write Contract 8.3.
@@ -1102,7 +1395,7 @@ Effects:
 17. `RED`: Add one failing verification or documentation check for a missing runbook element.
 18. `GREEN`: Update `verify:all` and the runbook.
 19. `REFACTOR`: Keep the release gate singular.
-20. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every bullet in the Contract Coverage Inventory for Contracts 8.1 through 8.4 is covered.
+20. `COVERAGE`: Before closing the phase, keep adding exactly one failing test at a time until every checkbox in the Contract Coverage Checklist for Contracts 8.1 through 8.4 is checked.
 
 ### Files
 - `app/lists/_actions/list.ts`
@@ -1112,6 +1405,7 @@ Effects:
 
 ### Phase Gate
 - [ ] Every red-green-refactor loop above was completed in order, with one new failing test at a time.
+- [ ] Every contract in this phase is verified by at least one explicit test added through the Specification-Driven TDD Workflow.
 - [ ] The accumulated unit and integration suites for Contracts 8.1 through 8.4 cover every documented invalidation outcome, non-effect guarantee, and release-gate behavior.
 - [ ] `npm run test:unit` passes.
 - [ ] `npm run test:integration` passes.
