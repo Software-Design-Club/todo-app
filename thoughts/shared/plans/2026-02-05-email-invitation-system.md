@@ -160,6 +160,7 @@ Effects:
 - Accepts only `http` or `https` application base URLs.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 1.1 checklist
 - [ ] Verifies the `"inserted"` outcome.
 - [ ] Verifies the `"repaired"` outcome.
@@ -285,6 +286,7 @@ Effects:
 - These tests assert harness operability only.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 2.1 checklist
 - [ ] Verifies `npm run test:unit` exits `0` when all unit tests pass.
 - [ ] Verifies `npm run test:unit` exits non-zero when a unit test fails.
@@ -413,6 +415,7 @@ Effects:
 - Running the backfill repeatedly is idempotent.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 3.1 checklist
 - [ ] Verifies accepted rows remain usable memberships.
 - [ ] Verifies `sent` rows remain non-membership invites.
@@ -602,6 +605,7 @@ Effects:
 - Returns the raw Resend `{ data, error }` response without translating it into domain state.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 4.1 checklist
 - [ ] Verifies `InvitationPermissionDeniedError`.
 - [ ] Verifies `ListNotFoundError`.
@@ -848,6 +852,7 @@ Effects:
 - Returns a non-success response for invalid signatures and malformed payloads.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 5.1 checklist
 - [ ] Verifies an accepted-for-delivery response is normalized correctly.
 - [ ] Verifies an accepted-for-delivery response is persisted against the invitation.
@@ -1026,6 +1031,7 @@ Effects:
 - The page does not silently redirect away from those terminal states.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 6.1 checklist
 - [ ] Verifies invalid secrets return the correct terminal outcome.
 - [ ] Verifies invalid-secret handling does not mutate unrelated invitations.
@@ -1197,6 +1203,7 @@ Effects:
 - Client code does not assume a state transition succeeded until the corresponding server contract reports success.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 7.1 checklist
 - [ ] Verifies the workflow returns only lists manageable by the actor.
 - [ ] Verifies the workflow includes accepted collaborators needed for management views.
@@ -1353,6 +1360,7 @@ Effects:
 - The release runbook documents required env vars, schema migration order, backfill order, rollback switch, and email-delivery troubleshooting steps.
 
 ### Contract Coverage Checklist
+Every checkbox below must be checked off only by a TEST that verifies that behavior. Do not check a box based on code inspection, reasoning, or manual belief alone.
 #### Contract 8.1 checklist
 - [ ] Verifies archive success is not observable before all open invites for the archived list reach a terminal state.
 - [ ] Verifies accepted collaborators remain accepted after archive.
