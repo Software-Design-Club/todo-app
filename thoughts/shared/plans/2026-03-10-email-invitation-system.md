@@ -3,6 +3,8 @@
 ## Review Outcome
 This plan replaces `2026-02-05-email-invitation-system.md` with the same scope, reorganized for maximum parallel execution. Phases are renumbered to match execution order. Wave 4 fans three independent phases into parallel jj workspaces. Contract JSDoc is the source of truth at the function and file level.
 
+**Schema revision (2026-03-10):** Replaced "extend `list_collaborators`" with a separate `invitations` table. `list_collaborators` holds only accepted members. Delivery tracking lives as columns on `invitations` (no separate `invitation_delivery_attempts` table). Email mismatch tracking via `acceptedByEmail`/`acceptedByUserId` on `invitations`. `pending_approval` lives on `invitations` — no `list_collaborators` row until owner approves.
+
 Ready to implement.
 
 ## Global Contract Rules
@@ -31,16 +33,16 @@ Implement email-based collaborator invitations with secure one-time tokens, sign
 - List lifecycle operations exist (archive/delete) but have no invitation lifecycle hook (`app/lists/_actions/list.ts:328`, `app/lists/_actions/list.ts:401`).
 - `resend` v4.0.0 is installed but there is no email-delivery code path in `app/` or `lib/` (`package.json:35`).
 - The codebase has no unit, integration, or e2e test harness configured (`package.json:6`).
-- `ListCollaboratorsTable.userId` is non-nullable (`drizzle/schema.ts:60`).
+- `ListCollaboratorsTable.userId` is non-nullable (`drizzle/schema.ts:60`). This remains correct — `list_collaborators` holds only accepted members with concrete user IDs.
 - `createList` does not create an owner collaborator row; owners are only backfilled by script (`app/lists/_actions/list.ts:167`, `drizzle/backfillListCollaborators.ts:27`).
 
 ### Gaps Blocking Implementation
 - No invitation token generation, persistence, or acceptance route exists.
-- `list_collaborators.userId` cannot represent email-only pending invites because it is `NOT NULL`.
-- Current collaborator queries and tagged types assume all records are accepted user memberships (`lib/types.ts:38`, `app/lists/_actions/collaborators.ts:118`).
+- No `invitations` table exists; the invitation lifecycle has no schema.
 - No test harness exists to verify any contract.
 - Sign-in redirect is hardcoded to `/`, blocking invite continuation.
 - Delivery tracking (provider message IDs, webhook correlation) has no schema or code.
+- No mechanism to track email mismatches between invited email and sign-in email.
 
 ## Desired End State
 1. Users allowed to invite collaborators to a list can send an invitation by email from the list dropdown and a dedicated cross-list management page.
@@ -61,9 +63,11 @@ Implement email-based collaborator invitations with secure one-time tokens, sign
 - `npm run verify:all` passes as the single release gate.
 
 ## Locked Decisions
-- Persist invitation lifecycle by extending `list_collaborators`; do not add a separate invitations table.
-- Persist delivery-attempt tracking in a separate `invitation_delivery_attempts` relation, not as columns on `list_collaborators`. This isolates delivery concerns from invitation state and enables Wave 4 parallelism without schema conflicts.
-- Keep strict email matching on acceptance; mismatch enters `pending_approval`.
+- Persist invitation lifecycle in a separate `invitations` table; `list_collaborators` holds only accepted members (no invitation columns).
+- Persist delivery tracking as columns on the `invitations` table; no separate `invitation_delivery_attempts` relation.
+- When an invitation is accepted, keep the invitation record with `status = 'accepted'` for audit trail. Create a `list_collaborators` row only upon acceptance (or approval of a mismatch).
+- Keep strict email matching on acceptance; mismatch enters `pending_approval` on the `invitations` table. No `list_collaborators` row is created until the list owner approves.
+- Track email mismatches: the `invitations` table records `acceptedByEmail` and `acceptedByUserId` when the sign-in email differs from the invited email.
 - Keep the existing dropdown workflow and add a dedicated collaborator management page.
 - Keep GitHub auth provider for MVP.
 - Keep authorization contracts capability-based so the implementation can evolve without rewriting the plan.
@@ -229,8 +233,8 @@ type InvitationEnv = {
  *
  * @effects
  * - After return, exactly one `list_collaborators` row exists for (listId, ownerId)
- *   with role="owner" and inviteStatus="accepted".
- * - The owner row is usable by the same accepted-collaborator read path used elsewhere.
+ *   with role="owner".
+ * - The owner row is usable by the same collaborator read path used elsewhere.
  * - Repeated calls do not create duplicate accepted owner memberships.
  * - Unrelated collaborator rows are not modified.
  *
@@ -258,7 +262,7 @@ upsertOwnerCollaborator(input: {
  * - If the function returns list L, then upsertOwnerCollaborator({ listId: L.id,
  *   ownerId: L.creatorId }) has already become true before the caller observes success.
  * - The function does not report success for a newly created list whose creator
- *   lacks accepted owner membership.
+ *   lacks an owner collaborator row.
  */
 createList(input: CreateListInput): Promise<List>
 ```
@@ -273,7 +277,7 @@ createList(input: CreateListInput): Promise<List>
  * @returns A report of scanned, inserted, repaired, and unchanged counts.
  *
  * @effects
- * - After return, every existing list has an accepted owner collaborator row.
+ * - After return, every existing list has an owner collaborator row.
  * - Running multiple times without intervening data changes does not create
  *   additional rows and does not change final database state after the first run.
  */
@@ -310,18 +314,18 @@ verifyInvitationEnv(env: NodeJS.ProcessEnv): InvitationEnv
 - [ ] Verifies the "inserted" outcome.
 - [ ] Verifies the "repaired" outcome.
 - [ ] Verifies the "unchanged" outcome.
-- [ ] Verifies the owner row is visible through the accepted-collaborator read path.
-- [ ] Verifies repeated calls do not create duplicate accepted owner memberships.
+- [ ] Verifies the owner row is visible through the collaborator read path.
+- [ ] Verifies repeated calls do not create duplicate owner memberships.
 - [ ] Verifies unrelated collaborator rows are not modified.
 - [ ] Verifies `ListNotFoundError`.
 - [ ] Verifies `UserNotFoundError`.
 
 #### Contract 1.2 checklist
-- [ ] Verifies successful `createList` is not observable before accepted owner membership exists.
-- [ ] Verifies the accepted owner row created by `createList` is visible through the accepted-collaborator read path.
+- [ ] Verifies successful `createList` is not observable before an owner collaborator row exists.
+- [ ] Verifies the owner row created by `createList` is visible through the collaborator read path.
 
 #### Contract 1.3 checklist
-- [ ] Verifies every existing list is repaired to have an accepted owner collaborator row.
+- [ ] Verifies every existing list is repaired to have an owner collaborator row.
 - [ ] Verifies the repair report accounts for inserted work accurately.
 - [ ] Verifies the repair report accounts for repaired work accurately.
 - [ ] Verifies the repair report accounts for unchanged work accurately.
@@ -343,8 +347,8 @@ verifyInvitationEnv(env: NodeJS.ProcessEnv): InvitationEnv
   1. Contract 1.1 "inserted" outcome
   2. Contract 1.1 "repaired" outcome
   3. Contract 1.1 "unchanged" outcome
-  4. Contract 1.1 visibility through accepted-collaborator read path
-  5. Contract 1.1 no duplicate memberships
+  4. Contract 1.1 visibility through collaborator read path
+  5. Contract 1.1 no duplicate owner memberships
   6. Contract 1.1 unrelated rows untouched
   7. Contract 1.1 `ListNotFoundError`
   8. Contract 1.1 `UserNotFoundError`
@@ -384,7 +388,7 @@ verifyInvitationEnv(env: NodeJS.ProcessEnv): InvitationEnv
 - [ ] `npm run typecheck` passes
 
 #### Manual Verification
-- [ ] `createList` in the UI creates an owner collaborator row observable in the database
+- [ ] `createList` in the UI creates an owner collaborator row observable in the database (no `inviteStatus` column — just userId, listId, role)
 - [ ] Backfill script produces correct counts when run against existing data
 
 ---
@@ -525,26 +529,24 @@ Each of the unit, integration, and e2e layers contains at least one intentionall
 
 ---
 
-## Phase 3: Schema Evolution for Invitation Lifecycle
+## Phase 3: Schema Evolution — Invitations Table
 
 ### Goal
-Extend `list_collaborators` so the schema can represent accepted memberships and pending invitations without breaking existing accepted-collaborator read paths. Add the `invitation_delivery_attempts` relation for delivery tracking.
+Create a separate `invitations` table to manage the full invitation lifecycle independently from `list_collaborators`. The `list_collaborators` table is unchanged — it holds only accepted members. Delivery tracking lives as columns on `invitations`.
 
 ### Phase Execution Rules
-- Governing specifications: Contracts 3.1 through 3.5 (inline below)
-- Required context: `ListCollaboratorsTable` currently has `userId NOT NULL` and no invitation columns (`drizzle/schema.ts:54-76`). `getCollaborators` inner-joins on `userId` (`app/lists/_actions/collaborators.ts:118-134`).
+- Governing specifications: Contracts 3.1 through 3.4 (inline below)
+- Required context: `ListCollaboratorsTable` currently has `userId NOT NULL` and no invitation columns (`drizzle/schema.ts:54-76`). `getCollaborators` inner-joins on `userId` (`app/lists/_actions/collaborators.ts:118-134`). The `list_collaborators` table is NOT modified in this phase.
 - Dependencies / prerequisites: Phase 1 (owner invariant) and Phase 2 (test harness) must both be merged.
 - Chunk dependencies: Chunks A + B (Wave 1 must be complete)
 - Unblocks: Phase 4 (Invitation Issuing)
 - Parallelization note: `none` — sequential after Wave 1 merge.
 - Relevant existing files:
-  - `drizzle/schema.ts` — Schema to extend
-  - `app/lists/_actions/collaborators.ts` — `getCollaborators` must filter by accepted status
+  - `drizzle/schema.ts` — Add `InvitationsTable`
   - `lib/types.ts` — Domain types to extend
-  - `drizzle/backfillListCollaborators.ts` — Needs lifecycle-state backfill
-- Constraints / non-goals: Do not implement invitation workflows. Only evolve the schema and ensure read paths remain stable.
+- Constraints / non-goals: Do not implement invitation workflows. Only create the schema and types. Do not modify `list_collaborators`. Do not add a separate `invitation_delivery_attempts` table — delivery tracking columns live on `invitations`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
-- Agent handoff note: This phase modifies the database schema and must produce a migration. The critical invariant is that `getCollaborators` continues to return only accepted collaborators after the schema change. Legacy rows must be backfilled to `inviteStatus = "accepted"`.
+- Agent handoff note: This phase creates the `invitations` table as a new, independent table. `list_collaborators` is untouched — `getCollaborators` continues to work as-is since it only reads accepted members (which is all `list_collaborators` contains). No backfill of `list_collaborators` is needed.
 
 ### Specifications
 
@@ -557,215 +559,194 @@ type InvitationResolvedAt = Tagged<Date, "InvitationResolvedAt">;
 type DeliveryAttemptedAt = Tagged<Date, "DeliveryAttemptedAt">;
 type ProviderMessageId = Tagged<string, "ProviderMessageId">;
 
-type AcceptedInvitationStatus = Tagged<"accepted", "AcceptedInvitationStatus">;
+type PendingInvitationStatus = Tagged<"pending", "PendingInvitationStatus">;
 type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
+type AcceptedInvitationStatus = Tagged<"accepted", "AcceptedInvitationStatus">;
 type PendingApprovalInvitationStatus = Tagged<"pending_approval", "PendingApprovalInvitationStatus">;
-type OpenInvitationStatus = SentInvitationStatus | PendingApprovalInvitationStatus;
 type RevokedInvitationStatus = Tagged<"revoked", "RevokedInvitationStatus">;
 type ExpiredInvitationStatus = Tagged<"expired", "ExpiredInvitationStatus">;
-type TerminalInvitationStatus = RevokedInvitationStatus | ExpiredInvitationStatus;
-type InvitationLifecycleStatus =
-  | AcceptedInvitationStatus
+
+type OpenInvitationStatus = PendingInvitationStatus | SentInvitationStatus;
+type TerminalInvitationStatus = AcceptedInvitationStatus | RevokedInvitationStatus | ExpiredInvitationStatus;
+type InvitationStatus =
   | OpenInvitationStatus
+  | PendingApprovalInvitationStatus
   | TerminalInvitationStatus;
 
-type AcceptedMembershipRow = {
-  kind: "accepted_membership";
-  invitationId: InvitationId;
+/** The invitations table row shape */
+type InvitationRow = {
+  id: InvitationId;
   listId: ListId;
-  userId: UserId;
-  role: UserRole;
-  inviteStatus: AcceptedInvitationStatus;
-};
-
-type OpenInvitationRow = {
-  kind: "open_invitation";
-  invitationId: InvitationId;
-  listId: ListId;
-  userId: null;
-  role: UserRole;
-  inviteStatus: OpenInvitationStatus;
+  inviterId: UserId;
   invitedEmailNormalized: NormalizedEmailAddress;
-  invitationSecretHash: InvitationSecretHash;
+  role: UserRole;
+  status: InvitationStatus;
+  secretHash: InvitationSecretHash;
   expiresAt: InvitationExpiry;
-  inviterId: UserId;
+
+  /** Set when the invitation is accepted or enters pending_approval */
+  acceptedByUserId: UserId | null;
+  /** The email used to sign in when it differs from invitedEmailNormalized */
+  acceptedByEmail: NormalizedEmailAddress | null;
+  /** When the invitation reached a terminal or pending_approval state */
+  resolvedAt: InvitationResolvedAt | null;
+
+  /** Delivery tracking (latest attempt) */
+  providerMessageId: ProviderMessageId | null;
+  lastDeliveryError: Tagged<string, "DeliveryError"> | null;
+  lastDeliveryAttemptAt: DeliveryAttemptedAt | null;
+
+  /** Webhook tracking (latest event) */
+  webhookEventType: string | null;
+  webhookReceivedAt: Date | null;
+
+  createdAt: Date;
+  updatedAt: Date;
 };
 
-type TerminalInvitationRow = {
-  kind: "terminal_invitation";
-  invitationId: InvitationId;
-  listId: ListId;
-  userId: null;
-  role: UserRole;
-  inviteStatus: TerminalInvitationStatus;
-  invitedEmailNormalized: NormalizedEmailAddress;
-  lastIssuedSecretHash: InvitationSecretHash;
-  lastExpiresAt: InvitationExpiry;
-  inviterId: UserId;
+/** Discriminated views for type-safe consumption */
+type OpenInvitation = InvitationRow & {
+  status: OpenInvitationStatus;
+  acceptedByUserId: null;
+  acceptedByEmail: null;
+  resolvedAt: null;
+};
+
+type PendingApprovalInvitation = InvitationRow & {
+  status: PendingApprovalInvitationStatus;
+  acceptedByUserId: UserId;
+  acceptedByEmail: NormalizedEmailAddress | null;
+};
+
+type AcceptedInvitation = InvitationRow & {
+  status: AcceptedInvitationStatus;
+  acceptedByUserId: UserId;
   resolvedAt: InvitationResolvedAt;
 };
 
-type InvitationLifecycleRow =
-  | AcceptedMembershipRow
-  | OpenInvitationRow
-  | TerminalInvitationRow;
-
-type AcceptedCollaborator = ListUser & {
-  collaboratorId: InvitationId;
-  inviteStatus: AcceptedInvitationStatus;
+type TerminalInvitation = InvitationRow & {
+  status: RevokedInvitationStatus | ExpiredInvitationStatus;
+  resolvedAt: InvitationResolvedAt;
 };
 
-type BackfillReport = {
-  scanned: number;
-  updated: number;
-  unchanged: number;
-};
-
-/** Delivery tracking (separate relation) */
-type InvitationDeliveryAttempt = {
-  id: Tagged<number, "DeliveryAttemptId">;
-  invitationId: InvitationId;
-  providerMessageId: ProviderMessageId | null;
-  providerErrorMessage: Tagged<string, "ResendErrorMessage"> | null;
-  providerErrorName: Tagged<string, "ResendErrorName"> | null;
-  attemptedAt: DeliveryAttemptedAt;
-  webhookEventType: string | null;
-  webhookReceivedAt: Date | null;
-};
+type InvitationView =
+  | OpenInvitation
+  | PendingApprovalInvitation
+  | AcceptedInvitation
+  | TerminalInvitation;
 ```
 
-#### Contract 3.1: Invitation lifecycle data model
+#### Contract 3.1: Invitations table data model
 ```ts
 /**
- * @contract InvitationLifecycleRow
+ * @contract InvitationsTable
  *
- * The schema projects invitation rows through InvitationLifecycleRow, whose `kind`
- * discriminator and branded `inviteStatus` values rule out mixed states at the type level.
+ * The `invitations` table manages the full invitation lifecycle independently
+ * from `list_collaborators`. Each row represents one invitation attempt.
  *
  * @invariants
- * - Rows with inviteStatus="accepted" represent usable collaborator memberships.
- * - Rows with inviteStatus="sent" or "pending_approval" represent open invitations.
- * - Rows with inviteStatus="revoked" or "expired" are terminal and cannot be accepted.
+ * - Rows with status="pending" or "sent" are open invitations awaiting action.
+ * - Rows with status="pending_approval" have a non-null acceptedByUserId and
+ *   represent an email-mismatch that needs owner approval.
+ * - Rows with status="accepted" have a non-null acceptedByUserId and resolvedAt,
+ *   and a corresponding `list_collaborators` row exists.
+ * - Rows with status="revoked" or "expired" are terminal and cannot be accepted.
+ * - `acceptedByEmail` is set when the sign-in email differs from invitedEmailNormalized.
+ * - Delivery tracking columns (providerMessageId, lastDeliveryError,
+ *   lastDeliveryAttemptAt) record the latest delivery attempt, not a history.
  */
 ```
 
-#### Contract 3.2: Row invariants for accepted memberships and invitations
-```ts
-/**
- * @contract Row invariants
- *
- * @invariants
- * - Accepted rows must have a non-null userId.
- * - Open invitation rows must have non-null: normalized invited email, token hash,
- *   expiry, and inviter id.
- * - The schema represents email-only invites by permitting userId=null before acceptance.
- * - Migration and backfill leave no row in an impossible mixed state.
- */
-```
-
-#### Contract 3.3: Uniqueness constraints
+#### Contract 3.2: Uniqueness constraints
 ```ts
 /**
  * @contract Uniqueness constraints
  *
  * @invariants
- * - At most one accepted membership for any (listId, userId).
- * - At most one open invite for any (listId, invitedEmailNormalized) among open states.
- * - Terminal invitation rows do not prevent a later new invitation for the same email and list.
+ * - At most one open invitation for any (listId, invitedEmailNormalized)
+ *   among open states (pending, sent).
+ * - Terminal or pending_approval rows do not prevent a later new invitation
+ *   for the same email and list.
+ * - The existing `list_collaborators` uniqueness on (listId, userId) is preserved
+ *   and enforced independently.
  */
 ```
 
-#### Contract 3.4: Accepted collaborator queries remain stable
+#### Contract 3.3: Existing collaborator queries remain stable
 ```ts
 /**
  * @contract getCollaborators
  *
- * Returns only accepted collaborators for a list.
+ * Returns only accepted collaborators for a list. Unaffected by the new
+ * `invitations` table since `list_collaborators` is unchanged.
  *
  * @param listId - The list to query.
  * @returns Only accepted collaborators with concrete user records.
  *
  * @effects
- * - Excludes rows with inviteStatus sent, pending_approval, revoked, or expired.
- * - Preserves the existing assumption that returned collaborators have associated user records.
+ * - Reads only from `list_collaborators` (no join to `invitations`).
+ * - Preserves the existing assumption that returned collaborators have
+ *   associated user records.
  */
 getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
 ```
 
-#### Contract 3.5: Legacy data is normalized
+#### Contract 3.4: Invitations table index strategy
 ```ts
 /**
- * @contract backfillInvitationLifecycleState
+ * @contract Index strategy
  *
- * Converts legacy collaborator rows into valid accepted invitation lifecycle rows.
- *
- * @returns A report of scanned, updated, and unchanged counts.
- *
- * @effects
- * - After return, no legacy row remains without a valid invitation lifecycle state.
- * - Running repeatedly is idempotent.
+ * @invariants
+ * - An index on (listId, status) supports the manage-collaborators UNION query.
+ * - An index on (secretHash) supports token-based lookup at acceptance time.
+ * - An index on (listId, invitedEmailNormalized, status) supports the
+ *   single-open-invite uniqueness check during invitation issuing.
  */
-backfillInvitationLifecycleState(): Promise<BackfillReport>
 ```
 
 ### Contract Coverage Checklist
 #### Contract 3.1 checklist
-- [ ] Verifies accepted rows remain usable memberships.
-- [ ] Verifies `sent` rows remain non-membership invites.
-- [ ] Verifies `pending_approval` rows remain non-membership invites.
-- [ ] Verifies `revoked` rows cannot later transition into acceptance.
-- [ ] Verifies `expired` rows cannot later transition into acceptance.
+- [ ] Verifies open invitation rows can be inserted with all required fields.
+- [ ] Verifies `pending_approval` rows require a non-null `acceptedByUserId`.
+- [ ] Verifies `accepted` rows require a non-null `acceptedByUserId` and `resolvedAt`.
+- [ ] Verifies terminal rows (revoked, expired) have a `resolvedAt`.
+- [ ] Verifies `acceptedByEmail` is set when the sign-in email differs from `invitedEmailNormalized`.
+- [ ] Verifies delivery tracking columns are nullable and independent of invitation status.
 
 #### Contract 3.2 checklist
-- [ ] Verifies accepted rows require a non-null `userId`.
-- [ ] Verifies open invites require a non-null normalized invited email.
-- [ ] Verifies open invites require a non-null token hash.
-- [ ] Verifies open invites require a non-null expiry.
-- [ ] Verifies open invites require a non-null inviter id.
-- [ ] Verifies email-only invites can be represented with `userId = null`.
-- [ ] Verifies impossible mixed-state rows are rejected or repaired during migration/backfill.
+- [ ] Verifies at most one open invitation for any `(listId, invitedEmailNormalized)` among open states.
+- [ ] Verifies a fresh invite can be issued after a prior invite reaches a terminal state.
+- [ ] Verifies `list_collaborators` uniqueness on `(listId, userId)` is preserved.
 
 #### Contract 3.3 checklist
-- [ ] Verifies at most one accepted membership for any `(listId, userId)`.
-- [ ] Verifies at most one open invite for any `(listId, invitedEmailNormalized)` among open states.
-- [ ] Verifies a fresh invite can be issued after a prior invite reaches a terminal state.
+- [ ] Verifies `getCollaborators` returns the same results as before the migration.
+- [ ] Verifies `getCollaborators` does not read from the `invitations` table.
 
 #### Contract 3.4 checklist
-- [ ] Verifies `getCollaborators` returns only accepted collaborators.
-- [ ] Verifies `getCollaborators` excludes `sent` rows.
-- [ ] Verifies `getCollaborators` excludes `pending_approval` rows.
-- [ ] Verifies `getCollaborators` excludes `revoked` rows.
-- [ ] Verifies `getCollaborators` excludes `expired` rows.
-- [ ] Verifies returned collaborator rows still have concrete user records.
-
-#### Contract 3.5 checklist
-- [ ] Verifies legacy rows are normalized to valid lifecycle states.
-- [ ] Verifies no legacy row remains without a lifecycle state after backfill.
-- [ ] Verifies rerunning the backfill is idempotent.
+- [ ] Verifies the `(listId, status)` index exists.
+- [ ] Verifies the `(secretHash)` index exists.
+- [ ] Verifies the `(listId, invitedEmailNormalized, status)` index exists.
 
 ### Specification-Driven TDD Workflow
-- First test to write: Failing integration test proving fresh-schema rows can represent an email-only invite (Contract 3.2).
+- First test to write: Failing integration test proving the `invitations` table can store an open invitation with all required fields (Contract 3.1).
 - Remaining contract-test inventory:
-  1. Contract 3.3 duplicate open invites rejected
-  2. Contract 3.4 `getCollaborators` excludes `sent` invite
-  3. Contract 3.4 other exclusions (one test per status)
-  4. Contract 3.5 legacy row normalized
-  5. Contract 3.5 idempotent rerun
-  6. Contract 3.1 accepted rows usable
-  7. Contract 3.1 terminal rows cannot transition to accepted
-  8. Contract 3.2 remaining invariants
-  9. Contract 3.3 fresh invite after terminal
+  1. Contract 3.1 pending_approval requires acceptedByUserId
+  2. Contract 3.1 accepted requires acceptedByUserId and resolvedAt
+  3. Contract 3.1 acceptedByEmail tracks email mismatch
+  4. Contract 3.1 delivery tracking columns are nullable
+  5. Contract 3.2 duplicate open invites rejected
+  6. Contract 3.2 fresh invite after terminal
+  7. Contract 3.3 getCollaborators unchanged
+  8. Contract 3.4 indexes exist
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
-- Delete-and-rebuild note: `getCollaborators` (`app/lists/_actions/collaborators.ts:118`) must be rewritten to filter by `inviteStatus = "accepted"`.
+- Delete-and-rebuild note: None. The `invitations` table and its migration are entirely new. `getCollaborators` is verified to be unchanged but not rewritten.
 - Commands: `npm run test:integration`, `npm run typecheck`, `npm run lint`
 
 ### Files
-- `drizzle/schema.ts` — Extend `ListCollaboratorsTable`, add `InvitationDeliveryAttemptsTable`
+- `drizzle/schema.ts` — Add `InvitationsTable` (do NOT modify `ListCollaboratorsTable`)
 - `drizzle/*.sql` (new migration)
 - `drizzle/meta/*` (generated)
-- `drizzle/backfillListCollaborators.ts` — Add lifecycle-state backfill
-- `app/lists/_actions/collaborators.ts` — Filter `getCollaborators` by accepted status
-- `lib/types.ts` — Add invitation lifecycle types
+- `lib/types.ts` — Add invitation types
 - `tests/integration/invitations/schema-migration.test.ts` (new)
 
 ### Phase Gate
@@ -778,28 +759,28 @@ backfillInvitationLifecycleState(): Promise<BackfillReport>
 - [ ] `npm run lint` passes
 
 #### Manual Verification
-- [ ] Existing list pages still render collaborators correctly after migration
-- [ ] Legacy data has `inviteStatus = "accepted"` after backfill
+- [ ] Existing list pages still render collaborators correctly after migration (no regression)
+- [ ] The `invitations` table exists with all expected columns and indexes
 
 ---
 
 ## Phase 4: Invitation Issuing & Send Attempt Workflow
 
 ### Goal
-Define the end-to-end workflow for inviting someone to a list up to the point where Resend returns its immediate send response. This phase creates the shared files (`lib/invitations/service.ts`, `app/lists/_actions/invitations.ts`) that Wave 4 phases will extend.
+Define the end-to-end workflow for inviting someone to a list up to the point where Resend returns its immediate send response. This phase creates the shared files (`lib/invitations/service.ts`, `app/lists/_actions/invitations.ts`) that Wave 4 phases will extend. All invitation state is written to the `invitations` table; `list_collaborators` is not touched.
 
 ### Phase Execution Rules
 - Governing specifications: Contracts 4.1 through 4.7 (inline below)
-- Required context: Phase 3 schema must be in place. `resend` v4.0.0 is already installed (`package.json:35`). Env vars `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL` are configured.
+- Required context: Phase 3 `invitations` table must be in place. `resend` v4.0.0 is already installed (`package.json:35`). Env vars `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL` are configured.
 - Dependencies / prerequisites: Phase 3 (Schema Evolution) must be complete.
 - Chunk dependencies: Chunk C (Phase 3)
 - Unblocks: Chunks E, F, G (Phases 5, 6, 7 — Wave 4)
 - Parallelization note: `none` — sequential. After this phase, three workspaces fan out.
 - Relevant existing files:
   - `app/lists/_actions/permissions.ts` — Permission model to extend
-  - `drizzle/schema.ts` — Extended schema from Phase 3
+  - `drizzle/schema.ts` — `InvitationsTable` from Phase 3
   - `lib/types.ts` — Domain types
-- Constraints / non-goals: Do not interpret Resend responses beyond returning them raw. Do not implement acceptance. Do not implement webhook handling.
+- Constraints / non-goals: Do not interpret Resend responses beyond returning them raw. Do not implement acceptance. Do not implement webhook handling. Do not write to `list_collaborators`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
 - Agent handoff note: This phase creates `lib/invitations/service.ts` and `app/lists/_actions/invitations.ts` as the base files. Wave 4 phases will ADD functions to these files. The service file must be structured for extension (exported functions, not a class).
 
@@ -834,7 +815,7 @@ type ResendSendResponse =
 
 type PersistedSentInvitation = {
   invitationId: InvitationId;
-  inviteStatus: SentInvitationStatus;
+  status: SentInvitationStatus;
   expiresAt: InvitationExpiry;
   wasRotated: boolean;
 };
@@ -861,9 +842,10 @@ type InviteCollaboratorWorkflowResult = {
  *
  * @effects
  * - Requires inviterId to be allowed to invite collaborators to listId.
- * - After return, exactly one open invite exists for (listId, invitedEmailNormalized).
- * - The persisted invite contains hashed secret, expiry, inviter id, normalized email,
- *   and inviteStatus="sent".
+ * - After return, exactly one open invitation row exists in `invitations` for
+ *   (listId, invitedEmailNormalized).
+ * - The persisted invitation contains hashed secret, expiry, inviter id, normalized
+ *   email, and status="sent".
  * - The returned acceptance URL contains the one-time secret matching the persisted hash.
  * - Attempts exactly one email send per invocation.
  * - Returns the raw Resend send response for later interpretation.
@@ -926,10 +908,10 @@ hashInvitationSecret(secret: InvitationSecret): InvitationSecretHash
 /**
  * @contract issueInvitation
  *
- * Persists exactly one open invite for (listId, invitedEmailNormalized).
- * If an open invite already existed, rotation invalidates the prior secret
- * while preserving the single-open-invite invariant.
- * Does not send email.
+ * Persists exactly one open invitation row in the `invitations` table for
+ * (listId, invitedEmailNormalized). If an open invitation already existed,
+ * rotation invalidates the prior secret while preserving the single-open-invite
+ * invariant. Does not send email. Does not write to `list_collaborators`.
  */
 issueInvitation(input: {
   listId: ListId;
@@ -978,7 +960,7 @@ sendInvitationEmail(input: {
 - [ ] Verifies persisted invite stores the expiry.
 - [ ] Verifies persisted invite stores the inviter id.
 - [ ] Verifies persisted invite stores the normalized email.
-- [ ] Verifies persisted invite stores `inviteStatus = "sent"`.
+- [ ] Verifies persisted invitation stores `status = "sent"` in the `invitations` table.
 - [ ] Verifies the returned acceptance URL uses the authoritative secret.
 - [ ] Verifies exactly one email send per invocation.
 - [ ] Verifies the raw Resend response is returned unchanged.
@@ -1061,22 +1043,22 @@ sendInvitationEmail(input: {
 ## Phase 5: Delivery Response & Webhook Authentication Workflow
 
 ### Goal
-Interpret Resend's immediate send responses, persist delivery outcomes, and authenticate webhook events before they can mutate invitation delivery state.
+Interpret Resend's immediate send responses, persist delivery outcomes as columns on the `invitations` table, and authenticate webhook events before they can update invitation delivery state.
 
 ### Phase Execution Rules
 - Governing specifications: Contracts 5.1 through 5.7 (inline below)
-- Required context: Resend send API returns `{ data, error }`. Webhook auth uses raw body + svix-id/timestamp/signature headers + signing secret. Delivery tracking lives in `invitation_delivery_attempts` (separate relation, locked decision).
+- Required context: Resend send API returns `{ data, error }`. Webhook auth uses raw body + svix-id/timestamp/signature headers + signing secret. Delivery tracking lives as columns on the `invitations` table (providerMessageId, lastDeliveryError, lastDeliveryAttemptAt, webhookEventType, webhookReceivedAt).
 - Dependencies / prerequisites: Phase 4 (Invitation Issuing) must be complete.
 - Chunk dependencies: Chunk D (Phase 4)
 - Unblocks: Chunk H (Phase 8 — Collaborator Management)
-- Parallelization note: Runs in parallel with Phases 6 and 7. Use `jj workspace add phase-5-delivery`. Adds functions to `lib/invitations/service.ts` and `app/lists/_actions/invitations.ts` — no functional overlap with Phases 6 or 7.
+- Parallelization note: Runs in parallel with Phases 6 and 7. Use `jj workspace add phase-5-delivery`. Adds functions to `lib/invitations/service.ts` and `app/lists/_actions/invitations.ts` — no functional overlap with Phases 6 or 7. This phase writes only delivery-tracking columns on `invitations` (providerMessageId, lastDeliveryError, lastDeliveryAttemptAt, webhookEventType, webhookReceivedAt). Phase 6 writes `status`, `acceptedByUserId`, `acceptedByEmail`, and `list_collaborators`. Phase 7 writes `status` and `resolvedAt`. No column-level write overlap.
 - Relevant existing files:
   - `lib/invitations/service.ts` — Add delivery response handlers (created in Phase 4)
   - `lib/email/resend.ts` — Add webhook verification (created in Phase 4)
-  - `drizzle/schema.ts` — `InvitationDeliveryAttemptsTable` (created in Phase 3)
-- Constraints / non-goals: Do not accept, revoke, or otherwise change invitation-recipient state. Only track delivery outcomes.
+  - `drizzle/schema.ts` — `InvitationsTable` delivery columns (created in Phase 3)
+- Constraints / non-goals: Do not accept, revoke, or otherwise change invitation status. Only update delivery-tracking columns. Do not write to `list_collaborators`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
-- Agent handoff note: This phase only touches delivery tracking. It does NOT modify `inviteStatus` on `list_collaborators`. All persistence goes to the `invitation_delivery_attempts` table. This is what makes it safe to run in parallel with Phases 6 and 7.
+- Agent handoff note: This phase only touches delivery-tracking columns on the `invitations` table. It does NOT modify `status`, `acceptedByUserId`, `acceptedByEmail`, `resolvedAt`, or `list_collaborators`. This column-level isolation is what makes it safe to run in parallel with Phases 6 and 7.
 
 ### Specifications
 
@@ -1130,10 +1112,12 @@ type AuthenticatedWebhookResult = {
  * Interprets the raw Resend { data, error } response and persists the delivery outcome.
  *
  * @effects
- * - If data.id is present and error is null, persists delivery-attempt result
- *   correlated to invitationId in invitation_delivery_attempts.
- * - If error is present, persists failure details correlated to invitationId.
- * - Does not accept, revoke, or otherwise change invitation-recipient state.
+ * - If data.id is present and error is null, updates delivery-tracking columns
+ *   on the `invitations` row for invitationId (providerMessageId, lastDeliveryAttemptAt).
+ * - If error is present, updates failure columns on the `invitations` row
+ *   (lastDeliveryError, lastDeliveryAttemptAt).
+ * - Does not modify invitation status, acceptedByUserId, acceptedByEmail,
+ *   resolvedAt, or `list_collaborators`.
  */
 handleInvitationSendResponseWorkflow(input: {
   invitationId: InvitationId;
@@ -1151,8 +1135,8 @@ handleInvitationSendResponseWorkflow(input: {
  *
  * @effects
  * - Rejects requests with invalid signatures.
- * - Accepts supported events and persists delivery metadata when correlatable
- *   to a previously recorded provider message id.
+ * - Accepts supported events and updates delivery-tracking columns on the
+ *   `invitations` row when correlatable to a previously recorded provider message id.
  * - Returns "ignored" for valid but uncorrelatable or unsupported events.
  */
 handleAuthenticatedResendWebhookWorkflow(input: {
@@ -1179,8 +1163,7 @@ normalizeResendSendResponse(response: ResendSendResponse): InvitationDeliveryRes
 /**
  * @contract recordInvitationSendResult
  *
- * Persists the normalized immediate send outcome for invitationId
- * in invitation_delivery_attempts.
+ * Updates the delivery-tracking columns on the `invitations` row for invitationId.
  * Stores provider message id for webhook correlation when accepted for delivery.
  * Stores provider failure details when send failed immediately.
  */
@@ -1213,7 +1196,8 @@ verifyResendWebhookSignature(input: {
 /**
  * @contract recordInvitationDeliveryEvent
  *
- * Persists supported Resend delivery events when correlatable through provider message id.
+ * Updates delivery-tracking columns on the `invitations` row when correlatable
+ * through provider message id.
  * Supports email.failed, email.bounced, email.delivery_delayed, email.complained.
  * Returns "ignored" for verified but uncorrelatable or unsupported events.
  */
@@ -1237,10 +1221,10 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 ### Contract Coverage Checklist
 #### Contract 5.1 checklist
 - [ ] Verifies accepted-for-delivery response is normalized correctly.
-- [ ] Verifies accepted-for-delivery response is persisted against the invitation.
+- [ ] Verifies accepted-for-delivery response updates delivery columns on the `invitations` row.
 - [ ] Verifies send-failed response is normalized correctly.
-- [ ] Verifies send-failed response is persisted against the invitation.
-- [ ] Verifies immediate response handling does not mutate invitation-recipient state.
+- [ ] Verifies send-failed response updates delivery columns on the `invitations` row.
+- [ ] Verifies immediate response handling does not mutate invitation status or `list_collaborators`.
 
 #### Contract 5.2 checklist
 - [ ] Verifies invalid signatures are rejected.
@@ -1253,8 +1237,8 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 - [ ] Verifies impossible mixed states are rejected.
 
 #### Contract 5.4 checklist
-- [ ] Verifies provider message ids are stored for accepted-for-delivery results.
-- [ ] Verifies provider failure details are stored for immediate send failures.
+- [ ] Verifies provider message ids are stored on the `invitations` row for accepted-for-delivery results.
+- [ ] Verifies provider failure details are stored on the `invitations` row for immediate send failures.
 
 #### Contract 5.5 checklist
 - [ ] Verifies successful signature verification returns the event payload.
@@ -1262,10 +1246,10 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 - [ ] Verifies invalid signature material raises `InvalidWebhookSignatureError`.
 
 #### Contract 5.6 checklist
-- [ ] Verifies `email.failed` events are persisted when correlatable.
-- [ ] Verifies `email.bounced` events are persisted when correlatable.
-- [ ] Verifies `email.delivery_delayed` events are persisted when correlatable.
-- [ ] Verifies `email.complained` events are persisted when correlatable.
+- [ ] Verifies `email.failed` events update delivery columns when correlatable.
+- [ ] Verifies `email.bounced` events update delivery columns when correlatable.
+- [ ] Verifies `email.delivery_delayed` events update delivery columns when correlatable.
+- [ ] Verifies `email.complained` events update delivery columns when correlatable.
 - [ ] Verifies unsupported verified events return "ignored".
 - [ ] Verifies uncorrelatable verified events return "ignored".
 
@@ -1322,7 +1306,7 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 ## Phase 6: Invitation Acceptance & Auth Continuation Workflow
 
 ### Goal
-Define the end-to-end workflow for consuming an invite link across logged-out, matched-email, mismatched-email, and terminal invite states.
+Define the end-to-end workflow for consuming an invite link across logged-out, matched-email, mismatched-email, and terminal invite states. Acceptance creates a `list_collaborators` row atomically with updating the invitation. Email mismatches enter `pending_approval` without creating a collaborator row, and the mismatch is tracked.
 
 ### Phase Execution Rules
 - Governing specifications: Contracts 6.1 through 6.5 (inline below)
@@ -1330,7 +1314,7 @@ Define the end-to-end workflow for consuming an invite link across logged-out, m
 - Dependencies / prerequisites: Phase 4 (Invitation Issuing) must be complete.
 - Chunk dependencies: Chunk D (Phase 4)
 - Unblocks: Chunk H (Phase 8 — Collaborator Management)
-- Parallelization note: Runs in parallel with Phases 5 and 7. Use `jj workspace add phase-6-acceptance`. Modifies `inviteStatus` on `list_collaborators` (writes `accepted`, `pending_approval`) — no overlap with Phase 5 (delivery tracking only) or Phase 7 (writes `revoked`, `expired`).
+- Parallelization note: Runs in parallel with Phases 5 and 7. Use `jj workspace add phase-6-acceptance`. Writes `status` (`accepted`, `pending_approval`), `acceptedByUserId`, `acceptedByEmail`, and `resolvedAt` on `invitations`. Creates `list_collaborators` rows on acceptance. No column-level overlap with Phase 5 (delivery-tracking columns only) or Phase 7 (writes `status` to `revoked`/`expired` — mutually exclusive values).
 - Relevant existing files:
   - `app/sign-in/_components/sign-in.tsx` — Redirect must support continuation
   - `app/sign-in/page.tsx` — May need to accept `redirectTo` param
@@ -1338,7 +1322,7 @@ Define the end-to-end workflow for consuming an invite link across logged-out, m
   - `app/lists/_actions/invitations.ts` — Add acceptance server actions (created in Phase 4)
 - Constraints / non-goals: Do not implement resend, revoke, approve, or reject actions. Only accept or transition to pending_approval.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
-- Agent handoff note: This phase modifies `inviteStatus` to `accepted` or `pending_approval` only. It does NOT write `revoked` or `expired` (that's Phase 7). It does NOT touch delivery tracking (that's Phase 5). The sign-in continuation flow requires modifying the existing `signIn("github", { redirectTo })` call to accept a dynamic redirect.
+- Agent handoff note: This phase writes `status` to `accepted` or `pending_approval` on `invitations` and creates `list_collaborators` rows for accepted invitations. It does NOT write `revoked` or `expired` (that's Phase 7). It does NOT touch delivery-tracking columns (that's Phase 5). On email mismatch, `acceptedByEmail` and `acceptedByUserId` are set on the `invitations` row but no `list_collaborators` row is created until owner approval (Phase 8). The sign-in continuation flow requires modifying the existing `signIn("github", { redirectTo })` call to accept a dynamic redirect.
 
 ### Specifications
 
@@ -1382,9 +1366,13 @@ type InvitePageOutcome = Exclude<
  * - If the invitation is open and viewer is null, returns redirect_to_sign_in
  *   with a safe path that resumes the same invite URL after sign-in.
  * - If the invitation is open and viewer.email matches, accepts the invitation
- *   and makes collaborator access observable immediately.
- * - If the invitation is open and viewer.email does not match, moves the
- *   invitation to pending_approval.
+ *   atomically: updates `invitations.status` to 'accepted', sets `acceptedByUserId`,
+ *   sets `resolvedAt`, and inserts a `list_collaborators` row. Collaborator access
+ *   is observable immediately.
+ * - If the invitation is open and viewer.email does not match, updates
+ *   `invitations.status` to 'pending_approval', sets `acceptedByUserId` and
+ *   `acceptedByEmail` to record the mismatch. Does NOT create a `list_collaborators`
+ *   row — the owner must approve first (Phase 8).
  * - Reusing a consumed, revoked, or expired secret does not create a second acceptance.
  */
 acceptInvitationWorkflow(input: {
@@ -1428,8 +1416,12 @@ buildInviteContinuationTarget(secret: InvitationSecret): SafeAppPath
  * Resolves an invitation based on the viewer's email and the invitation's state.
  *
  * @effects
- * - Accepts on exact email match.
- * - Moves mismatched authenticated viewers to pending_approval.
+ * - On exact email match: updates `invitations.status` to 'accepted', sets
+ *   `acceptedByUserId` and `resolvedAt`, inserts a `list_collaborators` row
+ *   atomically.
+ * - On email mismatch: updates `invitations.status` to 'pending_approval',
+ *   sets `acceptedByUserId` and `acceptedByEmail` to track the mismatch.
+ *   Does NOT create a `list_collaborators` row.
  * - Returns the correct terminal outcome for invalid, expired, revoked, or
  *   already resolved invitations.
  */
@@ -1456,9 +1448,13 @@ resolveInviteAcceptance(input: {
 - [ ] Verifies invalid secrets return the correct terminal outcome.
 - [ ] Verifies invalid-secret handling does not mutate unrelated invitations.
 - [ ] Verifies logged-out viewers receive a sign-in redirect with safe continuation target.
-- [ ] Verifies matching-email viewers accept the invitation successfully.
+- [ ] Verifies matching-email viewers accept the invitation successfully (status='accepted', acceptedByUserId set, resolvedAt set).
+- [ ] Verifies matching-email acceptance creates a `list_collaborators` row atomically.
 - [ ] Verifies matching-email acceptance makes collaborator access observable immediately.
-- [ ] Verifies mismatched-email viewers transition to `pending_approval`.
+- [ ] Verifies mismatched-email viewers transition invitation to `pending_approval`.
+- [ ] Verifies mismatched-email sets `acceptedByEmail` to the actual sign-in email.
+- [ ] Verifies mismatched-email sets `acceptedByUserId` to the viewer's user id.
+- [ ] Verifies mismatched-email does NOT create a `list_collaborators` row.
 - [ ] Verifies reused consumed secrets do not create a second acceptance.
 - [ ] Verifies reused revoked secrets do not create a second acceptance.
 - [ ] Verifies reused expired secrets do not create a second acceptance.
@@ -1475,8 +1471,8 @@ resolveInviteAcceptance(input: {
 - [ ] Verifies continuation targets do not emit cross-origin URLs.
 
 #### Contract 6.4 checklist
-- [ ] Verifies the `accepted` outcome.
-- [ ] Verifies the `pending_approval` outcome.
+- [ ] Verifies the `accepted` outcome (invitation status + list_collaborators row + acceptedByUserId + resolvedAt).
+- [ ] Verifies the `pending_approval` outcome (invitation status + acceptedByUserId + acceptedByEmail, no list_collaborators row).
 - [ ] Verifies the `invalid` outcome.
 - [ ] Verifies the `expired` outcome.
 - [ ] Verifies the `revoked` outcome.
@@ -1548,17 +1544,17 @@ Define the workflows that invalidate invitation state when list lifecycle change
 
 ### Phase Execution Rules
 - Governing specifications: Contracts 7.1 through 7.4 (inline below)
-- Required context: `archiveList` (`app/lists/_actions/list.ts:328`) and `deleteList` (`app/lists/_actions/list.ts:401`) exist but have no invitation lifecycle hooks. Phase 3's backfill produces `accepted` rows that must survive archive invalidation.
-- Dependencies / prerequisites: Phase 4 (Invitation Issuing) must be complete. Phase 3's schema with invitation lifecycle columns must exist.
+- Required context: `archiveList` (`app/lists/_actions/list.ts:328`) and `deleteList` (`app/lists/_actions/list.ts:401`) exist but have no invitation lifecycle hooks. Accepted invitations have corresponding `list_collaborators` rows that must survive archive invalidation.
+- Dependencies / prerequisites: Phase 4 (Invitation Issuing) must be complete. Phase 3's `invitations` table must exist.
 - Chunk dependencies: Chunk D (Phase 4)
 - Unblocks: Chunk H (Phase 8 — Collaborator Management)
-- Parallelization note: Runs in parallel with Phases 5 and 6. Use `jj workspace add phase-7-lifecycle`. Writes `inviteStatus` to `revoked`/`expired` only — no overlap with Phase 5 (delivery tracking) or Phase 6 (writes `accepted`/`pending_approval`).
+- Parallelization note: Runs in parallel with Phases 5 and 6. Use `jj workspace add phase-7-lifecycle`. Writes `status` to `revoked`/`expired` and `resolvedAt` on `invitations` only — no overlap with Phase 5 (delivery-tracking columns) or Phase 6 (writes `status` to `accepted`/`pending_approval` — mutually exclusive values).
 - Relevant existing files:
   - `app/lists/_actions/list.ts` — `archiveList` and `deleteList` need invalidation hooks
   - `lib/invitations/service.ts` — Add invalidation helper (created in Phase 4)
-- Constraints / non-goals: Do not implement invitation acceptance, delivery tracking, or management UI.
+- Constraints / non-goals: Do not implement invitation acceptance, delivery tracking, or management UI. Do not modify `list_collaborators`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
-- Agent handoff note: This phase modifies `inviteStatus` to `revoked` or `expired` only. Phase 3's backfilled `accepted` rows serve as fixtures for testing that accepted collaborators survive invalidation. No dependency on Phase 6's acceptance path.
+- Agent handoff note: This phase writes `status` to `revoked` or `expired` on the `invitations` table only. It does NOT touch `list_collaborators` — accepted collaborator rows are unaffected by invitation invalidation. Existing `list_collaborators` rows serve as fixtures for testing that accepted collaborators survive archive/delete. No dependency on Phase 6's acceptance path.
 
 ### Specifications
 
@@ -1575,9 +1571,9 @@ type InvitationInvalidationTerminalStatus = RevokedInvitationStatus | ExpiredInv
  * Archives a list and invalidates all open invites.
  *
  * @effects
- * - If the archive succeeds, every open invite for listId is moved to a terminal
- *   non-accepting state before the caller can observe archive success.
- * - Accepted collaborator memberships remain accepted after archive.
+ * - If the archive succeeds, every open invitation row in `invitations` for listId
+ *   is moved to a terminal non-accepting state before the caller can observe archive success.
+ * - Existing `list_collaborators` rows are unaffected — accepted collaborators remain.
  * - No unrelated list's invitations are modified.
  */
 archiveListWorkflow(input: {
@@ -1612,8 +1608,9 @@ deleteListWorkflow(input: {
 /**
  * @contract invalidateOpenInvitesForList
  *
- * Moves every open invite for listId to terminalStatus.
- * Does not modify accepted collaborators or invitations belonging to other lists.
+ * Moves every open invitation row in `invitations` for listId to terminalStatus.
+ * Sets `resolvedAt` on each invalidated row.
+ * Does not modify `list_collaborators` or invitations belonging to other lists.
  *
  * @returns The number of invitations invalidated.
  */
@@ -1637,17 +1634,17 @@ invalidateOpenInvitesForList(input: {
 
 ### Contract Coverage Checklist
 #### Contract 7.1 checklist
-- [ ] Verifies archive success is not observable before all open invites reach a terminal state.
-- [ ] Verifies accepted collaborators remain accepted after archive.
-- [ ] Verifies unrelated lists are untouched by archive-time invite invalidation.
+- [ ] Verifies archive success is not observable before all open invitations in `invitations` reach a terminal state.
+- [ ] Verifies `list_collaborators` rows are unaffected by archive (accepted collaborators remain).
+- [ ] Verifies unrelated lists' invitations are untouched by archive-time invalidation.
 
 #### Contract 7.2 checklist
 - [ ] Verifies previously issued invitation secrets become unusable after delete.
 - [ ] Verifies the delete workflow does not leave a post-success token-validity race.
 
 #### Contract 7.3 checklist
-- [ ] Verifies every open invite for the target list is moved to the requested terminal state.
-- [ ] Verifies accepted collaborators are left unchanged by invalidation.
+- [ ] Verifies every open invitation in `invitations` for the target list is moved to the requested terminal state with `resolvedAt` set.
+- [ ] Verifies `list_collaborators` rows are left unchanged by invalidation.
 - [ ] Verifies invitations for other lists are left unchanged by invalidation.
 
 #### Contract 7.4 checklist
@@ -1700,7 +1697,7 @@ invalidateOpenInvitesForList(input: {
 ## Phase 8: Collaborator Management Workflow & UX
 
 ### Goal
-Define the end-to-end workflow for users who are allowed to manage collaborators so they can view collaborator state and act on invitations without introducing authorization leaks or N+1 query behavior.
+Define the end-to-end workflow for users who are allowed to manage collaborators so they can view collaborator state and act on invitations without introducing authorization leaks or N+1 query behavior. The management view merges data from `list_collaborators` and `invitations` using two parallel queries (UNION pattern).
 
 ### Phase Execution Rules
 - Governing specifications: Contracts 8.1 through 8.6 (inline below)
@@ -1737,6 +1734,10 @@ type PendingApprovalInvitationSummary = {
   listId: ListId;
   invitedEmailNormalized: NormalizedEmailAddress;
   expiresAt: InvitationExpiry;
+  /** The user who attempted to accept with a mismatched email */
+  acceptedByUserId: UserId;
+  /** The email used to sign in (differs from invitedEmailNormalized) */
+  acceptedByEmail: NormalizedEmailAddress | null;
 };
 
 type InvitationSummary = SentInvitationSummary | PendingApprovalInvitationSummary;
@@ -1812,12 +1813,18 @@ assertCanManageCollaborators(input: {
  * @contract getCollaboratorManagementViewData
  *
  * Returns all lists, accepted collaborators, open invites, and pending_approval
- * entries manageable by actorId.
+ * entries manageable by actorId. Merges data from `list_collaborators` (accepted
+ * members) and `invitations` (open + pending_approval) using parallel queries.
  *
  * @effects
  * - Executes in a bounded number of database queries with respect to returned lists.
- *   Must not perform one additional query per list (no N+1).
+ *   Must not perform one additional query per list (no N+1). The expected pattern
+ *   is two parallel queries: one to `list_collaborators`, one to `invitations`
+ *   filtered by `status IN ('pending', 'sent', 'pending_approval')`.
  * - Preserves server-authoritative identifiers needed for invitation actions.
+ * - For `pending_approval` invitations, includes `acceptedByEmail` and
+ *   `acceptedByUserId` so the manager can see who attempted to join and from
+ *   which email.
  */
 getCollaboratorManagementViewData(input: {
   actorId: UserId;
@@ -1864,6 +1871,10 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
  * Send, resend, revoke, approve, reject, and copy-link flows use the server
  * contracts from Phases 4, 5, and 6 as the source of truth. Client code does
  * not assume a state transition succeeded until the server contract reports success.
+ *
+ * Approve atomically: updates `invitations.status` to 'accepted', sets `resolvedAt`,
+ * and inserts a `list_collaborators` row for the `acceptedByUserId`.
+ * Reject updates `invitations.status` to 'revoked' and sets `resolvedAt`.
  */
 ```
 
@@ -1876,7 +1887,7 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 - [ ] Verifies returned state is sufficient to drive resend actions.
 - [ ] Verifies returned state is sufficient to drive revoke actions.
 - [ ] Verifies returned state is sufficient to drive copy-link actions.
-- [ ] Verifies returned state is sufficient to drive approve actions.
+- [ ] Verifies returned state is sufficient to drive approve actions (including `acceptedByEmail` and `acceptedByUserId` for pending_approval invitations).
 - [ ] Verifies returned state is sufficient to drive reject actions.
 
 #### Contract 8.2 checklist
@@ -1975,13 +1986,13 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 
 ### Integration Contracts
 - Owner invariant enforcement (Phase 1).
-- Schema migration and backfill normalization (Phase 3).
-- Whole invitation issue-and-send workflow (Phase 4).
-- Immediate Resend send-response handling including persisted synchronous failures (Phase 5).
-- Authenticated webhook signature verification and delivery-failure persistence (Phase 5).
-- Whole invitation acceptance workflow (Phase 6).
-- Archive and delete invalidation workflows (Phase 7).
-- Whole collaborator-management data workflow including bounded-query requirement (Phase 8).
+- `invitations` table schema, indexes, and uniqueness constraints (Phase 3).
+- Whole invitation issue-and-send workflow writing to `invitations` table (Phase 4).
+- Immediate Resend send-response handling updating delivery columns on `invitations` (Phase 5).
+- Authenticated webhook signature verification and delivery column updates (Phase 5).
+- Whole invitation acceptance workflow: `invitations` status update + `list_collaborators` row creation, including email-mismatch tracking (Phase 6).
+- Archive and delete invalidation of `invitations` rows (Phase 7).
+- Whole collaborator-management data workflow merging `list_collaborators` and `invitations` with bounded-query requirement (Phase 8).
 
 ### E2E Contracts
 - Logged-out invite continuation through sign-in (Phase 6).
@@ -1989,11 +2000,12 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 - Invitation management actions for allowed managers (Phase 8).
 
 ## Migration Notes
-- Apply the schema migration (Phase 3) before shipping any invitation UI or acceptance route.
-- Run the invitation lifecycle backfill immediately after migration.
-- Run the owner-collaborator backfill (Phase 1) before or immediately after migration.
-- Keep both migration and backfill idempotent.
-- If production rollout fails, disable invitation entry points with a feature flag or env gate while preserving existing accepted collaborator behavior.
+- Apply the `invitations` table migration (Phase 3) before shipping any invitation UI or acceptance route.
+- No backfill of `list_collaborators` is needed — the table is unchanged.
+- Run the owner-collaborator backfill (Phase 1) before or immediately after the `invitations` table migration.
+- The `invitations` table starts empty; no data migration is required.
+- Keep the owner-collaborator backfill idempotent.
+- If production rollout fails, disable invitation entry points with a feature flag or env gate while preserving existing `list_collaborators` behavior (which is untouched).
 
 ## Security Review
 
