@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/thoughts -type f -name \"*.md\" 2>/dev/null | head -20)"
+      "Bash(find /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/thoughts -type f -name \"*.md\" 2>/dev/null | head -20)",
+      "Bash(jj log:*)"
     ]
   }
 }
