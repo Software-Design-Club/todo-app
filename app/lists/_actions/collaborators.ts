@@ -115,6 +115,21 @@ export async function addCollaborator(
   }
 }
 
+/**
+ * @contract getCollaborators
+ *
+ * Returns only accepted collaborators for a list. Invitation records stored in
+ * `invitations` are intentionally ignored so this read path remains stable
+ * across the invitation-schema migration.
+ *
+ * @param listId - The list to query.
+ * @returns Accepted collaborators with concrete user records.
+ *
+ * @effects
+ * - Reads from `list_collaborators` joined to `todo_users`.
+ * - Does not read from `invitations`.
+ * - Preserves the existing collaborator shape expected by list pages.
+ */
 export async function getCollaborators(
   listId: List["id"]
 ): Promise<ListUser[]> {

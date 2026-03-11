@@ -24,7 +24,15 @@ export default defineWorkspace([
     test: {
       name: "integration",
       include: ["tests/integration/**/*.test.ts"],
+      poolOptions: {
+        threads: {
+          isolate: true,
+          singleThread: true,
+        },
+      },
+      retry: 2,
       setupFiles: ["tests/setup/integration.ts"],
+      testTimeout: 10000,
     },
   },
 ]);

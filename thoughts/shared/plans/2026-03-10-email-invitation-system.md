@@ -6,7 +6,7 @@ This plan replaces `2026-02-05-email-invitation-system.md` with the same scope, 
 **Schema revision (2026-03-10):** Replaced "extend `list_collaborators`" with a separate `invitations` table. `list_collaborators` holds only accepted members. Delivery tracking lives as columns on `invitations` (no separate `invitation_delivery_attempts` table). Email mismatch tracking via `acceptedByEmail`/`acceptedByUserId` on `invitations`. `pending_approval` lives on `invitations` — no `list_collaborators` row until owner approves.
 **Live-schema revision (2026-03-11):** While preparing Phase 3, `drizzle-kit push` revealed that the live database still contains a legacy invitation design on `list_collaborators` with populated invitation columns. Phase 3 now includes a guarded data migration from those legacy columns into the new `invitations` table before any destructive column cleanup.
 
-Ready to resume from Phase 3 after completing Phases 1 and 2.
+Ready to resume from Phase 4 after completing Phases 1 through 3.
 
 ## Global Contract Rules
 1. No production code for invitation behavior may be added or changed until the affected contract JSDoc is written above the function.
@@ -742,33 +742,33 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
 
 ### Contract Coverage Checklist
 #### Contract 3.1 checklist
-- [ ] Verifies open invitation rows can be inserted with all required fields.
-- [ ] Verifies `pending_approval` rows require a non-null `acceptedByUserId`.
-- [ ] Verifies `accepted` rows require a non-null `acceptedByUserId` and `resolvedAt`.
-- [ ] Verifies terminal rows (revoked, expired) have a `resolvedAt`.
-- [ ] Verifies `acceptedByEmail` is set when the sign-in email differs from `invitedEmailNormalized`.
-- [ ] Verifies delivery tracking columns are nullable and independent of invitation status.
+- [x] Verifies open invitation rows can be inserted with all required fields.
+- [x] Verifies `pending_approval` rows require a non-null `acceptedByUserId`.
+- [x] Verifies `accepted` rows require a non-null `acceptedByUserId` and `resolvedAt`.
+- [x] Verifies terminal rows (revoked, expired) have a `resolvedAt`.
+- [x] Verifies `acceptedByEmail` is set when the sign-in email differs from `invitedEmailNormalized`.
+- [x] Verifies delivery tracking columns are nullable and independent of invitation status.
 
 #### Contract 3.2 checklist
-- [ ] Verifies at most one open invitation for any `(listId, invitedEmailNormalized)` among open states.
-- [ ] Verifies a fresh invite can be issued after a prior invite reaches a terminal state.
-- [ ] Verifies `list_collaborators` uniqueness on `(listId, userId)` is preserved.
+- [x] Verifies at most one open invitation for any `(listId, invitedEmailNormalized)` among open states.
+- [x] Verifies a fresh invite can be issued after a prior invite reaches a terminal state.
+- [x] Verifies `list_collaborators` uniqueness on `(listId, userId)` is preserved.
 
 #### Contract 3.3 checklist
-- [ ] Verifies `getCollaborators` returns the same results as before the migration.
-- [ ] Verifies `getCollaborators` does not read from the `invitations` table.
+- [x] Verifies `getCollaborators` returns the same results as before the migration.
+- [x] Verifies `getCollaborators` does not read from the `invitations` table.
 
 #### Contract 3.4 checklist
-- [ ] Verifies the `(listId, status)` index exists.
-- [ ] Verifies the `(secretHash)` index exists.
-- [ ] Verifies the `(listId, invitedEmailNormalized, status)` index exists.
+- [x] Verifies the `(listId, status)` index exists.
+- [x] Verifies the `(secretHash)` index exists.
+- [x] Verifies the `(listId, invitedEmailNormalized, status)` index exists.
 
 #### Contract 3.5 checklist
-- [ ] Verifies legacy invitation rows are copied into `invitations` before legacy columns are dropped.
-- [ ] Verifies migrated rows preserve token hash, inviter, expiry, delivery, and resolution data.
-- [ ] Verifies accepted collaborator access remains represented by `list_collaborators`.
-- [ ] Verifies the migration is a no-op when legacy columns are absent.
-- [ ] Verifies legacy invitation columns are dropped only after migrated row counts are confirmed.
+- [x] Verifies legacy invitation rows are copied into `invitations` before legacy columns are dropped.
+- [x] Verifies migrated rows preserve token hash, inviter, expiry, delivery, and resolution data.
+- [x] Verifies accepted collaborator access remains represented by `list_collaborators`.
+- [x] Verifies the migration is a no-op when legacy columns are absent.
+- [x] Verifies legacy invitation columns are dropped only after migrated row counts are confirmed.
 
 ### Specification-Driven TDD Workflow
 - First test to write: Failing integration test proving the `invitations` table can store an open invitation with all required fields (Contract 3.1).
@@ -797,12 +797,12 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
-- [ ] Contract coverage checklist fully checked
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:integration` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
+- [x] Contract JSDoc written above each function before implementation
+- [x] Contract coverage checklist fully checked
+- [x] Contract tests executed one at a time
+- [x] `npm run test:integration` passes
+- [x] `npm run typecheck` passes
+- [x] `npm run lint` passes
 
 #### Manual Verification
 - [ ] Existing list pages still render collaborators correctly after migration (no regression)

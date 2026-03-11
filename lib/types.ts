@@ -4,6 +4,9 @@ import {
   CollaboratorRoleEnum,
   ListVisibilityEnum,
   ListStateEnum,
+  InvitationStatusEnum,
+  InvitationDeliveryEventTypeEnum,
+  InvitationsTable,
 } from "@/drizzle/schema";
 import { Tagged, UnwrapTagged } from "type-fest";
 
@@ -13,6 +16,10 @@ export type UserRole = Tagged<(typeof CollaboratorRoleEnum.enumValues)[number], 
 export type DisplayUserRole = Tagged<UnwrapTagged<UserRole> | "viewer", "UserRole">;
 export const VIEWER_ROLE: DisplayUserRole = "viewer" as DisplayUserRole;
 export const toDisplayUserRole = (role: UserRole): DisplayUserRole => role;
+export type InvitationStatus =
+  (typeof InvitationStatusEnum.enumValues)[number];
+export type InvitationDeliveryEventType =
+  (typeof InvitationDeliveryEventTypeEnum.enumValues)[number];
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
@@ -39,6 +46,30 @@ export type ListUser = {
   User: User;
   listId: List["id"];
   Role: UserRole;
+};
+
+export type Invitation = {
+  id: Tagged<(typeof InvitationsTable.$inferSelect)["id"], "InvitationId">;
+  listId: List["id"];
+  inviterId: User["id"] | null;
+  invitedEmailNormalized: Tagged<string, "NormalizedEmailAddress"> | null;
+  role: UserRole;
+  status: Tagged<InvitationStatus, "InvitationStatus">;
+  secretHash: Tagged<string, "InvitationSecretHash"> | null;
+  expiresAt: Tagged<Date, "InvitationExpiry"> | null;
+  acceptedByUserId: User["id"] | null;
+  acceptedByEmail: Tagged<string, "NormalizedEmailAddress"> | null;
+  resolvedAt: Tagged<Date, "InvitationResolvedAt"> | null;
+  providerMessageId: Tagged<string, "ProviderMessageId"> | null;
+  lastDeliveryError: Tagged<string, "DeliveryError"> | null;
+  lastDeliveryAttemptAt: Tagged<Date, "DeliveryAttemptedAt"> | null;
+  deliveryEventType:
+    | Tagged<InvitationDeliveryEventType, "DeliveryEventType">
+    | null;
+  providerRawEventType: Tagged<string, "ProviderRawEventType"> | null;
+  providerEventReceivedAt: Tagged<Date, "ProviderEventReceivedAt"> | null;
+  createdAt: Tagged<Date, "CreatedAt">;
+  updatedAt: Tagged<Date, "UpdatedAt">;
 };
 
 export const createTaggedList = (
