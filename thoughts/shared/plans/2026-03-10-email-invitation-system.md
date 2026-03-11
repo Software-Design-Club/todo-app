@@ -4,8 +4,9 @@
 This plan replaces `2026-02-05-email-invitation-system.md` with the same scope, reorganized for maximum parallel execution. Phases are renumbered to match execution order. Wave 4 fans three independent phases into parallel jj workspaces. Contract JSDoc is the source of truth at the function and file level.
 
 **Schema revision (2026-03-10):** Replaced "extend `list_collaborators`" with a separate `invitations` table. `list_collaborators` holds only accepted members. Delivery tracking lives as columns on `invitations` (no separate `invitation_delivery_attempts` table). Email mismatch tracking via `acceptedByEmail`/`acceptedByUserId` on `invitations`. `pending_approval` lives on `invitations` — no `list_collaborators` row until owner approves.
+**Live-schema revision (2026-03-11):** While preparing Phase 3, `drizzle-kit push` revealed that the live database still contains a legacy invitation design on `list_collaborators` with populated invitation columns. Phase 3 now includes a guarded data migration from those legacy columns into the new `invitations` table before any destructive column cleanup.
 
-Ready to implement.
+Ready to resume from Phase 3 after completing Phases 1 and 2.
 
 ## Global Contract Rules
 1. No production code for invitation behavior may be added or changed until the affected contract JSDoc is written above the function.
@@ -32,17 +33,18 @@ Implement email-based collaborator invitations with secure one-time tokens, sign
 - Sign-in always redirects to `/` and cannot preserve invite continuation (`app/sign-in/_components/sign-in.tsx:23`).
 - List lifecycle operations exist (archive/delete) but have no invitation lifecycle hook (`app/lists/_actions/list.ts:328`, `app/lists/_actions/list.ts:401`).
 - `resend` v4.0.0 is installed but there is no email-delivery code path in `app/` or `lib/` (`package.json:35`).
-- The codebase has no unit, integration, or e2e test harness configured (`package.json:6`).
+- Vitest unit/integration and Playwright smoke harnesses now exist from Phase 2 (`package.json:6`).
 - `ListCollaboratorsTable.userId` is non-nullable (`drizzle/schema.ts:60`). This remains correct — `list_collaborators` holds only accepted members with concrete user IDs.
-- `createList` does not create an owner collaborator row; owners are only backfilled by script (`app/lists/_actions/list.ts:167`, `drizzle/backfillListCollaborators.ts:27`).
+- `createList` now guarantees an owner collaborator row, and the owner-collaborator backfill is idempotent from Phase 1 (`app/lists/_actions/list.ts:167`, `drizzle/backfillListCollaborators.ts:27`).
+- The live database still has legacy invitation columns on `list_collaborators` with populated data, even though the repo schema no longer models them. The migration plan must preserve and copy that data before dropping those columns.
 
 ### Gaps Blocking Implementation
 - No invitation token generation, persistence, or acceptance route exists.
 - No `invitations` table exists; the invitation lifecycle has no schema.
-- No test harness exists to verify any contract.
 - Sign-in redirect is hardcoded to `/`, blocking invite continuation.
 - Delivery tracking (provider message IDs, webhook correlation) has no schema or code.
 - No mechanism to track email mismatches between invited email and sign-in email.
+- The repository schema and the live database schema have drifted. Applying the new `invitations` table naively would delete populated legacy invitation columns from `list_collaborators`.
 
 ## Desired End State
 1. Users allowed to invite collaborators to a list can send an invitation by email from the list dropdown and a dedicated cross-list management page.
@@ -73,6 +75,7 @@ Implement email-based collaborator invitations with secure one-time tokens, sign
 - Introduce an `EmailService` boundary: production uses a Resend-backed implementation; automated e2e uses a test stub so browser scenarios do not depend on live third-party delivery.
 - Keep authorization contracts capability-based so the implementation can evolve without rewriting the plan.
 - Integration tests use per-test transaction isolation to prevent cross-phase test data contamination.
+- If legacy invitation columns exist on `list_collaborators`, Phase 3 migrates that data into `invitations` before any destructive cleanup. If those columns are absent, the migration path is a no-op.
 
 ## What We Are Not Doing
 - Adding new auth providers.
@@ -530,24 +533,25 @@ Each of the unit, integration, and e2e layers contains at least one intentionall
 
 ---
 
-## Phase 3: Schema Evolution — Invitations Table
+## Phase 3: Schema Evolution — Invitations Table & Legacy Data Migration
 
 ### Goal
-Create a separate `invitations` table to manage the full invitation lifecycle independently from `list_collaborators`. The `list_collaborators` table is unchanged — it holds only accepted members. Delivery tracking lives as columns on `invitations`.
+Create a separate `invitations` table to manage the full invitation lifecycle independently from `list_collaborators`, and migrate any legacy invitation data out of `list_collaborators` before removing obsolete invitation columns. After this phase, `list_collaborators` again holds only accepted members and delivery tracking lives on `invitations`.
 
 ### Phase Execution Rules
-- Governing specifications: Contracts 3.1 through 3.4 (inline below)
-- Required context: `ListCollaboratorsTable` currently has `userId NOT NULL` and no invitation columns (`drizzle/schema.ts:54-76`). `getCollaborators` inner-joins on `userId` (`app/lists/_actions/collaborators.ts:118-134`). The `list_collaborators` table is NOT modified in this phase.
+- Governing specifications: Contracts 3.1 through 3.5 (inline below)
+- Required context: The repo schema shows `ListCollaboratorsTable.userId NOT NULL` and no invitation columns (`drizzle/schema.ts:54-76`), but the live database still carries legacy invitation columns on `list_collaborators` with populated rows. `getCollaborators` inner-joins on `userId` (`app/lists/_actions/collaborators.ts:118-134`) and must remain stable after migration cleanup.
 - Dependencies / prerequisites: Phase 1 (owner invariant) and Phase 2 (test harness) must both be merged.
 - Chunk dependencies: Chunks A + B (Wave 1 must be complete)
 - Unblocks: Phase 4 (Invitation Issuing)
 - Parallelization note: `none` — sequential after Wave 1 merge.
 - Relevant existing files:
   - `drizzle/schema.ts` — Add `InvitationsTable`
+  - `drizzle/*.sql` — Create `invitations`, copy legacy rows, then drop legacy columns only after verification
   - `lib/types.ts` — Domain types to extend
-- Constraints / non-goals: Do not implement invitation workflows. Only create the schema and types. Do not modify `list_collaborators`. Do not add a separate `invitation_delivery_attempts` table — delivery tracking columns live on `invitations`.
+- Constraints / non-goals: Do not implement invitation workflows. Preserve all legacy invitation data before dropping any legacy columns. Do not add a separate `invitation_delivery_attempts` table — delivery tracking columns live on `invitations`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
-- Agent handoff note: This phase creates the `invitations` table as a new, independent table. `list_collaborators` is untouched — `getCollaborators` continues to work as-is since it only reads accepted members (which is all `list_collaborators` contains). No backfill of `list_collaborators` is needed.
+- Agent handoff note: This phase creates the `invitations` table, copies any legacy invitation-shaped data from `list_collaborators` into it, verifies the migrated row counts and state mapping, and only then removes obsolete invitation columns. `getCollaborators` must continue to work as-is because accepted collaborator rows remain in `list_collaborators`.
 
 ### Specifications
 
@@ -715,6 +719,27 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
  */
 ```
 
+#### Contract 3.5: Legacy invitation data migration
+```ts
+/**
+ * @contract migrateLegacyCollaboratorInvitations
+ *
+ * Copies legacy invitation data stored on `list_collaborators` into the new
+ * `invitations` table before legacy columns are dropped.
+ *
+ * @invariants
+ * - If legacy invitation columns are absent, the migration is a no-op.
+ * - Every legacy invitation-shaped row is represented in `invitations` before
+ *   destructive cleanup runs.
+ * - Legacy token hashes, expiry timestamps, inviter ids, delivery state, and
+ *   resolution timestamps are preserved in the migrated row.
+ * - Accepted collaborator access remains represented by the existing
+ *   `list_collaborators` row while the migrated invitation row provides audit history.
+ * - Legacy columns are dropped only after migrated row counts and status mapping
+ *   have been verified.
+ */
+```
+
 ### Contract Coverage Checklist
 #### Contract 3.1 checklist
 - [ ] Verifies open invitation rows can be inserted with all required fields.
@@ -738,6 +763,13 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
 - [ ] Verifies the `(secretHash)` index exists.
 - [ ] Verifies the `(listId, invitedEmailNormalized, status)` index exists.
 
+#### Contract 3.5 checklist
+- [ ] Verifies legacy invitation rows are copied into `invitations` before legacy columns are dropped.
+- [ ] Verifies migrated rows preserve token hash, inviter, expiry, delivery, and resolution data.
+- [ ] Verifies accepted collaborator access remains represented by `list_collaborators`.
+- [ ] Verifies the migration is a no-op when legacy columns are absent.
+- [ ] Verifies legacy invitation columns are dropped only after migrated row counts are confirmed.
+
 ### Specification-Driven TDD Workflow
 - First test to write: Failing integration test proving the `invitations` table can store an open invitation with all required fields (Contract 3.1).
 - Remaining contract-test inventory:
@@ -749,13 +781,16 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
   6. Contract 3.2 fresh invite after terminal
   7. Contract 3.3 getCollaborators unchanged
   8. Contract 3.4 indexes exist
+  9. Contract 3.5 migrates legacy invitation rows before cleanup
+  10. Contract 3.5 preserves legacy lifecycle fields
+  11. Contract 3.5 no-op when legacy columns are absent
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
-- Delete-and-rebuild note: None. The `invitations` table and its migration are entirely new. `getCollaborators` is verified to be unchanged but not rewritten.
+- Delete-and-rebuild note: The `invitations` table is new, but the migration must also account for live legacy invitation columns on `list_collaborators`. `getCollaborators` is verified to be unchanged but not rewritten.
 - Commands: `npm run test:integration`, `npm run typecheck`, `npm run lint`
 
 ### Files
 - `drizzle/schema.ts` — Add `InvitationsTable` (do NOT modify `ListCollaboratorsTable`)
-- `drizzle/*.sql` (new migration)
+- `drizzle/*.sql` (new migration that creates `invitations`, backfills legacy rows, verifies counts, then drops legacy columns)
 - `drizzle/meta/*` (generated)
 - `lib/types.ts` — Add invitation types
 - `tests/integration/invitations/schema-migration.test.ts` (new)
@@ -772,6 +807,7 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
 #### Manual Verification
 - [ ] Existing list pages still render collaborators correctly after migration (no regression)
 - [ ] The `invitations` table exists with all expected columns and indexes
+- [ ] Legacy invitation rows are present in `invitations` before legacy `list_collaborators` invitation columns are removed
 
 ---
 
@@ -2044,7 +2080,7 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 
 ### Integration Contracts
 - Owner invariant enforcement (Phase 1).
-- `invitations` table schema, indexes, and uniqueness constraints (Phase 3).
+- `invitations` table schema, indexes, uniqueness constraints, and legacy data migration (Phase 3).
 - Whole invitation issue-and-send workflow writing to `invitations` table (Phase 4).
 - Immediate Resend send-response handling updating delivery columns on `invitations` (Phase 5).
 - Authenticated webhook signature verification and delivery column updates (Phase 5).
@@ -2115,9 +2151,10 @@ All invitation e2e scenarios use Playwright plus the Phase 4 test-stub `EmailSer
 
 ## Migration Notes
 - Apply the `invitations` table migration (Phase 3) before shipping any invitation UI or acceptance route.
-- No backfill of `list_collaborators` is needed — the table is unchanged.
 - Run the owner-collaborator backfill (Phase 1) before or immediately after the `invitations` table migration.
-- The `invitations` table starts empty; no data migration is required.
+- If legacy invitation columns exist on `list_collaborators`, copy them into `invitations` and verify migrated row counts before dropping those columns.
+- Preserve legacy token hashes and delivery metadata during migration; do not regenerate or log raw invite links.
+- If the legacy columns are already absent, the data-migration step is a no-op and the `invitations` table starts empty.
 - Keep the owner-collaborator backfill idempotent.
 - If production rollout fails, disable invitation entry points with a feature flag or env gate while preserving existing `list_collaborators` behavior (which is untouched).
 
@@ -2149,6 +2186,11 @@ All invitation e2e scenarios use Playwright plus the Phase 4 test-stub `EmailSer
 **Email Normalization (Medium Priority)**
 - Email comparison must be case-insensitive and trimmed before hashing or matching.
 - Consider RFC 5321 normalization (lowercase local-part and domain) for the `NormalizedEmailAddress` type.
+
+**Legacy Invitation Data Migration (Medium Priority)**
+- Migration code must not log token hashes, invited emails, or provider delivery identifiers beyond aggregate counts.
+- Copy legacy invitation rows into `invitations` before dropping legacy columns, and verify row counts inside the same migration flow to avoid silent data loss.
+- If destructive cleanup cannot be verified, abort before dropping legacy columns.
 
 **Permission Model (Low Priority)**
 - Capability-based authorization is correct for this use case.
