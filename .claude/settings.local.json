@@ -3,7 +3,9 @@
     "allow": [
       "Bash(find /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/thoughts -type f -name \"*.md\" 2>/dev/null | head -20)",
       "Bash(jj log:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(jj resolve:*)",
+      "Bash(ls app/lists/_actions/ app/lists/_components/ app/lists/[listId]/)"
     ]
   }
 }
