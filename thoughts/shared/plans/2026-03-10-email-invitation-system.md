@@ -2061,9 +2061,9 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 - [x] `npm run verify:all` passes
 
 #### Manual Verification
-- [ ] Owner can send, resend, revoke invites from the management page
-- [ ] Owner can approve/reject pending_approval invites
-- [ ] Non-owners cannot access management actions
+- [x] Owner can send, resend, revoke invites from the management page
+- [x] Owner can approve/reject pending_approval invites
+- [x] Non-owners cannot access management actions
 
 ---
 
