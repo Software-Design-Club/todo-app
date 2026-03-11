@@ -6,8 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components lib ui tests scripts auth.ts middleware.ts playwright.config.ts vitest.workspace.ts --max-warnings=0",
     "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "verify:env": "node ./scripts/verify-env.mjs",
+    "verify:all": "bash ./scripts/verify-all.sh",
     "prepare": "husky"
   },
   "dependencies": {
@@ -39,6 +44,7 @@
     "type-fest": "^4.41.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -49,11 +55,12 @@
     "lint-staged": "^15.5.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "next lint --fix --file",
+      "eslint --fix --max-warnings=0",
       "bash -c \"tsc --noEmit -p tsconfig.json\""
     ]
   }

@@ -467,29 +467,29 @@ Each of the unit, integration, and e2e layers contains at least one intentionall
 
 ### Contract Coverage Checklist
 #### Contract 2.1 checklist
-- [ ] Verifies `npm run test:unit` exits 0 when all unit tests pass.
+- [x] Verifies `npm run test:unit` exits 0 when all unit tests pass.
 - [ ] Verifies `npm run test:unit` exits non-zero when a unit test fails.
 - [ ] Verifies `npm run test:unit` does not run integration tests.
 - [ ] Verifies `npm run test:unit` does not run e2e tests.
 
 #### Contract 2.2 checklist
-- [ ] Verifies `npm run test:integration` exits 0 when all integration tests pass.
+- [x] Verifies `npm run test:integration` exits 0 when all integration tests pass.
 - [ ] Verifies `npm run test:integration` exits non-zero when an integration test fails.
-- [ ] Verifies per-test transaction isolation prevents cross-test data leakage.
+- [x] Verifies per-test transaction isolation prevents cross-test data leakage.
 
 #### Contract 2.3 checklist
-- [ ] Verifies `npm run test:e2e:smoke` exits 0 when smoke scenarios pass.
+- [x] Verifies `npm run test:e2e:smoke` exits 0 when smoke scenarios pass.
 - [ ] Verifies `npm run test:e2e:smoke` exits non-zero when a smoke scenario fails.
 
 #### Contract 2.4 checklist
-- [ ] Verifies `verify:all` runs commands in the fixed order.
-- [ ] Verifies `verify:all` exits 0 when every prerequisite command succeeds.
-- [ ] Verifies `verify:all` exits non-zero when any prerequisite command fails.
+- [x] Verifies `verify:all` runs commands in the fixed order.
+- [x] Verifies `verify:all` exits 0 when every prerequisite command succeeds.
+- [x] Verifies `verify:all` exits non-zero when any prerequisite command fails.
 
 #### Contract 2.5 checklist
-- [ ] Verifies the unit layer has a minimal operability test.
-- [ ] Verifies the integration layer has a minimal operability test.
-- [ ] Verifies the e2e layer has a minimal operability test.
+- [x] Verifies the unit layer has a minimal operability test.
+- [x] Verifies the integration layer has a minimal operability test.
+- [x] Verifies the e2e layer has a minimal operability test.
 
 ### Specification-Driven TDD Workflow
 - First test to write: Failing unit smoke test (`tests/unit/smoke.test.ts`).
@@ -517,12 +517,12 @@ Each of the unit, integration, and e2e layers contains at least one intentionall
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract coverage checklist covers all command outcomes and harness behaviors
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run test:e2e:smoke` passes
-- [ ] `npm run verify:all` passes
+- [x] Contract coverage checklist covers all command outcomes and harness behaviors
+- [x] Contract tests executed one at a time
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run test:e2e:smoke` passes
+- [x] `npm run verify:all` passes
 
 #### Manual Verification
 - [ ] Intentionally breaking a unit test causes `test:unit` to exit non-zero
