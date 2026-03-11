@@ -1477,6 +1477,9 @@ resolveInviteAcceptance(input: {
 - [ ] Verifies the `expired` outcome.
 - [ ] Verifies the `revoked` outcome.
 - [ ] Verifies the `already_resolved` outcome.
+- [ ] Verifies a zero-row conditional acceptance update returns the correct terminal outcome.
+- [ ] Verifies acceptance loses a race to archive and creates no `list_collaborators` row.
+- [ ] Verifies acceptance loses a race to delete and creates no `list_collaborators` row.
 
 #### Contract 6.5 checklist
 - [ ] Verifies the invite page renders an explicit `invalid` state.
@@ -1635,12 +1638,15 @@ invalidateOpenInvitesForList(input: {
 ### Contract Coverage Checklist
 #### Contract 7.1 checklist
 - [ ] Verifies archive success is not observable before all open invitations in `invitations` reach a terminal state.
+- [ ] Verifies archive invalidation runs in the same transaction as the list archive state change.
 - [ ] Verifies `list_collaborators` rows are unaffected by archive (accepted collaborators remain).
 - [ ] Verifies unrelated lists' invitations are untouched by archive-time invalidation.
 
 #### Contract 7.2 checklist
 - [ ] Verifies previously issued invitation secrets become unusable after delete.
 - [ ] Verifies the delete workflow does not leave a post-success token-validity race.
+- [ ] Verifies delete invalidation runs in the same transaction as list deletion.
+- [ ] Verifies a concurrent acceptance attempt that loses the delete race creates no `list_collaborators` row.
 
 #### Contract 7.3 checklist
 - [ ] Verifies every open invitation in `invitations` for the target list is moved to the requested terminal state with `resolvedAt` set.
