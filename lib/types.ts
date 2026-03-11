@@ -102,6 +102,28 @@ export type Invitation = {
 export type InvitationId = Invitation["id"];
 export type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
 
+export type AuthenticatedUser = Pick<User, "id" | "email" | "name">;
+export type ListId = List["id"];
+
+export type AcceptedInvitationResolution = { kind: "accepted"; listId: ListId };
+export type PendingApprovalInvitationResolution = { kind: "pending_approval"; listId: ListId };
+export type TerminalInvitationResolution =
+  | { kind: "invalid" }
+  | { kind: "expired" }
+  | { kind: "revoked" }
+  | { kind: "already_resolved" };
+
+export type ResolveInviteAcceptanceResult =
+  | AcceptedInvitationResolution
+  | PendingApprovalInvitationResolution
+  | TerminalInvitationResolution;
+
+export type AcceptInvitationWorkflowResult =
+  | { kind: "redirect_to_sign_in"; redirectTo: SafeAppPath }
+  | ResolveInviteAcceptanceResult;
+
+export type InvitePageOutcome = Exclude<ResolveInviteAcceptanceResult, AcceptedInvitationResolution>;
+
 export const createTaggedList = (
   list: typeof ListsTable.$inferSelect
 ): List => {

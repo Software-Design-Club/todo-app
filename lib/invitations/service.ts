@@ -2,21 +2,26 @@ import { sql } from "@vercel/postgres";
 import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 
-import { InvitationsTable, ListsTable } from "@/drizzle/schema";
+import { InvitationsTable, ListCollaboratorsTable, ListsTable } from "@/drizzle/schema";
 import { sendInvitationEmail, type EmailServiceSendResponse } from "@/lib/email/service";
 import { ListNotFoundError } from "@/lib/errors";
 import { verifyInvitationEnv } from "@/lib/invitations/env";
+import { buildInviteContinuationTarget } from "@/lib/invitations/redirect";
 import { assertCanInviteCollaborators } from "@/app/lists/_actions/permissions";
 import {
   type AbsoluteInvitationUrl,
+  type AcceptInvitationWorkflowResult,
   type AppBaseUrl,
+  type AuthenticatedUser,
   type EmailAddress,
   type InvitationExpiry,
   type InvitationId,
   type InvitationSecret,
   type InvitationSecretHash,
   type List,
+  type ListId,
   type NormalizedEmailAddress,
+  type ResolveInviteAcceptanceResult,
   type SentInvitationStatus,
   type User,
 } from "@/lib/types";
@@ -245,4 +250,140 @@ export async function inviteCollaboratorWorkflow(input: {
     acceptanceUrl,
     emailServiceResponse,
   };
+}
+
+/**
+ * @contract resolveInviteAcceptance (Contract 6.4)
+ *
+ * Resolves an invitation acceptance attempt. Atomically transitions the
+ * invitation to accepted (with list_collaborators insert) or pending_approval
+ * (without list_collaborators insert) based on email match.
+ */
+export async function resolveInviteAcceptance(input: {
+  invitationSecret: InvitationSecret;
+  viewer: AuthenticatedUser;
+  now: Date;
+}): Promise<ResolveInviteAcceptanceResult> {
+  const db = drizzle(sql);
+  const secretHash = hashInvitationSecret(input.invitationSecret);
+
+  const [invitation] = await db
+    .select({
+      id: InvitationsTable.id,
+      listId: InvitationsTable.listId,
+      status: InvitationsTable.status,
+      invitedEmailNormalized: InvitationsTable.invitedEmailNormalized,
+      expiresAt: InvitationsTable.expiresAt,
+    })
+    .from(InvitationsTable)
+    .where(eq(InvitationsTable.secretHash, secretHash))
+    .limit(1);
+
+  if (!invitation) {
+    return { kind: "invalid" };
+  }
+
+  const isOpen = invitation.status === "pending" || invitation.status === "sent";
+
+  if (!isOpen) {
+    if (invitation.status === "expired") {
+      return { kind: "expired" };
+    }
+    if (invitation.status === "revoked") {
+      return { kind: "revoked" };
+    }
+    return { kind: "already_resolved" };
+  }
+
+  if (invitation.expiresAt && invitation.expiresAt < input.now) {
+    return { kind: "expired" };
+  }
+
+  const viewerEmailNormalized = input.viewer.email
+    .trim()
+    .toLowerCase() as NormalizedEmailAddress;
+  const emailMatches =
+    viewerEmailNormalized === invitation.invitedEmailNormalized;
+  const listId = invitation.listId as ListId;
+
+  return db.transaction(async (tx) => {
+    if (emailMatches) {
+      const updated = await tx
+        .update(InvitationsTable)
+        .set({
+          status: "accepted",
+          acceptedByUserId: input.viewer.id,
+          resolvedAt: input.now,
+          updatedAt: input.now,
+        })
+        .where(
+          and(
+            eq(InvitationsTable.id, invitation.id),
+            inArray(InvitationsTable.status, [...OPEN_INVITATION_STATUSES]),
+          ),
+        )
+        .returning({ id: InvitationsTable.id });
+
+      if (updated.length === 0) {
+        return { kind: "already_resolved" as const };
+      }
+
+      await tx.insert(ListCollaboratorsTable).values({
+        listId: invitation.listId,
+        userId: input.viewer.id,
+        role: "collaborator",
+      });
+
+      return { kind: "accepted" as const, listId };
+    }
+
+    // Email mismatch: set to pending_approval
+    const updated = await tx
+      .update(InvitationsTable)
+      .set({
+        status: "pending_approval",
+        acceptedByUserId: input.viewer.id,
+        acceptedByEmail: viewerEmailNormalized,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(InvitationsTable.id, invitation.id),
+          inArray(InvitationsTable.status, [...OPEN_INVITATION_STATUSES]),
+        ),
+      )
+      .returning({ id: InvitationsTable.id });
+
+    if (updated.length === 0) {
+      return { kind: "already_resolved" as const };
+    }
+
+    return { kind: "pending_approval" as const, listId };
+  });
+}
+
+/**
+ * @contract acceptInvitationWorkflow (Contract 6.1)
+ *
+ * Entry point for consuming an invite link. If the viewer is not authenticated,
+ * redirects to sign-in with a continuation target. Otherwise, delegates to
+ * resolveInviteAcceptance.
+ */
+export async function acceptInvitationWorkflow(input: {
+  invitationSecret: InvitationSecret;
+  viewer: AuthenticatedUser | null;
+  now: Date;
+}): Promise<AcceptInvitationWorkflowResult> {
+  if (!input.viewer) {
+    return {
+      kind: "redirect_to_sign_in",
+      redirectTo: buildInviteContinuationTarget(input.invitationSecret),
+    };
+  }
+
+  return resolveInviteAcceptance({
+    invitationSecret: input.invitationSecret,
+    viewer: input.viewer,
+    now: input.now,
+  });
 }
