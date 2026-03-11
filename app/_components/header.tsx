@@ -65,6 +65,9 @@ export default async function Header() {
             <Button variant="ghost" asChild>
               <Link href="/">Home</Link>
             </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/lists/collaborators">Collaborators</Link>
+            </Button>
           </nav>
         </div>
       </div>

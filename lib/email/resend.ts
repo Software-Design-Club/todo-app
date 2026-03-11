@@ -1,13 +1,13 @@
 import { Resend } from "resend";
 import { Webhook } from "svix";
-import { renderToStaticMarkup } from "react-dom/server";
 
-import { InvitationEmail } from "@/app/emails/invitation-email";
+import { buildInvitationEmailHtml } from "@/app/emails/invitation-email";
 import { verifyInvitationEnv } from "@/lib/invitations/env";
 import { InvalidWebhookSignatureError } from "@/lib/invitations/errors";
 import type {
   AbsoluteInvitationUrl,
   DeliveryEventType,
+  EmailAddress,
   EmailServiceDeliveryEvent,
   InvitationId,
   ProviderEventReceivedAt,
@@ -30,16 +30,15 @@ export function createResendEmailService(): EmailService {
     async sendInvitationEmail(input: {
       invitationId: InvitationId;
       acceptanceUrl: AbsoluteInvitationUrl;
+      invitedEmail: EmailAddress;
     }): Promise<EmailServiceSendResponse> {
       const invitationEnv = verifyInvitationEnv(process.env);
       const resend = new Resend(invitationEnv.resendApiKey);
       const result = await resend.emails.send({
         from: invitationEnv.emailFrom,
-        to: [invitationEnv.emailFrom],
+        to: [input.invitedEmail],
         subject: "Todo list invitation",
-        html: renderToStaticMarkup(
-          InvitationEmail({ acceptanceUrl: input.acceptanceUrl }),
-        ),
+        html: buildInvitationEmailHtml(input.acceptanceUrl),
         headers: {
           "X-Todo-Invitation-Id": String(input.invitationId),
         },

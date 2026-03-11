@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import type { AbsoluteInvitationUrl, InvitationId } from "@/lib/types";
+import type { AbsoluteInvitationUrl, EmailAddress, InvitationId } from "@/lib/types";
 
 import type { EmailService, EmailServiceSendResponse } from "./service";
 
@@ -55,6 +55,7 @@ export function createTestStubEmailService(): EmailService {
     async sendInvitationEmail(input: {
       invitationId: InvitationId;
       acceptanceUrl: AbsoluteInvitationUrl;
+      invitedEmail: EmailAddress;
     }): Promise<EmailServiceSendResponse> {
       const deliveries = await readDeliveries();
 

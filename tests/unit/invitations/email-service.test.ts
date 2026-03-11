@@ -9,6 +9,8 @@ import {
   resetStubInvitationMailbox,
 } from "@/lib/email/test-stub";
 
+const invitedEmail = "invitee@example.com" as never;
+
 afterEach(() => {
   setEmailServiceForTesting(null);
   vi.unstubAllEnvs();
@@ -29,6 +31,7 @@ describe("sendInvitationEmail", () => {
       sendInvitationEmail({
         invitationId: 123 as never,
         acceptanceUrl: "https://example.com/invite?token=secret" as never,
+        invitedEmail,
       }),
     ).rejects.toThrow("Missing required env var: RESEND_API_KEY");
     expect(sendInvitationEmailSpy).not.toHaveBeenCalled();
@@ -54,6 +57,7 @@ describe("sendInvitationEmail", () => {
       sendInvitationEmail({
         invitationId: 123 as never,
         acceptanceUrl: "https://example.com/invite?token=secret" as never,
+        invitedEmail,
       }),
     ).resolves.toEqual(acceptedResponse);
     expect(sendInvitationEmailSpy).toHaveBeenCalledTimes(1);
@@ -77,6 +81,7 @@ describe("sendInvitationEmail", () => {
       sendInvitationEmail({
         invitationId: 456 as never,
         acceptanceUrl: "https://example.com/invite?token=secret" as never,
+        invitedEmail,
       }),
     ).resolves.toEqual(rejectedResponse);
   });
@@ -90,6 +95,7 @@ describe("sendInvitationEmail", () => {
     const response = await sendInvitationEmail({
       invitationId: 789 as never,
       acceptanceUrl: "https://example.com/invite?token=stubbed" as never,
+      invitedEmail,
     });
 
     await expect(listStubInvitationDeliveries()).resolves.toEqual([

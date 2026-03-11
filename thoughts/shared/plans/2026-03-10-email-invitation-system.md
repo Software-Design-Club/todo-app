@@ -798,16 +798,16 @@ getCollaborators(listId: ListId): Promise<AcceptedCollaborator[]>
 ### Phase Gate
 #### Automated Verification
 - [x] Contract JSDoc written above each function before implementation
-- [x] Contract coverage checklist fully checked
+- [ ] Contract coverage checklist fully checked
 - [x] Contract tests executed one at a time
 - [x] `npm run test:integration` passes
 - [x] `npm run typecheck` passes
 - [x] `npm run lint` passes
 
 #### Manual Verification
-- [ ] Existing list pages still render collaborators correctly after migration (no regression)
-- [ ] The `invitations` table exists with all expected columns and indexes
-- [ ] Legacy invitation rows are present in `invitations` before legacy `list_collaborators` invitation columns are removed
+- [x] Existing list pages still render collaborators correctly after migration (no regression)
+- [x] The `invitations` table exists with all expected columns and indexes
+- [x] Legacy invitation rows are present in `invitations` before legacy `list_collaborators` invitation columns are removed
 
 ---
 
@@ -1092,13 +1092,13 @@ sendInvitationEmail(input: {
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
+- [x] Contract JSDoc written above each function before implementation
 - [ ] Contract coverage checklist fully checked
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
+- [x] Contract tests executed one at a time
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run typecheck` passes
+- [x] `npm run lint` passes
 
 #### Manual Verification
 - [ ] Sending an invitation from a test script delivers an email to Resend's test inbox
@@ -1368,16 +1368,16 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
+- [x] Contract JSDoc written above each function before implementation
 - [ ] Contract coverage checklist fully checked
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
+- [x] Contract tests executed one at a time
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run typecheck` passes
+- [x] `npm run lint` passes
 
 #### Manual Verification
-- [ ] Webhook route returns 401 for unsigned requests (testable via curl)
+- [x] Webhook route returns 401 for unsigned requests (testable via curl)
 
 ---
 
@@ -1607,18 +1607,18 @@ resolveInviteAcceptance(input: {
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
-- [ ] Contract coverage checklist fully checked
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run test:e2e:smoke` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
+- [x] Contract JSDoc written above each function before implementation
+- [x] Contract coverage checklist fully checked
+- [x] Contract tests executed one at a time
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run test:e2e:smoke` passes
+- [x] `npm run typecheck` passes
+- [x] `npm run lint` passes
 
 #### Manual Verification
-- [ ] Clicking an invite link while logged out redirects to sign-in and resumes after auth
-- [ ] Clicking an invite link while logged in with matching email grants list access
+- [x] Clicking an invite link while logged out redirects to sign-in and resumes after auth
+- [x] Clicking an invite link while logged in with matching email grants list access
 
 ---
 
@@ -1771,16 +1771,16 @@ invalidateOpenInvitesForList(input: {
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
-- [ ] Contract coverage checklist fully checked
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run verify:all` passes
+- [x] Contract JSDoc written above each function before implementation
+- [x] Contract coverage checklist fully checked
+- [x] Contract tests executed one at a time
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run verify:all` passes
 
 #### Manual Verification
-- [ ] Archiving a list with pending invites shows them as revoked in the database
-- [ ] Deleting a list with pending invites renders the invite link as invalid
+- [x] Archiving a list with pending invites shows them as revoked in the database
+- [x] Deleting a list with pending invites renders the invite link as invalid
 
 ---
 
@@ -1970,50 +1970,50 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 
 ### Contract Coverage Checklist
 #### Contract 8.1 checklist
-- [ ] Verifies the workflow returns only lists manageable by the actor.
-- [ ] Verifies the workflow includes accepted collaborators.
-- [ ] Verifies the workflow includes open invites.
-- [ ] Verifies the workflow includes `pending_approval` invites.
-- [ ] Verifies returned state is sufficient to drive resend actions.
-- [ ] Verifies returned state is sufficient to drive revoke actions.
-- [ ] Verifies returned state is sufficient to drive copy-link actions.
-- [ ] Verifies returned state is sufficient to drive approve actions (including `acceptedByEmail` and `acceptedByUserId` for pending_approval invitations).
-- [ ] Verifies returned state is sufficient to drive reject actions.
+- [x] Verifies the workflow returns only lists manageable by the actor.
+- [x] Verifies the workflow includes accepted collaborators.
+- [x] Verifies the workflow includes open invites.
+- [x] Verifies the workflow includes `pending_approval` invites.
+- [x] Verifies returned state is sufficient to drive resend actions.
+- [x] Verifies returned state is sufficient to drive revoke actions.
+- [x] Verifies returned state is sufficient to drive copy-link actions.
+- [x] Verifies returned state is sufficient to drive approve actions (including `acceptedByEmail` and `acceptedByUserId` for pending_approval invitations).
+- [x] Verifies returned state is sufficient to drive reject actions.
 
 #### Contract 8.2 checklist
-- [ ] Verifies allowed actors pass.
-- [ ] Verifies denied actors raise `CollaboratorManagementPermissionDeniedError`.
-- [ ] Verifies the check does not mutate collaborator state.
-- [ ] Verifies the check does not mutate invitation state.
+- [x] Verifies allowed actors pass.
+- [x] Verifies denied actors raise `CollaboratorManagementPermissionDeniedError`.
+- [x] Verifies the check does not mutate collaborator state.
+- [x] Verifies the check does not mutate invitation state.
 
 #### Contract 8.3 checklist
-- [ ] Verifies manageable-list data includes all required lists.
-- [ ] Verifies manageable-list data includes accepted collaborators.
-- [ ] Verifies manageable-list data includes open invites.
-- [ ] Verifies manageable-list data includes `pending_approval` invites.
-- [ ] Verifies query count remains bounded as manageable lists grow.
-- [ ] Verifies unauthorized lists are excluded.
-- [ ] Verifies authoritative identifiers are preserved.
+- [x] Verifies manageable-list data includes all required lists.
+- [x] Verifies manageable-list data includes accepted collaborators.
+- [x] Verifies manageable-list data includes open invites.
+- [x] Verifies manageable-list data includes `pending_approval` invites.
+- [x] Verifies query count remains bounded as manageable lists grow.
+- [x] Verifies unauthorized lists are excluded.
+- [x] Verifies authoritative identifiers are preserved.
 
 #### Contract 8.4 checklist
-- [ ] Verifies available actions are constrained by invitation state.
-- [ ] Verifies available actions are constrained by actor capability.
-- [ ] Verifies forbidden actions are never offered.
+- [x] Verifies available actions are constrained by invitation state.
+- [x] Verifies available actions are constrained by actor capability.
+- [x] Verifies forbidden actions are never offered.
 
 #### Contract 8.5 checklist
-- [ ] Verifies unauthenticated users are redirected to sign-in.
-- [ ] Verifies authenticated managers see authorized data.
-- [ ] Verifies unauthorized users do not receive unauthorized data.
+- [x] Verifies unauthenticated users are redirected to sign-in.
+- [x] Verifies authenticated managers see authorized data.
+- [x] Verifies unauthorized users do not receive unauthorized data.
 
 #### Contract 8.6 checklist
-- [ ] Verifies send flows remain server-authoritative.
-- [ ] Verifies resend flows remain server-authoritative.
-- [ ] Verifies revoke flows remain server-authoritative.
-- [ ] Verifies approve flows remain server-authoritative.
-- [ ] Verifies reject flows remain server-authoritative.
-- [ ] Verifies copy-link flows remain server-authoritative.
-- [ ] Verifies approve performs the allowed `pending_approval -> accepted` transition atomically with collaborator creation.
-- [ ] Verifies reject performs the allowed `pending_approval -> revoked` transition without creating a collaborator row.
+- [x] Verifies send flows remain server-authoritative.
+- [x] Verifies resend flows remain server-authoritative.
+- [x] Verifies revoke flows remain server-authoritative.
+- [x] Verifies approve flows remain server-authoritative.
+- [x] Verifies reject flows remain server-authoritative.
+- [x] Verifies copy-link flows remain server-authoritative.
+- [x] Verifies approve performs the allowed `pending_approval -> accepted` transition atomically with collaborator creation.
+- [x] Verifies reject performs the allowed `pending_approval -> revoked` transition without creating a collaborator row.
 
 ### Specification-Driven TDD Workflow
 - First test to write: Failing unit test proving an unauthorized actor is denied collaborator-management capability (Contract 8.2).
@@ -2050,15 +2050,15 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
-- [ ] Contract coverage checklist fully checked
-- [ ] Contract tests executed one at a time
-- [ ] `npm run test:unit` passes
-- [ ] `npm run test:integration` passes
-- [ ] `npm run test:e2e:smoke` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run lint` passes
-- [ ] `npm run verify:all` passes
+- [x] Contract JSDoc written above each function before implementation
+- [x] Contract coverage checklist fully checked
+- [x] Contract tests executed one at a time
+- [x] `npm run test:unit` passes
+- [x] `npm run test:integration` passes
+- [x] `npm run test:e2e:smoke` passes
+- [x] `npm run typecheck` passes
+- [x] `npm run lint` passes
+- [x] `npm run verify:all` passes
 
 #### Manual Verification
 - [ ] Owner can send, resend, revoke invites from the management page

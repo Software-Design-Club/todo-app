@@ -100,7 +100,10 @@ export type Invitation = {
   updatedAt: Tagged<Date, "UpdatedAt">;
 };
 export type InvitationId = Invitation["id"];
+export type UserId = User["id"];
 export type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
+export type RevokedInvitationStatus = Tagged<"revoked", "RevokedInvitationStatus">;
+export type ExpiredInvitationStatus = Tagged<"expired", "ExpiredInvitationStatus">;
 
 export type InvitationDeliveryResult =
   | { kind: "accepted_for_delivery"; providerMessageId: ProviderMessageId }
@@ -128,6 +131,89 @@ export type AuthenticatedDeliveryEventResult = {
   providerRawEventType: ProviderRawEventType;
   persistence: "updated" | "ignored";
 };
+
+export type AuthenticatedUser = Pick<User, "id" | "email" | "name">;
+export type ListId = List["id"];
+
+export type AcceptedInvitationResolution = { kind: "accepted"; listId: ListId };
+export type PendingApprovalInvitationResolution = { kind: "pending_approval"; listId: ListId };
+export type TerminalInvitationResolution =
+  | { kind: "invalid" }
+  | { kind: "expired" }
+  | { kind: "revoked" }
+  | { kind: "already_resolved" };
+
+export type ResolveInviteAcceptanceResult =
+  | AcceptedInvitationResolution
+  | PendingApprovalInvitationResolution
+  | TerminalInvitationResolution;
+
+export type AcceptInvitationWorkflowResult =
+  | { kind: "redirect_to_sign_in"; redirectTo: SafeAppPath }
+  | ResolveInviteAcceptanceResult;
+
+export type InvitePageOutcome = Exclude<ResolveInviteAcceptanceResult, AcceptedInvitationResolution>;
+
+// ─── Phase 8: Collaborator Management Types ────────────────────────────────
+
+export type SentInvitationSummary = {
+  kind: "sent";
+  invitationId: InvitationId;
+  listId: ListId;
+  invitedEmailNormalized: NormalizedEmailAddress;
+  expiresAt: InvitationExpiry;
+};
+
+export type PendingApprovalInvitationSummary = {
+  kind: "pending_approval";
+  invitationId: InvitationId;
+  listId: ListId;
+  invitedEmailNormalized: NormalizedEmailAddress;
+  expiresAt: InvitationExpiry;
+  /** The user who attempted to accept with a mismatched email */
+  acceptedByUserId: UserId;
+  /** The email used to sign in (differs from invitedEmailNormalized) */
+  acceptedByEmail: NormalizedEmailAddress | null;
+};
+
+export type InvitationSummary = SentInvitationSummary | PendingApprovalInvitationSummary;
+
+export type ActorCollaboratorCapabilities = {
+  canResend: boolean;
+  canRevoke: boolean;
+  canCopyLink: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+};
+
+export type InvitationAction =
+  | { kind: "resend"; invitationId: InvitationId }
+  | { kind: "revoke"; invitationId: InvitationId }
+  | { kind: "copy_link"; invitationId: InvitationId }
+  | { kind: "approve"; invitationId: InvitationId }
+  | { kind: "reject"; invitationId: InvitationId };
+
+export type SentInvitationAction = Extract<InvitationAction, { kind: "resend" | "revoke" | "copy_link" }>;
+export type PendingApprovalInvitationAction = Extract<InvitationAction, { kind: "approve" | "reject" }>;
+
+export type AcceptedCollaborator = {
+  userId: UserId;
+  name: User["name"];
+  email: User["email"];
+  role: UserRole;
+};
+
+export type CollaboratorManagementListView = {
+  list: ListWithRole;
+  acceptedCollaborators: ReadonlyArray<AcceptedCollaborator>;
+  invitations: ReadonlyArray<InvitationSummary>;
+};
+
+export type CollaboratorManagementViewData = {
+  manageableLists: ReadonlyArray<CollaboratorManagementListView>;
+};
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 export const createTaggedList = (
   list: typeof ListsTable.$inferSelect

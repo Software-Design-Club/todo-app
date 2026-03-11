@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import { normalizeRedirectTarget } from "@/lib/invitations/redirect";
 import { Button } from "@/ui/button";
 import {
   Card,
@@ -8,7 +9,13 @@ import {
   CardTitle,
 } from "@/ui/card";
 
-export default function SignInForm() {
+export default function SignInForm({
+  redirectTo,
+}: {
+  redirectTo?: string;
+}) {
+  const safeRedirectTo = normalizeRedirectTarget(redirectTo);
+
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
@@ -20,7 +27,7 @@ export default function SignInForm() {
           <form
             action={async () => {
               "use server";
-              await signIn("github", { redirectTo: "/" });
+              await signIn("github", { redirectTo: safeRedirectTo });
             }}
           >
             <Button variant="outline" size="sm" type="submit">

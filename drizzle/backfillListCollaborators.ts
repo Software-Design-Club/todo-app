@@ -1,8 +1,7 @@
 import { sql } from "@vercel/postgres";
+import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { ListsTable } from "./schema";
-import { upsertOwnerCollaborator } from "@/lib/lists/owner-collaborators";
-import type { List, User } from "@/lib/types";
+import { ListCollaboratorsTable, ListsTable } from "./schema";
 
 /**
  * @contract backfillOwnerCollaborators
@@ -18,29 +17,63 @@ import type { List, User } from "@/lib/types";
  */
 async function backfillOwnerCollaborators() {
   const db = drizzle(sql);
-  const lists = await db
-    .select({
-      id: ListsTable.id,
-      creatorId: ListsTable.creatorId,
-    })
-    .from(ListsTable);
+  return db.transaction(async (tx) => {
+    const ownershipRows = await tx
+      .select({
+        listId: ListsTable.id,
+        ownerId: ListsTable.creatorId,
+        collaboratorId: ListCollaboratorsTable.id,
+        role: ListCollaboratorsTable.role,
+      })
+      .from(ListsTable)
+      .leftJoin(
+        ListCollaboratorsTable,
+        and(
+          eq(ListCollaboratorsTable.listId, ListsTable.id),
+          eq(ListCollaboratorsTable.userId, ListsTable.creatorId),
+        ),
+      );
 
-  const report = {
-    scanned: lists.length,
-    inserted: 0,
-    repaired: 0,
-    unchanged: 0,
-  };
+    const missingOwners = ownershipRows.filter(
+      (row) => row.collaboratorId === null,
+    );
+    const wrongRoleRows = ownershipRows.filter(
+      (row) => row.collaboratorId !== null && row.role !== "owner",
+    );
 
-  for (const list of lists) {
-    const result = await upsertOwnerCollaborator({
-      listId: list.id as List["id"],
-      ownerId: list.creatorId as User["id"],
-    });
-    report[result] += 1;
-  }
+    if (missingOwners.length > 0) {
+      await tx.insert(ListCollaboratorsTable).values(
+        missingOwners.map((row) => ({
+          listId: row.listId,
+          userId: row.ownerId,
+          role: "owner" as const,
+        })),
+      );
+    }
 
-  return report;
+    if (wrongRoleRows.length > 0) {
+      await tx
+        .update(ListCollaboratorsTable)
+        .set({
+          role: "owner",
+          updatedAt: new Date(),
+        })
+        .where(
+          inArray(
+            ListCollaboratorsTable.id,
+            wrongRoleRows.map((row) => row.collaboratorId!),
+          ),
+        );
+    }
+
+    return {
+      scanned: ownershipRows.length,
+      inserted: missingOwners.length,
+      repaired: wrongRoleRows.length,
+      unchanged:
+        ownershipRows.length - missingOwners.length - wrongRoleRows.length,
+    };
+  });
 }
 
 // Run the backfill if this script is executed directly

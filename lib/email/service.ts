@@ -3,6 +3,7 @@ import { createTestStubEmailService } from "@/lib/email/test-stub";
 import { verifyInvitationEnv } from "@/lib/invitations/env";
 import type {
   AbsoluteInvitationUrl,
+  EmailAddress,
   EmailServiceErrorMessage,
   EmailServiceErrorName,
   InvitationId,
@@ -28,6 +29,7 @@ export type EmailService = {
   sendInvitationEmail(input: {
     invitationId: InvitationId;
     acceptanceUrl: AbsoluteInvitationUrl;
+    invitedEmail: EmailAddress;
   }): Promise<EmailServiceSendResponse>;
 };
 
@@ -68,6 +70,7 @@ export function setEmailServiceForTesting(service: EmailService | null) {
 export async function sendInvitationEmail(input: {
   invitationId: InvitationId;
   acceptanceUrl: AbsoluteInvitationUrl;
+  invitedEmail: EmailAddress;
 }): Promise<EmailServiceSendResponse> {
   verifyInvitationEnv(process.env);
 

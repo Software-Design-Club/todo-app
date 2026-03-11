@@ -32,7 +32,8 @@ export default defineWorkspace([
       },
       retry: 2,
       setupFiles: ["tests/setup/integration.ts"],
-      testTimeout: 10000,
+      hookTimeout: 15000,
+      testTimeout: 15000,
     },
   },
 ]);

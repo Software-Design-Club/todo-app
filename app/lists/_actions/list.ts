@@ -1,8 +1,9 @@
 "use server";
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { eq, not, and, or } from "drizzle-orm";
+import { eq, not, and, or, inArray } from "drizzle-orm";
 import {
+  InvitationsTable,
   ListCollaboratorsTable,
   ListsTable,
   TodosTable,
@@ -366,7 +367,15 @@ export async function updateListVisibility(
 }
 
 /**
- * Archives a list (owner only)
+ * @contract archiveList
+ *
+ * Archives a list and invalidates all open invitations (pending, sent) for
+ * that list within a single transaction. Accepted collaborator rows in
+ * list_collaborators are not modified.
+ *
+ * @param listId - The list to archive
+ * @param userId - The user requesting the archive (must be the owner)
+ * @returns The archived list
  */
 export async function archiveList(
   listId: List["id"],
@@ -383,22 +392,35 @@ export async function archiveList(
   }
 
   const db = drizzle(sql);
-  const [updatedList] = await db
-    .update(ListsTable)
-    .set({
-      state: "archived",
-      updatedAt: new Date(),
-    })
-    .where(eq(ListsTable.id, listId))
-    .returning();
+  return db.transaction(async (tx) => {
+    const now = new Date();
 
-  if (!updatedList) {
-    throw new Error("List not found");
-  }
+    // Invalidate open invites first
+    await tx
+      .update(InvitationsTable)
+      .set({ status: "revoked", resolvedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(InvitationsTable.listId, listId),
+          inArray(InvitationsTable.status, ["pending", "sent"]),
+        ),
+      );
 
-  revalidatePath("/lists");
+    // Then archive the list
+    const [updatedList] = await tx
+      .update(ListsTable)
+      .set({ state: "archived", updatedAt: now })
+      .where(eq(ListsTable.id, listId))
+      .returning();
 
-  return createTaggedList(updatedList);
+    if (!updatedList) {
+      throw new Error("List not found");
+    }
+
+    revalidatePath("/lists");
+
+    return createTaggedList(updatedList);
+  });
 }
 
 /**
@@ -438,8 +460,15 @@ export async function unarchiveList(
 }
 
 /**
- * Permanently deletes a list and all associated data (owner only)
- * This action is irreversible - todos and collaborator records are deleted via cascade
+ * @contract deleteList
+ *
+ * Permanently deletes a list after invalidating all open invitations (pending,
+ * sent) within a single transaction. The cascade will delete invitation rows,
+ * but invalidation prevents race conditions where an open invite could be
+ * accepted between the invalidation check and the delete.
+ *
+ * @param listId - The list to delete
+ * @param userId - The user requesting the delete (must be the owner)
  */
 export async function deleteList(
   listId: List["id"],
@@ -452,14 +481,30 @@ export async function deleteList(
   }
 
   const db = drizzle(sql);
-  const result = await db
-    .delete(ListsTable)
-    .where(eq(ListsTable.id, listId))
-    .returning();
+  await db.transaction(async (tx) => {
+    const now = new Date();
 
-  if (result.length === 0) {
-    throw new Error("List not found");
-  }
+    // Invalidate open invites first to prevent race conditions
+    await tx
+      .update(InvitationsTable)
+      .set({ status: "revoked", resolvedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(InvitationsTable.listId, listId),
+          inArray(InvitationsTable.status, ["pending", "sent"]),
+        ),
+      );
 
-  revalidatePath("/lists");
+    // Then delete the list (cascades to invitations, collaborators, todos)
+    const result = await tx
+      .delete(ListsTable)
+      .where(eq(ListsTable.id, listId))
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error("List not found");
+    }
+
+    revalidatePath("/lists");
+  });
 }

@@ -2,8 +2,11 @@ import { sql } from "@vercel/postgres";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { CollaboratorRoleEnum, ListCollaboratorsTable } from "@/drizzle/schema";
-import { InvitationPermissionDeniedError } from "@/lib/invitations/errors";
-import { List, ListUser, User } from "@/lib/types";
+import {
+  CollaboratorManagementPermissionDeniedError,
+  InvitationPermissionDeniedError,
+} from "@/lib/invitations/errors";
+import { List, ListId, ListUser, User, UserId } from "@/lib/types";
 
 const ALLOWED_TO_EDIT_COLLABORATORS_ROLES = [
   CollaboratorRoleEnum.enumValues[0],
@@ -70,6 +73,41 @@ export async function assertCanInviteCollaborators(input: {
 
   if (!membership) {
     throw new InvitationPermissionDeniedError({
+      listId: Number(input.listId),
+      actorId: Number(input.actorId),
+    });
+  }
+}
+
+/**
+ * @contract assertCanManageCollaborators
+ *
+ * Returns successfully iff actorId is allowed to manage collaborators for listId (must be owner).
+ * Does not mutate collaborator or invitation state.
+ *
+ * @throws CollaboratorManagementPermissionDeniedError if not allowed.
+ */
+export async function assertCanManageCollaborators(input: {
+  listId: ListId;
+  actorId: UserId;
+}): Promise<void> {
+  const db = drizzle(sql);
+  const [membership] = await db
+    .select({
+      id: ListCollaboratorsTable.id,
+    })
+    .from(ListCollaboratorsTable)
+    .where(
+      and(
+        eq(ListCollaboratorsTable.listId, input.listId),
+        eq(ListCollaboratorsTable.userId, input.actorId),
+        eq(ListCollaboratorsTable.role, "owner"),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    throw new CollaboratorManagementPermissionDeniedError({
       listId: Number(input.listId),
       actorId: Number(input.actorId),
     });
