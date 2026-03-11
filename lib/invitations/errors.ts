@@ -6,3 +6,10 @@ export class InvitationPermissionDeniedError extends Error {
     this.name = "InvitationPermissionDeniedError";
   }
 }
+
+export class InvalidWebhookSignatureError extends Error {
+  constructor(message?: string) {
+    super(message ?? "Invalid webhook signature");
+    this.name = "InvalidWebhookSignatureError";
+  }
+}

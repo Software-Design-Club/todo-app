@@ -10,7 +10,10 @@ import { assertCanInviteCollaborators } from "@/app/lists/_actions/permissions";
 import {
   type AbsoluteInvitationUrl,
   type AppBaseUrl,
+  type AuthenticatedDeliveryEventResult,
   type EmailAddress,
+  type EmailServiceDeliveryEvent,
+  type InvitationDeliveryResult,
   type InvitationExpiry,
   type InvitationId,
   type InvitationSecret,
@@ -244,5 +247,143 @@ export async function inviteCollaboratorWorkflow(input: {
     invitationId: persistedInvitation.invitationId,
     acceptanceUrl,
     emailServiceResponse,
+  };
+}
+
+/**
+ * @contract normalizeEmailServiceSendResponse (5.3)
+ *
+ * Pure function. Maps a generic EmailServiceSendResponse into an
+ * InvitationDeliveryResult for persistence.
+ */
+export function normalizeEmailServiceSendResponse(
+  response: EmailServiceSendResponse,
+): InvitationDeliveryResult {
+  if (response.kind === "accepted") {
+    return {
+      kind: "accepted_for_delivery",
+      providerMessageId: response.providerMessageId,
+    };
+  }
+
+  return {
+    kind: "send_failed",
+    providerErrorMessage: response.errorMessage,
+    providerErrorName: response.errorName,
+  };
+}
+
+/**
+ * @contract recordInvitationSendResult (5.4)
+ *
+ * DB update. Updates delivery-tracking columns on the invitations row
+ * based on the normalized delivery result.
+ */
+export async function recordInvitationSendResult(input: {
+  invitationId: InvitationId;
+  result: InvitationDeliveryResult;
+  now: Date;
+}): Promise<void> {
+  const db = drizzle(sql);
+
+  if (input.result.kind === "accepted_for_delivery") {
+    await db
+      .update(InvitationsTable)
+      .set({
+        providerMessageId: input.result.providerMessageId,
+        lastDeliveryAttemptAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(eq(InvitationsTable.id, input.invitationId));
+  } else {
+    const errorParts: string[] = [];
+    if (input.result.providerErrorName) {
+      errorParts.push(input.result.providerErrorName as string);
+    }
+    errorParts.push(input.result.providerErrorMessage as string);
+
+    await db
+      .update(InvitationsTable)
+      .set({
+        lastDeliveryError: errorParts.join(": "),
+        lastDeliveryAttemptAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(eq(InvitationsTable.id, input.invitationId));
+  }
+}
+
+/**
+ * @contract handleInvitationSendResponseWorkflow (5.1)
+ *
+ * Combines normalizeEmailServiceSendResponse (5.3) and
+ * recordInvitationSendResult (5.4). Normalizes the email service
+ * response then persists the delivery outcome.
+ */
+export async function handleInvitationSendResponseWorkflow(input: {
+  invitationId: InvitationId;
+  emailServiceResponse: EmailServiceSendResponse;
+  now: Date;
+}): Promise<InvitationDeliveryResult> {
+  const deliveryResult = normalizeEmailServiceSendResponse(
+    input.emailServiceResponse,
+  );
+
+  await recordInvitationSendResult({
+    invitationId: input.invitationId,
+    result: deliveryResult,
+    now: input.now,
+  });
+
+  return deliveryResult;
+}
+
+/**
+ * @contract recordInvitationDeliveryEvent (5.6)
+ *
+ * DB update for webhook events. Updates deliveryEventType, providerRawEventType,
+ * and providerEventReceivedAt when correlatable by providerMessageId.
+ * Returns "updated" when a matching invitation row was found and updated,
+ * or "ignored" otherwise.
+ */
+export async function recordInvitationDeliveryEvent(
+  event: EmailServiceDeliveryEvent,
+): Promise<"updated" | "ignored"> {
+  if (event.kind === "ignored") {
+    return "ignored";
+  }
+
+  const db = drizzle(sql);
+
+  const result = await db
+    .update(InvitationsTable)
+    .set({
+      deliveryEventType: event.deliveryEventType,
+      providerRawEventType: event.providerRawEventType,
+      providerEventReceivedAt: event.receivedAt,
+      updatedAt: event.receivedAt as unknown as Date,
+    })
+    .where(eq(InvitationsTable.providerMessageId, event.providerMessageId))
+    .returning({ id: InvitationsTable.id });
+
+  return result.length > 0 ? "updated" : "ignored";
+}
+
+/**
+ * @contract handleAuthenticatedEmailProviderEventWorkflow (5.2)
+ *
+ * Delegates to recordInvitationDeliveryEvent and returns
+ * an AuthenticatedDeliveryEventResult.
+ */
+export async function handleAuthenticatedEmailProviderEventWorkflow(
+  event: EmailServiceDeliveryEvent,
+): Promise<AuthenticatedDeliveryEventResult> {
+  const persistence = await recordInvitationDeliveryEvent(event);
+
+  return {
+    deliveryEventType:
+      event.kind === "delivery_reported" ? event.deliveryEventType : null,
+    providerRawEventType: event.providerRawEventType,
+    persistence,
   };
 }

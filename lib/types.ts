@@ -102,6 +102,33 @@ export type Invitation = {
 export type InvitationId = Invitation["id"];
 export type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
 
+export type InvitationDeliveryResult =
+  | { kind: "accepted_for_delivery"; providerMessageId: ProviderMessageId }
+  | { kind: "send_failed"; providerErrorMessage: EmailServiceErrorMessage; providerErrorName?: EmailServiceErrorName };
+
+export type SupportedEmailServiceDeliveryEvent = {
+  kind: "delivery_reported";
+  deliveryEventType: DeliveryEventType;
+  providerMessageId: ProviderMessageId;
+  providerRawEventType: ProviderRawEventType;
+  receivedAt: ProviderEventReceivedAt;
+};
+
+export type IgnoredEmailServiceDeliveryEvent = {
+  kind: "ignored";
+  providerRawEventType: ProviderRawEventType;
+  providerMessageId?: ProviderMessageId | null;
+  receivedAt: ProviderEventReceivedAt;
+};
+
+export type EmailServiceDeliveryEvent = SupportedEmailServiceDeliveryEvent | IgnoredEmailServiceDeliveryEvent;
+
+export type AuthenticatedDeliveryEventResult = {
+  deliveryEventType: DeliveryEventType | null;
+  providerRawEventType: ProviderRawEventType;
+  persistence: "updated" | "ignored";
+};
+
 export const createTaggedList = (
   list: typeof ListsTable.$inferSelect
 ): List => {
