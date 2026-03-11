@@ -1,5 +1,9 @@
+import { sql } from "@vercel/postgres";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/vercel-postgres";
+import { CollaboratorRoleEnum, ListCollaboratorsTable } from "@/drizzle/schema";
+import { InvitationPermissionDeniedError } from "@/lib/invitations/errors";
 import { List, ListUser, User } from "@/lib/types";
-import { CollaboratorRoleEnum } from "@/drizzle/schema";
 
 const ALLOWED_TO_EDIT_COLLABORATORS_ROLES = [
   CollaboratorRoleEnum.enumValues[0],
@@ -35,6 +39,41 @@ export function isAuthorizedToEditCollaborators(
         collaborator.Role as (typeof CollaboratorRoleEnum.enumValues)[0]
       )
   );
+}
+
+/**
+ * @contract assertCanInviteCollaborators
+ *
+ * Returns successfully iff actorId is allowed to invite collaborators to listId.
+ * Does not mutate invitation or collaborator state.
+ *
+ * @throws InvitationPermissionDeniedError if not allowed.
+ */
+export async function assertCanInviteCollaborators(input: {
+  listId: List["id"];
+  actorId: User["id"];
+}): Promise<void> {
+  const db = drizzle(sql);
+  const [membership] = await db
+    .select({
+      id: ListCollaboratorsTable.id,
+    })
+    .from(ListCollaboratorsTable)
+    .where(
+      and(
+        eq(ListCollaboratorsTable.listId, input.listId),
+        eq(ListCollaboratorsTable.userId, input.actorId),
+        eq(ListCollaboratorsTable.role, "owner"),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    throw new InvitationPermissionDeniedError({
+      listId: Number(input.listId),
+      actorId: Number(input.actorId),
+    });
+  }
 }
 
 export function canBeRemovedAsCollaborator(collaborator: ListUser) {
@@ -73,4 +112,3 @@ export function canViewList(
   if (!userId) return false;
   return collaborators.some((c) => c.User.id === userId);
 }
-

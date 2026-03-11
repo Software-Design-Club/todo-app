@@ -1,11 +1,9 @@
-import type { Tagged } from "type-fest";
-
-type AppBaseUrl =
-  | Tagged<`http://${string}`, "AppBaseUrl">
-  | Tagged<`https://${string}`, "AppBaseUrl">;
-type EmailFromAddress = Tagged<string, "EmailFromAddress">;
-type ResendApiKey = Tagged<string, "ResendApiKey">;
-type ResendWebhookSecret = Tagged<string, "ResendWebhookSecret">;
+import type {
+  AppBaseUrl,
+  EmailFromAddress,
+  ResendApiKey,
+  ResendWebhookSecret,
+} from "@/lib/types";
 
 export type InvitationEnv = {
   resendApiKey: ResendApiKey;

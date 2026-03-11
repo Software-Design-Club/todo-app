@@ -20,6 +20,36 @@ export type InvitationStatus =
   (typeof InvitationStatusEnum.enumValues)[number];
 export type InvitationDeliveryEventType =
   (typeof InvitationDeliveryEventTypeEnum.enumValues)[number];
+export type EmailAddress = Tagged<string, "EmailAddress">;
+export type NormalizedEmailAddress = Tagged<string, "NormalizedEmailAddress">;
+export type SafeAppPath = Tagged<`/${string}`, "SafeAppPath">;
+export type AppBaseUrl =
+  | Tagged<`http://${string}`, "AppBaseUrl">
+  | Tagged<`https://${string}`, "AppBaseUrl">;
+export type AbsoluteInvitationUrl =
+  | Tagged<`http://${string}`, "AbsoluteInvitationUrl">
+  | Tagged<`https://${string}`, "AbsoluteInvitationUrl">;
+export type ResendApiKey = Tagged<string, "ResendApiKey">;
+export type ResendWebhookSecret = Tagged<string, "ResendWebhookSecret">;
+export type EmailFromAddress = Tagged<string, "EmailFromAddress">;
+export type InvitationSecret = Tagged<string, "InvitationSecret">;
+export type InvitationSecretHash = Tagged<string, "InvitationSecretHash">;
+export type InvitationExpiry = Tagged<Date, "InvitationExpiry">;
+export type InvitationResolvedAt = Tagged<Date, "InvitationResolvedAt">;
+export type ProviderMessageId = Tagged<string, "ProviderMessageId">;
+export type DeliveryError = Tagged<string, "DeliveryError">;
+export type DeliveryAttemptedAt = Tagged<Date, "DeliveryAttemptedAt">;
+export type DeliveryEventType = Tagged<
+  InvitationDeliveryEventType,
+  "DeliveryEventType"
+>;
+export type ProviderRawEventType = Tagged<string, "ProviderRawEventType">;
+export type ProviderEventReceivedAt = Tagged<Date, "ProviderEventReceivedAt">;
+export type EmailServiceErrorMessage = Tagged<
+  string,
+  "EmailServiceErrorMessage"
+>;
+export type EmailServiceErrorName = Tagged<string, "EmailServiceErrorName">;
 
 export type List = {
   id: Tagged<(typeof ListsTable.$inferSelect)["id"], "ListId">;
@@ -52,25 +82,25 @@ export type Invitation = {
   id: Tagged<(typeof InvitationsTable.$inferSelect)["id"], "InvitationId">;
   listId: List["id"];
   inviterId: User["id"] | null;
-  invitedEmailNormalized: Tagged<string, "NormalizedEmailAddress"> | null;
+  invitedEmailNormalized: NormalizedEmailAddress | null;
   role: UserRole;
   status: Tagged<InvitationStatus, "InvitationStatus">;
-  secretHash: Tagged<string, "InvitationSecretHash"> | null;
-  expiresAt: Tagged<Date, "InvitationExpiry"> | null;
+  secretHash: InvitationSecretHash | null;
+  expiresAt: InvitationExpiry | null;
   acceptedByUserId: User["id"] | null;
-  acceptedByEmail: Tagged<string, "NormalizedEmailAddress"> | null;
-  resolvedAt: Tagged<Date, "InvitationResolvedAt"> | null;
-  providerMessageId: Tagged<string, "ProviderMessageId"> | null;
-  lastDeliveryError: Tagged<string, "DeliveryError"> | null;
-  lastDeliveryAttemptAt: Tagged<Date, "DeliveryAttemptedAt"> | null;
-  deliveryEventType:
-    | Tagged<InvitationDeliveryEventType, "DeliveryEventType">
-    | null;
-  providerRawEventType: Tagged<string, "ProviderRawEventType"> | null;
-  providerEventReceivedAt: Tagged<Date, "ProviderEventReceivedAt"> | null;
+  acceptedByEmail: NormalizedEmailAddress | null;
+  resolvedAt: InvitationResolvedAt | null;
+  providerMessageId: ProviderMessageId | null;
+  lastDeliveryError: DeliveryError | null;
+  lastDeliveryAttemptAt: DeliveryAttemptedAt | null;
+  deliveryEventType: DeliveryEventType | null;
+  providerRawEventType: ProviderRawEventType | null;
+  providerEventReceivedAt: ProviderEventReceivedAt | null;
   createdAt: Tagged<Date, "CreatedAt">;
   updatedAt: Tagged<Date, "UpdatedAt">;
 };
+export type InvitationId = Invitation["id"];
+export type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
 
 export const createTaggedList = (
   list: typeof ListsTable.$inferSelect
