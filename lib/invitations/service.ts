@@ -184,6 +184,38 @@ export function buildInvitationAcceptanceUrl(input: {
 }
 
 /**
+ * @contract invalidateOpenInvitesForList
+ *
+ * Moves all open invitations (pending, sent) for a given list to a terminal
+ * status (revoked or expired). Does not modify list_collaborators.
+ *
+ * @returns The count of updated invitation rows.
+ */
+export async function invalidateOpenInvitesForList(input: {
+  listId: List["id"];
+  now: Date;
+  terminalStatus: "revoked" | "expired";
+}): Promise<number> {
+  const db = drizzle(sql);
+  const invalidated = await db
+    .update(InvitationsTable)
+    .set({
+      status: input.terminalStatus,
+      resolvedAt: input.now,
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(InvitationsTable.listId, input.listId),
+        inArray(InvitationsTable.status, [...OPEN_INVITATION_STATUSES]),
+      ),
+    )
+    .returning({ id: InvitationsTable.id });
+
+  return invalidated.length;
+}
+
+/**
  * @contract inviteCollaboratorWorkflow
  *
  * End-to-end workflow for inviting someone to a list by email.

@@ -101,6 +101,8 @@ export type Invitation = {
 };
 export type InvitationId = Invitation["id"];
 export type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
+export type RevokedInvitationStatus = Tagged<"revoked", "RevokedInvitationStatus">;
+export type ExpiredInvitationStatus = Tagged<"expired", "ExpiredInvitationStatus">;
 
 export const createTaggedList = (
   list: typeof ListsTable.$inferSelect
