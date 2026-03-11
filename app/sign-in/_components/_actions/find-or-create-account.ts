@@ -2,8 +2,9 @@
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { eq } from "drizzle-orm";
-import { ListsTable, TodosTable, UsersTable } from "@/drizzle/schema";
-import { createTaggedUser } from "@/lib/types";
+import { TodosTable, UsersTable } from "@/drizzle/schema";
+import { createList } from "@/app/lists/_actions/list";
+import { createTaggedUser, type List, type User } from "@/lib/types";
 
 interface FindOrCreateAccountParams {
   email: string;
@@ -29,10 +30,10 @@ export async function findOrCreateAccount(
       })
       .returning();
 
-    const [newList] = await db
-      .insert(ListsTable)
-      .values({ title: "My first list", creatorId: newUser.id })
-      .returning();
+    const newList = await createList({
+      title: "My first list" as List["title"],
+      creatorId: newUser.id as User["id"],
+    });
 
     await db
       .insert(TodosTable)

@@ -312,35 +312,35 @@ verifyInvitationEnv(env: NodeJS.ProcessEnv): InvitationEnv
 
 ### Contract Coverage Checklist
 #### Contract 1.1 checklist
-- [ ] Verifies the "inserted" outcome.
-- [ ] Verifies the "repaired" outcome.
-- [ ] Verifies the "unchanged" outcome.
-- [ ] Verifies the owner row is visible through the collaborator read path.
-- [ ] Verifies repeated calls do not create duplicate owner memberships.
-- [ ] Verifies unrelated collaborator rows are not modified.
-- [ ] Verifies `ListNotFoundError`.
-- [ ] Verifies `UserNotFoundError`.
+- [x] Verifies the "inserted" outcome.
+- [x] Verifies the "repaired" outcome.
+- [x] Verifies the "unchanged" outcome.
+- [x] Verifies the owner row is visible through the collaborator read path.
+- [x] Verifies repeated calls do not create duplicate owner memberships.
+- [x] Verifies unrelated collaborator rows are not modified.
+- [x] Verifies `ListNotFoundError`.
+- [x] Verifies `UserNotFoundError`.
 
 #### Contract 1.2 checklist
-- [ ] Verifies successful `createList` is not observable before an owner collaborator row exists.
-- [ ] Verifies the owner row created by `createList` is visible through the collaborator read path.
+- [x] Verifies successful `createList` is not observable before an owner collaborator row exists.
+- [x] Verifies the owner row created by `createList` is visible through the collaborator read path.
 
 #### Contract 1.3 checklist
-- [ ] Verifies every existing list is repaired to have an owner collaborator row.
-- [ ] Verifies the repair report accounts for inserted work accurately.
-- [ ] Verifies the repair report accounts for repaired work accurately.
-- [ ] Verifies the repair report accounts for unchanged work accurately.
-- [ ] Verifies repeated runs do not create extra collaborator rows.
-- [ ] Verifies repeated runs do not change final database state after the first pass.
+- [x] Verifies every existing list is repaired to have an owner collaborator row.
+- [x] Verifies the repair report accounts for inserted work accurately.
+- [x] Verifies the repair report accounts for repaired work accurately.
+- [x] Verifies the repair report accounts for unchanged work accurately.
+- [x] Verifies repeated runs do not create extra collaborator rows.
+- [x] Verifies repeated runs do not change final database state after the first pass.
 
 #### Contract 1.4 checklist
-- [ ] Verifies normalized success output.
-- [ ] Verifies each missing required key is named in the failure.
-- [ ] Verifies invalid values name the offending key and reason.
-- [ ] Verifies `http` base URLs are accepted.
-- [ ] Verifies `https` base URLs are accepted.
-- [ ] Verifies non-HTTP(S) base URLs are rejected.
-- [ ] Verifies `resendWebhookSecret` remains optional.
+- [x] Verifies normalized success output.
+- [x] Verifies each missing required key is named in the failure.
+- [x] Verifies invalid values name the offending key and reason.
+- [x] Verifies `http` base URLs are accepted.
+- [x] Verifies `https` base URLs are accepted.
+- [x] Verifies non-HTTP(S) base URLs are rejected.
+- [x] Verifies `resendWebhookSecret` remains optional.
 
 ### Specification-Driven TDD Workflow
 - First test to write: Failing integration test proving `createList` does not guarantee an accepted owner collaborator row (Contract 1.2).
@@ -381,12 +381,12 @@ verifyInvitationEnv(env: NodeJS.ProcessEnv): InvitationEnv
 
 ### Phase Gate
 #### Automated Verification
-- [ ] Contract JSDoc written above each function before implementation
-- [ ] Contract coverage checklist covers all outputs, errors, mutations, and side effects
-- [ ] Contract tests executed one at a time, each failing for expected reason before code written
-- [ ] Each targeted contract test passes before the next is added
-- [ ] `npm run verify:env` passes for a valid env file
-- [ ] `npm run typecheck` passes
+- [x] Contract JSDoc written above each function before implementation
+- [x] Contract coverage checklist covers all outputs, errors, mutations, and side effects
+- [x] Contract tests executed one at a time, each failing for expected reason before code written
+- [x] Each targeted contract test passes before the next is added
+- [x] `npm run verify:env` passes for a valid env file
+- [x] `npm run typecheck` passes
 
 #### Manual Verification
 - [ ] `createList` in the UI creates an owner collaborator row observable in the database (no `inviteStatus` column — just userId, listId, role)

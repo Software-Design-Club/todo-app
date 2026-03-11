@@ -16,8 +16,17 @@ import {
   type ListWithRole,
   type User,
 } from "@/lib/types";
+import {
+  upsertOwnerCollaborator,
+} from "@/lib/lists/owner-collaborators";
 import { getCollaborators } from "./collaborators";
 import { userCanEditList, isAuthorizedToChangeVisibility } from "./permissions";
+
+type CreateListInput = {
+  title: List["title"];
+  creatorId: User["id"];
+  visibility?: List["visibility"];
+};
 
 export type UsersListTodos = {
   id: number;
@@ -161,21 +170,49 @@ export async function getLists(
   return Array.from(listMap.values());
 }
 
+function parseCreateListInput(input: FormData | CreateListInput) {
+  if (input instanceof FormData) {
+    const title = input.get("title")?.toString();
+    const creatorIdStr = input.get("creatorId")?.toString();
+
+    if (!title || !creatorIdStr) {
+      throw new Error("Title and creator ID are required");
+    }
+
+    const creatorId = parseInt(creatorIdStr, 10);
+    if (isNaN(creatorId)) {
+      throw new Error("Invalid creator ID");
+    }
+
+    return {
+      title: title as List["title"],
+      creatorId: creatorId as User["id"],
+      visibility: undefined,
+    } satisfies CreateListInput;
+  }
+
+  return input;
+}
+
 /**
- * Creates a new list with the given title for a specific user
+ * @contract createList
+ *
+ * Creates a new list and guarantees the creator has an accepted owner collaborator
+ * row before the caller can observe success.
+ *
+ * @param input - Title, creatorId, and optional visibility.
+ * @returns The newly created list.
+ *
+ * @effects
+ * - If the function returns list L, then upsertOwnerCollaborator({ listId: L.id,
+ *   ownerId: L.creatorId }) has already become true before the caller observes success.
+ * - The function does not report success for a newly created list whose creator
+ *   lacks an owner collaborator row.
  */
-export async function createList(formData: FormData) {
-  const title = formData.get("title")?.toString();
-  const creatorIdStr = formData.get("creatorId")?.toString();
-
-  if (!title || !creatorIdStr) {
-    throw new Error("Title and creator ID are required");
-  }
-
-  const creatorId = parseInt(creatorIdStr, 10);
-  if (isNaN(creatorId)) {
-    throw new Error("Invalid creator ID");
-  }
+export async function createList(
+  input: FormData | CreateListInput,
+): Promise<List> {
+  const { title, creatorId, visibility } = parseCreateListInput(input);
 
   const db = drizzle(sql);
 
@@ -185,13 +222,19 @@ export async function createList(formData: FormData) {
     .values({
       title,
       creatorId,
+      visibility,
     })
     .returning();
+
+  await upsertOwnerCollaborator({
+    listId: newList.id as List["id"],
+    ownerId: newList.creatorId as User["id"],
+  });
 
   // Revalidate to update the UI
   revalidatePath("/lists");
 
-  return newList;
+  return createTaggedList(newList);
 }
 
 /**

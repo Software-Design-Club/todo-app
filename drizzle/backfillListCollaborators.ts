@@ -1,66 +1,53 @@
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { ListsTable, ListCollaboratorsTable } from "./schema";
+import { ListsTable } from "./schema";
+import { upsertOwnerCollaborator } from "@/lib/lists/owner-collaborators";
+import type { List, User } from "@/lib/types";
 
-async function backfillListCollaborators() {
-  console.log("Starting backfill of ListCollaborators table...");
-
+/**
+ * @contract backfillOwnerCollaborators
+ *
+ * Ensures every existing list has an accepted owner collaborator row for its creator.
+ *
+ * @returns A report of scanned, inserted, repaired, and unchanged counts.
+ *
+ * @effects
+ * - After return, every existing list has an owner collaborator row.
+ * - Running multiple times without intervening data changes does not create
+ *   additional rows and does not change final database state after the first run.
+ */
+async function backfillOwnerCollaborators() {
   const db = drizzle(sql);
+  const lists = await db
+    .select({
+      id: ListsTable.id,
+      creatorId: ListsTable.creatorId,
+    })
+    .from(ListsTable);
 
-  try {
-    // Get all lists with their creator information
-    const lists = await db
-      .select({
-        id: ListsTable.id,
-        creatorId: ListsTable.creatorId,
-      })
-      .from(ListsTable);
+  const report = {
+    scanned: lists.length,
+    inserted: 0,
+    repaired: 0,
+    unchanged: 0,
+  };
 
-    console.log(`Found ${lists.length} lists to backfill`);
-
-    let upsertedCount = 0;
-
-    for (const list of lists) {
-      try {
-        // Upsert the creator as an owner
-        await db
-          .insert(ListCollaboratorsTable)
-          .values({
-            listId: list.id,
-            userId: list.creatorId,
-            role: "owner",
-          })
-          .onConflictDoUpdate({
-            target: [
-              ListCollaboratorsTable.listId,
-              ListCollaboratorsTable.userId,
-            ],
-            set: {
-              role: "owner",
-              updatedAt: new Date(),
-            },
-          });
-
-        console.log(`Upserted owner record for list ${list.id}`);
-        upsertedCount++;
-      } catch (error) {
-        console.error(`Error processing list ${list.id}:`, error);
-      }
-    }
-
-    console.log(`Backfill completed!`);
-    console.log(`- Upserted: ${upsertedCount} records`);
-  } catch (error) {
-    console.error("Error during backfill:", error);
-    throw error;
+  for (const list of lists) {
+    const result = await upsertOwnerCollaborator({
+      listId: list.id as List["id"],
+      ownerId: list.creatorId as User["id"],
+    });
+    report[result] += 1;
   }
+
+  return report;
 }
 
 // Run the backfill if this script is executed directly
 if (require.main === module) {
-  backfillListCollaborators()
-    .then(() => {
-      console.log("Backfill script completed successfully");
+  backfillOwnerCollaborators()
+    .then((report) => {
+      console.log(JSON.stringify(report, null, 2));
       process.exit(0);
     })
     .catch((error) => {
@@ -69,4 +56,4 @@ if (require.main === module) {
     });
 }
 
-export { backfillListCollaborators };
+export { backfillOwnerCollaborators };
