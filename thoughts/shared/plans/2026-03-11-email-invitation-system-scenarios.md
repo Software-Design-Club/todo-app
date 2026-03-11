@@ -27,11 +27,12 @@ This document tells the story of the feature through scenarios:
 - App UI: dropdown, management page, invite page, sign-in page
 - Server Actions: server-authoritative entry points from the UI
 - Invitation Service: domain logic for invitations
+- EmailService: provider-agnostic boundary for send responses and delivery events
 - Permissions: capability checks for invite/manage operations
 - Database:
   - `invitations`: invitation lifecycle and delivery state
   - `list_collaborators`: accepted membership only
-- Resend: email provider and webhook source
+- Resend Adapter: provider-specific implementation behind `EmailService`
 
 ## Shared Rules Across Every Scenario
 
@@ -43,6 +44,8 @@ This document tells the story of the feature through scenarios:
 - Email mismatch becomes `pending_approval`.
 - Archive and delete invalidate open invites before success is observable.
 - UI actions are never trusted on their own; the server is the source of truth.
+- Delivery state is separate from membership state.
+- Canonical delivery event values are shared across providers; raw provider event names are stored only as metadata.
 
 ## State Model At A Glance
 
@@ -73,7 +76,7 @@ sequenceDiagram
   participant Action as "Server Actions"
   participant Service as "Invitation Service"
   participant DB as "Postgres"
-  participant Resend as "Resend"
+  participant Email as "EmailService"
   participant Invite as "/invite"
   participant Auth as "/sign-in"
 
@@ -82,8 +85,8 @@ sequenceDiagram
   Action->>Service: inviteCollaboratorWorkflow(...)
   Service->>DB: assertCanInviteCollaborators(...)
   Service->>DB: issue invitation row with hashed secret
-  Service->>Resend: send invitation email
-  Resend-->>Service: { data: { id }, error: null }
+  Service->>Email: send invitation email
+  Email-->>Service: { kind: "accepted", providerMessageId }
   Service->>DB: record providerMessageId and attemptedAt
   Service-->>UI: success
 
@@ -118,18 +121,18 @@ function inviteCollaboratorWorkflow(input) {
   });
 
   const acceptanceUrl = buildInvitationAcceptanceUrl(appBaseUrl, secret);
-  const resendResponse = sendInvitationEmail({
+  const emailServiceResponse = sendInvitationEmail({
     invitationId: invitation.invitationId,
     acceptanceUrl,
   });
 
   handleInvitationSendResponseWorkflow({
     invitationId: invitation.invitationId,
-    resendResponse,
+    emailServiceResponse,
     attemptedAt: now(),
   });
 
-  return { invitationId: invitation.invitationId, acceptanceUrl, resendResponse };
+  return { invitationId: invitation.invitationId, acceptanceUrl, emailServiceResponse };
 }
 
 function acceptInvitationWorkflow(secret, viewer, now) {
@@ -503,14 +506,14 @@ sequenceDiagram
   participant Action as "Server Actions"
   participant Service as "Invitation Service"
   participant DB as "Postgres"
-  participant Resend as "Resend"
+  participant Email as "EmailService"
 
   Owner->>UI: Click Resend
   UI->>Action: resendInvitation(invitationId)
   Action->>Service: inviteCollaboratorWorkflow(...)
   Service->>DB: replace open invite secret hash for same list/email
-  Service->>Resend: send new email with new link
-  Resend-->>Service: accepted response
+  Service->>Email: send new email with new link
+  Email-->>Service: accepted response
   Service->>DB: update delivery fields
   Service-->>UI: success
 ```
@@ -530,7 +533,7 @@ function issueInvitation(input) {
 
 ### Story
 
-The app successfully issues the invitation row, but Resend rejects the send attempt immediately.
+The app successfully issues the invitation row, but the configured `EmailService` reports an immediate send failure.
 
 ### Expected Outcome
 
@@ -547,24 +550,24 @@ sequenceDiagram
   participant Action as "Server Actions"
   participant Service as "Invitation Service"
   participant DB as "Postgres"
-  participant Resend as "Resend"
+  participant Email as "EmailService"
 
   Owner->>UI: Send invite
   UI->>Action: inviteCollaborator(...)
   Action->>Service: inviteCollaboratorWorkflow(...)
   Service->>DB: persist invitation
-  Service->>Resend: send email
-  Resend-->>Service: { data: null, error }
+  Service->>Email: send email
+  Email-->>Service: { kind: "rejected", errorMessage, errorName? }
   Service->>DB: store lastDeliveryError and attemptedAt
-  Service-->>UI: raw failed response
+  Service-->>UI: failed email-service response
   UI-->>Owner: Show send failure state with retry option
 ```
 
 ### Pseudocode
 
 ```ts
-const resendResponse = sendInvitationEmail(...);
-const deliveryResult = normalizeResendSendResponse(resendResponse);
+const emailServiceResponse = sendInvitationEmail(...);
+const deliveryResult = normalizeEmailServiceSendResponse(emailServiceResponse);
 recordInvitationSendResult({
   invitationId,
   result: deliveryResult,
@@ -572,16 +575,18 @@ recordInvitationSendResult({
 });
 ```
 
-## Scenario 12: Resend Webhook Records Delivery Trouble
+## Scenario 12: Provider Delivery Event Records Delivery Trouble
 
 ### Story
 
-Resend later reports `email.failed`, `email.bounced`, `email.delivery_delayed`, or `email.complained`.
+The provider later reports a delivery problem. The Resend route verifies the signed webhook, maps the provider payload into a generic `EmailServiceDeliveryEvent`, and the invitation service stores canonical delivery metadata without changing membership state.
 
 ### Expected Outcome
 
 - Webhook is signature-verified first
-- Matching invitation is updated with latest webhook info
+- Matching invitation is updated with canonical delivery metadata
+- Canonical `deliveryEventType` remains consistent across providers
+- Raw provider event type is stored for audit/debugging
 - Invitation membership state is unchanged
 
 ### Sequence Diagram
@@ -590,14 +595,17 @@ Resend later reports `email.failed`, `email.bounced`, `email.delivery_delayed`, 
 sequenceDiagram
   participant Resend as "Resend Webhook"
   participant Route as "/api/webhooks/resend"
+  participant Adapter as "Resend Adapter"
   participant Service as "Invitation Service"
   participant DB as "Postgres"
 
   Resend->>Route: POST signed webhook
-  Route->>Service: verifyResendWebhookSignature(...)
-  Service-->>Route: verified event
+  Route->>Adapter: verifyResendWebhookSignature(...)
+  Adapter-->>Route: verified payload
+  Route->>Adapter: map to EmailServiceDeliveryEvent
+  Adapter-->>Route: canonical delivery event + raw provider event type
   Route->>Service: recordInvitationDeliveryEvent(event)
-  Service->>DB: update webhookEventType and webhookReceivedAt
+  Service->>DB: update deliveryEventType, providerRawEventType, providerEventReceivedAt
   Service-->>Route: updated or ignored
   Route-->>Resend: 2xx
 ```
@@ -608,13 +616,17 @@ sequenceDiagram
 function handleResendWebhookRequest(request) {
   const rawBody = request.text();
   const headers = extractResendWebhookHeaders(request);
-  const event = verifyResendWebhookSignature({
+  const verifiedPayload = verifyResendWebhookSignature({
     rawBody,
     headers,
     signingSecret: invitationEnv.resendWebhookSecret,
   });
+  const deliveryEvent = mapResendWebhookToEmailServiceDeliveryEvent({
+    payload: verifiedPayload,
+    receivedAt: now(),
+  });
 
-  const persistence = recordInvitationDeliveryEvent({ event });
+  const persistence = recordInvitationDeliveryEvent({ event: deliveryEvent });
   return responseForWebhookPersistence(persistence);
 }
 ```
@@ -905,6 +917,7 @@ acceptInvitationWorkflow(input)
 handleResendWebhookRequest(request)
   -> read raw body
   -> verifyResendWebhookSignature(...)
+  -> map Resend payload to EmailServiceDeliveryEvent
   -> recordInvitationDeliveryEvent(...)
 
 // Lifecycle invalidation
@@ -949,7 +962,7 @@ revokeInvitation(input)
 | Reused resolved token | `already_resolved` outcome | not created again |
 | Resend | still open, secret rotated | unchanged |
 | Immediate send failure | still open, delivery error stored | unchanged |
-| Delivery webhook trouble | status unchanged, delivery metadata updated | unchanged |
+| Provider delivery trouble | status unchanged, canonical delivery metadata updated | unchanged |
 | Archive | open invites terminal | unchanged for accepted members |
 | Delete | open invites terminal before delete | unchanged for accepted members before removal |
 
@@ -961,4 +974,4 @@ revokeInvitation(input)
 - Can any old token remain usable after resend, revoke, archive, or delete?
 - Does every terminal outcome produce an explicit user-facing state?
 - Are delivery failures visible without being confused with membership state?
-
+- Is all provider-specific parsing and verification isolated to the email adapter and webhook route?

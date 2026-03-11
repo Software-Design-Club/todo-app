@@ -70,6 +70,7 @@ Implement email-based collaborator invitations with secure one-time tokens, sign
 - Track email mismatches: the `invitations` table records `acceptedByEmail` and `acceptedByUserId` when the sign-in email differs from the invited email.
 - Keep the existing dropdown workflow and add a dedicated collaborator management page.
 - Keep GitHub auth provider for MVP.
+- Introduce an `EmailService` boundary: production uses a Resend-backed implementation; automated e2e uses a test stub so browser scenarios do not depend on live third-party delivery.
 - Keep authorization contracts capability-based so the implementation can evolve without rewriting the plan.
 - Integration tests use per-test transaction isolation to prevent cross-phase test data contamination.
 
@@ -410,7 +411,7 @@ Create stable test commands whose behavior is itself specified and verifiable be
   - `tsconfig.json` — TypeScript configuration for test file inclusion
 - Constraints / non-goals: Do not write domain tests. Only write harness-operability smoke tests.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
-- Agent handoff note: This phase is pure infrastructure. It installs vitest, playwright, configures test commands, and writes minimal smoke tests that prove the harnesses work. No domain knowledge required. Integration tests must support per-test transaction isolation for later phases.
+- Agent handoff note: This phase is pure infrastructure. It installs vitest, playwright, configures test commands, and writes minimal smoke tests that prove the harnesses work. No domain knowledge required. Integration tests must support per-test transaction isolation for later phases. Playwright setup should also allow later phases to plug in test-only service substitutions and multi-user fixtures without redesigning the harness.
 
 ### Specifications
 
@@ -557,7 +558,14 @@ type InvitationSecretHash = Tagged<string, "InvitationSecretHash">;
 type InvitationExpiry = Tagged<Date, "InvitationExpiry">;
 type InvitationResolvedAt = Tagged<Date, "InvitationResolvedAt">;
 type DeliveryAttemptedAt = Tagged<Date, "DeliveryAttemptedAt">;
+type DeliveryEventType = Tagged<
+  "failed" | "bounced" | "delayed" | "complained",
+  "DeliveryEventType"
+>;
+type DeliveryError = Tagged<string, "DeliveryError">;
 type ProviderMessageId = Tagged<string, "ProviderMessageId">;
+type ProviderRawEventType = Tagged<string, "ProviderRawEventType">;
+type ProviderEventReceivedAt = Tagged<Date, "ProviderEventReceivedAt">;
 
 type PendingInvitationStatus = Tagged<"pending", "PendingInvitationStatus">;
 type SentInvitationStatus = Tagged<"sent", "SentInvitationStatus">;
@@ -593,12 +601,13 @@ type InvitationRow = {
 
   /** Delivery tracking (latest attempt) */
   providerMessageId: ProviderMessageId | null;
-  lastDeliveryError: Tagged<string, "DeliveryError"> | null;
+  lastDeliveryError: DeliveryError | null;
   lastDeliveryAttemptAt: DeliveryAttemptedAt | null;
 
-  /** Webhook tracking (latest event) */
-  webhookEventType: string | null;
-  webhookReceivedAt: Date | null;
+  /** Latest provider-reported delivery event */
+  deliveryEventType: DeliveryEventType | null;
+  providerRawEventType: ProviderRawEventType | null;
+  providerEventReceivedAt: ProviderEventReceivedAt | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -653,7 +662,9 @@ type InvitationView =
  * - Rows with status="revoked" or "expired" are terminal and cannot be accepted.
  * - `acceptedByEmail` is set when the sign-in email differs from invitedEmailNormalized.
  * - Delivery tracking columns (providerMessageId, lastDeliveryError,
- *   lastDeliveryAttemptAt) record the latest delivery attempt, not a history.
+ *   lastDeliveryAttemptAt, deliveryEventType, providerRawEventType,
+ *   providerEventReceivedAt) record only the latest send attempt and latest
+ *   provider-reported delivery event, not a history.
  */
 ```
 
@@ -780,7 +791,7 @@ Define the end-to-end workflow for inviting someone to a list up to the point wh
   - `app/lists/_actions/permissions.ts` — Permission model to extend
   - `drizzle/schema.ts` — `InvitationsTable` from Phase 3
   - `lib/types.ts` — Domain types
-- Constraints / non-goals: Do not interpret Resend responses beyond returning them raw. Do not implement acceptance. Do not implement webhook handling. Do not write to `list_collaborators`.
+- Constraints / non-goals: Do not leak provider-specific send-response types beyond the `EmailService` boundary. Do not implement acceptance. Do not implement webhook handling. Do not write to `list_collaborators`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
 - Agent handoff note: This phase creates `lib/invitations/service.ts` and `app/lists/_actions/invitations.ts` as the base files. Wave 4 phases will ADD functions to these files. The service file must be structured for extension (exported functions, not a class).
 
@@ -793,25 +804,23 @@ type AbsoluteInvitationUrl =
   | Tagged<`http://${string}`, "AbsoluteInvitationUrl">
   | Tagged<`https://${string}`, "AbsoluteInvitationUrl">;
 
-type ResendErrorMessage = Tagged<string, "ResendErrorMessage">;
-type ResendErrorName = Tagged<string, "ResendErrorName">;
+type EmailServiceErrorMessage = Tagged<string, "EmailServiceErrorMessage">;
+type EmailServiceErrorName = Tagged<string, "EmailServiceErrorName">;
 
-type InvitationSendAcceptedResponse = {
-  data: { id: ProviderMessageId };
-  error: null;
+type EmailServiceAcceptedSendResponse = {
+  kind: "accepted";
+  providerMessageId: ProviderMessageId;
 };
 
-type InvitationSendRejectedResponse = {
-  data: null;
-  error: {
-    message: ResendErrorMessage;
-    name?: ResendErrorName;
-  };
+type EmailServiceRejectedSendResponse = {
+  kind: "rejected";
+  errorMessage: EmailServiceErrorMessage;
+  errorName?: EmailServiceErrorName;
 };
 
-type ResendSendResponse =
-  | InvitationSendAcceptedResponse
-  | InvitationSendRejectedResponse;
+type EmailServiceSendResponse =
+  | EmailServiceAcceptedSendResponse
+  | EmailServiceRejectedSendResponse;
 
 type PersistedSentInvitation = {
   invitationId: InvitationId;
@@ -820,10 +829,17 @@ type PersistedSentInvitation = {
   wasRotated: boolean;
 };
 
+type EmailService = {
+  sendInvitationEmail(input: {
+    invitationId: InvitationId;
+    acceptanceUrl: AbsoluteInvitationUrl;
+  }): Promise<EmailServiceSendResponse>;
+};
+
 type InviteCollaboratorWorkflowResult = {
   invitationId: InvitationId;
   acceptanceUrl: AbsoluteInvitationUrl;
-  resendResponse: ResendSendResponse;
+  emailServiceResponse: EmailServiceSendResponse;
 };
 ```
 
@@ -838,7 +854,7 @@ type InviteCollaboratorWorkflowResult = {
  * @param input.inviterId - The user sending the invitation.
  * @param input.invitedEmail - The email to invite.
  * @param input.now - Current timestamp for expiry calculation.
- * @returns The invitation ID, acceptance URL, and raw Resend response.
+ * @returns The invitation ID, acceptance URL, and generic email-service response.
  *
  * @effects
  * - Requires inviterId to be allowed to invite collaborators to listId.
@@ -848,7 +864,7 @@ type InviteCollaboratorWorkflowResult = {
  *   email, and status="sent".
  * - The returned acceptance URL contains the one-time secret matching the persisted hash.
  * - Attempts exactly one email send per invocation.
- * - Returns the raw Resend send response for later interpretation.
+ * - Returns the generic email-service send response for later interpretation.
  * - If an open invite already existed, previously issued secrets become unusable
  *   and the returned secret becomes authoritative.
  *
@@ -936,19 +952,25 @@ buildInvitationAcceptanceUrl(input: {
 }): AbsoluteInvitationUrl
 ```
 
-#### Contract 4.7: Resend send attempt
+#### Contract 4.7: Email service send attempt
 ```ts
 /**
  * @contract sendInvitationEmail
  *
  * Validates required email configuration before attempting provider delivery.
- * Attempts exactly one provider send per invocation.
- * Returns the raw Resend { data, error } response without translating it.
+ * Delegates to the configured `EmailService` implementation.
+ * Attempts exactly one service send per invocation.
+ * Production uses a Resend-backed `EmailService`, which maps provider-specific
+ * send responses into `EmailServiceSendResponse` before returning.
+ * E2E uses a test-stub `EmailService` that captures invitation deliveries for
+ * deterministic browser tests without depending on live provider delivery.
+ * Returns the generic `EmailServiceSendResponse`; downstream invitation code
+ * does not depend on provider-specific response shapes.
  */
 sendInvitationEmail(input: {
   invitationId: InvitationId;
   acceptanceUrl: AbsoluteInvitationUrl;
-}): Promise<ResendSendResponse>
+}): Promise<EmailServiceSendResponse>
 ```
 
 ### Contract Coverage Checklist
@@ -963,7 +985,7 @@ sendInvitationEmail(input: {
 - [ ] Verifies persisted invitation stores `status = "sent"` in the `invitations` table.
 - [ ] Verifies the returned acceptance URL uses the authoritative secret.
 - [ ] Verifies exactly one email send per invocation.
-- [ ] Verifies the raw Resend response is returned unchanged.
+- [ ] Verifies the generic email-service response is returned unchanged.
 - [ ] Verifies rotating an existing open invite makes the prior secret unusable.
 - [ ] Verifies rotating an existing open invite makes the returned secret authoritative.
 
@@ -986,6 +1008,7 @@ sendInvitationEmail(input: {
 - [ ] Verifies the single-open-invite invariant.
 - [ ] Verifies rotation replaces the authoritative secret.
 - [ ] Verifies issuing does not send email.
+- [ ] Verifies issuing/rotation preserves the allowed open-invitation transition shape without creating a second open row.
 
 #### Contract 4.6 checklist
 - [ ] Verifies the canonical `/invite?token=...` URL is produced.
@@ -993,9 +1016,10 @@ sendInvitationEmail(input: {
 
 #### Contract 4.7 checklist
 - [ ] Verifies required email configuration is validated before delivery.
-- [ ] Verifies exactly one provider send attempt per invocation.
-- [ ] Verifies a successful raw response is returned unchanged.
-- [ ] Verifies a failed raw response is returned unchanged.
+- [ ] Verifies exactly one configured `EmailService` send attempt per invocation.
+- [ ] Verifies the configured `EmailService` boundary can be swapped for a test stub in e2e.
+- [ ] Verifies a successful `EmailServiceSendResponse` is returned unchanged.
+- [ ] Verifies a failed `EmailServiceSendResponse` is returned unchanged.
 
 ### Specification-Driven TDD Workflow
 - First test to write: Failing unit test proving an unauthorized actor is rejected (Contract 4.2).
@@ -1004,12 +1028,14 @@ sendInvitationEmail(input: {
   2. Contract 4.4 equal secrets hash identically
   3. Contract 4.5 first-time persistence
   4. Contract 4.5 rotation
-  5. Contract 4.6 canonical URL
-  6. Contract 4.7 successful Resend response
-  7. Contract 4.7 failed Resend response
-  8. Contract 4.1 happy-path integration (success + URL + response)
-  9. Contract 4.1 failed-send integration
-  10. Remaining checklist items one at a time
+  5. Contract 4.5 state-transition shape for issue vs rotation
+  6. Contract 4.6 canonical URL
+  7. Contract 4.7 configured `EmailService` invoked exactly once
+  8. Contract 4.7 successful email-service response
+  9. Contract 4.7 failed email-service response
+  10. Contract 4.1 happy-path integration (success + URL + response)
+  11. Contract 4.1 failed-send integration
+  12. Remaining checklist items one at a time
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
 - Delete-and-rebuild note: None. All files are new.
 - Commands: `npm run test:unit`, `npm run test:integration`, `npm run typecheck`, `npm run lint`
@@ -1020,8 +1046,11 @@ sendInvitationEmail(input: {
 - `lib/invitations/errors.ts` (new) — Domain error types
 - `app/lists/_actions/invitations.ts` (new) — Server action wrappers
 - `app/lists/_actions/permissions.ts` — Add `assertCanInviteCollaborators`
-- `lib/email/resend.ts` (new) — `sendInvitationEmail`
+- `lib/email/service.ts` (new) — `EmailService` contract and implementation selection
+- `lib/email/resend.ts` (new) — production Resend-backed `EmailService`
+- `lib/email/test-stub.ts` (new) — test-stub `EmailService` for Playwright
 - `app/emails/invitation-email.tsx` (new) — React Email template
+- `tests/e2e/support/invitation-mailbox.ts` (new) — Playwright helper for reading stubbed invite deliveries
 - `tests/unit/invitations/*.test.ts` (new)
 - `tests/integration/invitations/service.test.ts` (new)
 
@@ -1043,18 +1072,18 @@ sendInvitationEmail(input: {
 ## Phase 5: Delivery Response & Webhook Authentication Workflow
 
 ### Goal
-Interpret Resend's immediate send responses, persist delivery outcomes as columns on the `invitations` table, and authenticate webhook events before they can update invitation delivery state.
+Interpret generic `EmailService` send responses, persist delivery outcomes as columns on the `invitations` table, and consume authenticated provider delivery events after the Resend adapter verifies and normalizes webhook payloads.
 
 ### Phase Execution Rules
 - Governing specifications: Contracts 5.1 through 5.7 (inline below)
-- Required context: Resend send API returns `{ data, error }`. Webhook auth uses raw body + svix-id/timestamp/signature headers + signing secret. Delivery tracking lives as columns on the `invitations` table (providerMessageId, lastDeliveryError, lastDeliveryAttemptAt, webhookEventType, webhookReceivedAt).
+- Required context: The production Resend adapter maps provider-specific send responses into `EmailServiceSendResponse` at the `EmailService` boundary and maps verified Resend webhook payloads into generic `EmailServiceDeliveryEvent` values. Resend webhook auth uses raw body + svix-id/timestamp/signature headers + signing secret. Delivery tracking lives as columns on the `invitations` table (providerMessageId, lastDeliveryError, lastDeliveryAttemptAt, deliveryEventType, providerRawEventType, providerEventReceivedAt).
 - Dependencies / prerequisites: Phase 4 (Invitation Issuing) must be complete.
 - Chunk dependencies: Chunk D (Phase 4)
 - Unblocks: Chunk H (Phase 8 — Collaborator Management)
-- Parallelization note: Runs in parallel with Phases 6 and 7. Use `jj workspace add phase-5-delivery`. Adds functions to `lib/invitations/service.ts` and `app/lists/_actions/invitations.ts` — no functional overlap with Phases 6 or 7. This phase writes only delivery-tracking columns on `invitations` (providerMessageId, lastDeliveryError, lastDeliveryAttemptAt, webhookEventType, webhookReceivedAt). Phase 6 writes `status`, `acceptedByUserId`, `acceptedByEmail`, and `list_collaborators`. Phase 7 writes `status` and `resolvedAt`. No column-level write overlap.
+- Parallelization note: Runs in parallel with Phases 6 and 7. Use `jj workspace add phase-5-delivery`. Adds functions to `lib/invitations/service.ts` and `app/lists/_actions/invitations.ts` — no functional overlap with Phases 6 or 7. This phase writes only delivery-tracking columns on `invitations` (providerMessageId, lastDeliveryError, lastDeliveryAttemptAt, deliveryEventType, providerRawEventType, providerEventReceivedAt). Phase 6 writes `status`, `acceptedByUserId`, `acceptedByEmail`, and `list_collaborators`. Phase 7 writes `status` and `resolvedAt`. No column-level write overlap.
 - Relevant existing files:
   - `lib/invitations/service.ts` — Add delivery response handlers (created in Phase 4)
-  - `lib/email/resend.ts` — Add webhook verification (created in Phase 4)
+  - `lib/email/resend.ts` — Add Resend webhook verification and mapping to generic delivery events (created in Phase 4)
   - `drizzle/schema.ts` — `InvitationsTable` delivery columns (created in Phase 3)
 - Constraints / non-goals: Do not accept, revoke, or otherwise change invitation status. Only update delivery-tracking columns. Do not write to `list_collaborators`.
 - Execution order: One RED-GREEN-REFACTOR loop per new contract test.
@@ -1070,92 +1099,100 @@ type ResendWebhookHeaders = {
   "svix-signature": Tagged<string, "ResendSvixSignature">;
 };
 
-type SupportedResendWebhookEventType = Tagged<
-  "email.failed" | "email.bounced" | "email.delivery_delayed" | "email.complained",
-  "SupportedResendWebhookEventType"
->;
-
-type UnsupportedResendWebhookEventType = Tagged<string, "UnsupportedResendWebhookEventType">;
-type ResendWebhookEventType = SupportedResendWebhookEventType | UnsupportedResendWebhookEventType;
-
-type SupportedResendWebhookEvent = {
-  type: SupportedResendWebhookEventType;
-  data: { email_id: ProviderMessageId };
-};
-
-type UnsupportedResendWebhookEvent = {
-  type: UnsupportedResendWebhookEventType;
+type VerifiedResendWebhookPayload = {
+  type: Tagged<string, "ResendWebhookEventType">;
   data: { email_id?: ProviderMessageId | null };
 };
-
-type ResendWebhookEvent = SupportedResendWebhookEvent | UnsupportedResendWebhookEvent;
 
 type InvitationDeliveryResult =
   | { kind: "accepted_for_delivery"; providerMessageId: ProviderMessageId }
   | {
       kind: "send_failed";
-      providerErrorMessage: ResendErrorMessage;
-      providerErrorName?: ResendErrorName;
+      providerErrorMessage: EmailServiceErrorMessage;
+      providerErrorName?: EmailServiceErrorName;
     };
 
-type AuthenticatedWebhookResult = {
-  verifiedEventType: ResendWebhookEventType;
+type SupportedEmailServiceDeliveryEvent = {
+  kind: "delivery_reported";
+  deliveryEventType: DeliveryEventType;
+  providerMessageId: ProviderMessageId;
+  providerRawEventType: ProviderRawEventType;
+  receivedAt: ProviderEventReceivedAt;
+};
+
+type IgnoredEmailServiceDeliveryEvent = {
+  kind: "ignored";
+  providerRawEventType: ProviderRawEventType;
+  providerMessageId?: ProviderMessageId | null;
+  receivedAt: ProviderEventReceivedAt;
+};
+
+type EmailServiceDeliveryEvent =
+  | SupportedEmailServiceDeliveryEvent
+  | IgnoredEmailServiceDeliveryEvent;
+
+type AuthenticatedDeliveryEventResult = {
+  deliveryEventType: DeliveryEventType | null;
+  providerRawEventType: ProviderRawEventType;
   persistence: "updated" | "ignored";
 };
 ```
 
-#### Contract 5.1: Immediate Resend response handling workflow
+#### Contract 5.1: Immediate email service response handling workflow
 ```ts
 /**
  * @contract handleInvitationSendResponseWorkflow
  *
- * Interprets the raw Resend { data, error } response and persists the delivery outcome.
+ * Interprets the generic `EmailServiceSendResponse` and persists the delivery outcome.
  *
  * @effects
- * - If data.id is present and error is null, updates delivery-tracking columns
+ * - If the response kind is "accepted", updates delivery-tracking columns
  *   on the `invitations` row for invitationId (providerMessageId, lastDeliveryAttemptAt).
- * - If error is present, updates failure columns on the `invitations` row
+ * - If the response kind is "rejected", updates failure columns on the `invitations` row
  *   (lastDeliveryError, lastDeliveryAttemptAt).
  * - Does not modify invitation status, acceptedByUserId, acceptedByEmail,
  *   resolvedAt, or `list_collaborators`.
  */
 handleInvitationSendResponseWorkflow(input: {
   invitationId: InvitationId;
-  resendResponse: ResendSendResponse;
+  emailServiceResponse: EmailServiceSendResponse;
   attemptedAt: DeliveryAttemptedAt;
 }): Promise<InvitationDeliveryResult>
 ```
 
-#### Contract 5.2: Authenticated Resend webhook handling workflow
+#### Contract 5.2: Authenticated provider delivery-event workflow
 ```ts
 /**
- * @contract handleAuthenticatedResendWebhookWorkflow
+ * @contract handleAuthenticatedEmailProviderEventWorkflow
  *
- * Verifies webhook signature, then persists supported delivery events.
+ * Persists an already-authenticated provider delivery event produced by the
+ * `EmailService` boundary.
  *
  * @effects
- * - Rejects requests with invalid signatures.
  * - Accepts supported events and updates delivery-tracking columns on the
  *   `invitations` row when correlatable to a previously recorded provider message id.
- * - Returns "ignored" for valid but uncorrelatable or unsupported events.
+ * - Stores canonical `deliveryEventType` values so invitation-domain behavior is
+ *   consistent across providers.
+ * - Preserves the provider's raw event name in `providerRawEventType` for audit/debugging.
+ * - Returns "ignored" for authenticated but uncorrelatable or unsupported events.
  */
-handleAuthenticatedResendWebhookWorkflow(input: {
-  rawBody: string;
-  headers: ResendWebhookHeaders;
-}): Promise<AuthenticatedWebhookResult>
+handleAuthenticatedEmailProviderEventWorkflow(input: {
+  deliveryEvent: EmailServiceDeliveryEvent;
+}): Promise<AuthenticatedDeliveryEventResult>
 ```
 
 ### Step Specifications
 
-#### Contract 5.3: Resend send-response normalization
+#### Contract 5.3: Email service send-response normalization
 ```ts
 /**
- * @contract normalizeResendSendResponse
+ * @contract normalizeEmailServiceSendResponse
  *
- * Maps the official Resend { data, error } shape into the invitation domain result.
- * Rejects impossible mixed states where both success and failure fields appear populated.
+ * Maps `EmailServiceSendResponse` into the invitation delivery-domain result.
+ * The invitation domain remains provider-agnostic; provider-specific response
+ * mapping must already have occurred inside the `EmailService` implementation.
  */
-normalizeResendSendResponse(response: ResendSendResponse): InvitationDeliveryResult
+normalizeEmailServiceSendResponse(response: EmailServiceSendResponse): InvitationDeliveryResult
 ```
 
 #### Contract 5.4: Invitation delivery-attempt persistence
@@ -1164,7 +1201,7 @@ normalizeResendSendResponse(response: ResendSendResponse): InvitationDeliveryRes
  * @contract recordInvitationSendResult
  *
  * Updates the delivery-tracking columns on the `invitations` row for invitationId.
- * Stores provider message id for webhook correlation when accepted for delivery.
+ * Stores provider message id for later delivery-event correlation when accepted for delivery.
  * Stores provider failure details when send failed immediately.
  */
 recordInvitationSendResult(input: {
@@ -1188,7 +1225,7 @@ verifyResendWebhookSignature(input: {
   rawBody: string;
   headers: ResendWebhookHeaders;
   signingSecret: ResendWebhookSecret;
-}): ResendWebhookEvent
+}): VerifiedResendWebhookPayload
 ```
 
 #### Contract 5.6: Webhook delivery-event persistence
@@ -1198,11 +1235,11 @@ verifyResendWebhookSignature(input: {
  *
  * Updates delivery-tracking columns on the `invitations` row when correlatable
  * through provider message id.
- * Supports email.failed, email.bounced, email.delivery_delayed, email.complained.
- * Returns "ignored" for verified but uncorrelatable or unsupported events.
+ * Stores canonical `deliveryEventType` values and the provider's raw event name.
+ * Returns "ignored" for authenticated but uncorrelatable or unsupported events.
  */
 recordInvitationDeliveryEvent(input: {
-  event: ResendWebhookEvent;
+  event: EmailServiceDeliveryEvent;
 }): Promise<"updated" | "ignored">
 ```
 
@@ -1213,6 +1250,8 @@ recordInvitationDeliveryEvent(input: {
  *
  * Reads the raw request body without destroying signature verification ability.
  * Uses Contract 5.5 before any delivery mutation occurs.
+ * Maps the verified Resend payload into `EmailServiceDeliveryEvent` before invoking
+ * invitation-domain delivery persistence.
  * Returns a non-success response for invalid signatures and malformed payloads.
  */
 handleResendWebhookRequest(request: Request): Promise<Response>
@@ -1227,14 +1266,14 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 - [ ] Verifies immediate response handling does not mutate invitation status or `list_collaborators`.
 
 #### Contract 5.2 checklist
-- [ ] Verifies invalid signatures are rejected.
-- [ ] Verifies supported events are persisted after successful verification.
-- [ ] Verifies valid but uncorrelatable events return "ignored".
+- [ ] Verifies supported authenticated delivery events are persisted.
+- [ ] Verifies canonical `deliveryEventType` values are stored consistently across providers.
+- [ ] Verifies authenticated but uncorrelatable events return "ignored".
 
 #### Contract 5.3 checklist
-- [ ] Verifies successful normalization of `{ data: { id }, error: null }`.
-- [ ] Verifies failed normalization of `{ data: null, error }`.
-- [ ] Verifies impossible mixed states are rejected.
+- [ ] Verifies successful normalization of `EmailServiceAcceptedSendResponse`.
+- [ ] Verifies failed normalization of `EmailServiceRejectedSendResponse`.
+- [ ] Verifies invitation-domain code consumes only `EmailServiceSendResponse`, not provider-specific response shapes.
 
 #### Contract 5.4 checklist
 - [ ] Verifies provider message ids are stored on the `invitations` row for accepted-for-delivery results.
@@ -1246,24 +1285,26 @@ handleResendWebhookRequest(request: Request): Promise<Response>
 - [ ] Verifies invalid signature material raises `InvalidWebhookSignatureError`.
 
 #### Contract 5.6 checklist
-- [ ] Verifies `email.failed` events update delivery columns when correlatable.
-- [ ] Verifies `email.bounced` events update delivery columns when correlatable.
-- [ ] Verifies `email.delivery_delayed` events update delivery columns when correlatable.
-- [ ] Verifies `email.complained` events update delivery columns when correlatable.
-- [ ] Verifies unsupported verified events return "ignored".
-- [ ] Verifies uncorrelatable verified events return "ignored".
+- [ ] Verifies `failed` delivery events update delivery columns when correlatable.
+- [ ] Verifies `bounced` delivery events update delivery columns when correlatable.
+- [ ] Verifies `delayed` delivery events update delivery columns when correlatable.
+- [ ] Verifies `complained` delivery events update delivery columns when correlatable.
+- [ ] Verifies raw provider event names are stored alongside canonical delivery event types.
+- [ ] Verifies unsupported authenticated events return "ignored".
+- [ ] Verifies uncorrelatable authenticated events return "ignored".
 
 #### Contract 5.7 checklist
 - [ ] Verifies the route reads raw body preserving signature verification.
 - [ ] Verifies signature verification occurs before any delivery mutation.
+- [ ] Verifies the route maps verified Resend payloads into `EmailServiceDeliveryEvent`.
 - [ ] Verifies invalid signatures return a non-success response.
 - [ ] Verifies malformed payloads return a non-success response.
 
 ### Specification-Driven TDD Workflow
-- First test to write: Failing unit test proving a successful Resend response normalizes to `accepted_for_delivery` (Contract 5.3).
+- First test to write: Failing unit test proving a successful `EmailServiceAcceptedSendResponse` normalizes to `accepted_for_delivery` (Contract 5.3).
 - Remaining contract-test inventory:
   1. Contract 5.3 failure normalization
-  2. Contract 5.3 mixed-state rejection
+  2. Contract 5.3 provider-agnostic boundary verification
   3. Contract 5.4 provider message id persistence
   4. Contract 5.4 failure detail persistence
   5. Contract 5.1 accepted-for-delivery integration
@@ -1271,21 +1312,22 @@ handleResendWebhookRequest(request: Request): Promise<Response>
   7. Contract 5.1 does not mutate recipient state
   8. Contract 5.5 invalid signature rejection
   9. Contract 5.5 successful verification
-  10. Contract 5.6 email.bounced persistence
-  11. Contract 5.6 remaining event types
+  10. Contract 5.6 bounced canonical-event persistence
+  11. Contract 5.6 remaining canonical event types + raw provider type storage
   12. Contract 5.6 unsupported/uncorrelatable ignored
-  13. Contract 5.2 + 5.7 authenticated webhook integration
+  13. Contract 5.2 + 5.7 authenticated webhook integration through the EmailService boundary
   14. Contract 5.7 raw body preservation
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
 - Delete-and-rebuild note: None. All files are new or extended.
 - Commands: `npm run test:unit`, `npm run test:integration`, `npm run typecheck`, `npm run lint`
 
 ### Files
-- `lib/email/resend.ts` — Add webhook verification, response normalization
-- `lib/invitations/service.ts` — Add `handleInvitationSendResponseWorkflow`, delivery persistence
+- `lib/email/resend.ts` — Add Resend webhook verification plus mapping to `EmailServiceSendResponse` and `EmailServiceDeliveryEvent`
+- `lib/invitations/service.ts` — Add `handleInvitationSendResponseWorkflow`, generic delivery-event handling, and delivery persistence
 - `app/api/webhooks/resend/route.ts` (new) — Webhook route handler
 - `app/lists/_actions/invitations.ts` — Add delivery workflow server action
-- `tests/unit/invitations/resend-response.test.ts` (new)
+- `tests/unit/invitations/email-provider-response.test.ts` (new)
+- `tests/unit/email/resend-webhook.test.ts` (new)
 - `tests/integration/invitations/delivery-response.test.ts` (new)
 
 ### Phase Gate
@@ -1473,10 +1515,13 @@ resolveInviteAcceptance(input: {
 #### Contract 6.4 checklist
 - [ ] Verifies the `accepted` outcome (invitation status + list_collaborators row + acceptedByUserId + resolvedAt).
 - [ ] Verifies the `pending_approval` outcome (invitation status + acceptedByUserId + acceptedByEmail, no list_collaborators row).
+- [ ] Verifies the allowed transition from open invitation to `accepted`.
+- [ ] Verifies the allowed transition from open invitation to `pending_approval`.
 - [ ] Verifies the `invalid` outcome.
 - [ ] Verifies the `expired` outcome.
 - [ ] Verifies the `revoked` outcome.
 - [ ] Verifies the `already_resolved` outcome.
+- [ ] Verifies non-open invitations do not transition again through acceptance.
 - [ ] Verifies a zero-row conditional acceptance update returns the correct terminal outcome.
 - [ ] Verifies acceptance loses a race to archive and creates no `list_collaborators` row.
 - [ ] Verifies acceptance loses a race to delete and creates no `list_collaborators` row.
@@ -1496,17 +1541,18 @@ resolveInviteAcceptance(input: {
   2. Contract 6.2 safe path acceptance
   3. Contract 6.3 continuation preserves token
   4. Contract 6.3 no absolute URLs
-  5. Contract 6.4 accepted outcome
-  6. Contract 6.4 pending_approval outcome
+  5. Contract 6.4 accepted state transition
+  6. Contract 6.4 pending_approval state transition
   7. Contract 6.4 expired outcome
   8. Contract 6.4 revoked outcome
   9. Contract 6.4 invalid outcome
   10. Contract 6.4 already_resolved outcome
-  11. Contract 6.1 logged-out redirect integration
-  12. Contract 6.1 matching-email acceptance integration
-  13. Contract 6.1 mismatched-email integration
-  14. Contract 6.1 reused-secret tests
-  15. Contract 6.5 e2e page rendering for each outcome
+  11. Contract 6.4 non-reenterable state transitions
+  12. Contract 6.1 logged-out redirect integration
+  13. Contract 6.1 matching-email acceptance integration
+  14. Contract 6.1 mismatched-email integration
+  15. Contract 6.1 reused-secret tests
+  16. Contract 6.5 e2e page rendering for each outcome
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
 - Delete-and-rebuild note: `signIn("github", { redirectTo: "/" })` in `app/sign-in/_components/sign-in.tsx:23` must be rewritten to accept a dynamic `redirectTo` parameter.
 - Commands: `npm run test:unit`, `npm run test:integration`, `npm run test:e2e:smoke`, `npm run typecheck`, `npm run lint`
@@ -1650,6 +1696,7 @@ invalidateOpenInvitesForList(input: {
 
 #### Contract 7.3 checklist
 - [ ] Verifies every open invitation in `invitations` for the target list is moved to the requested terminal state with `resolvedAt` set.
+- [ ] Verifies only open invitations transition to the requested terminal state; accepted, pending_approval, and already terminal rows remain unchanged.
 - [ ] Verifies `list_collaborators` rows are left unchanged by invalidation.
 - [ ] Verifies invitations for other lists are left unchanged by invalidation.
 
@@ -1664,15 +1711,16 @@ invalidateOpenInvitesForList(input: {
 ### Specification-Driven TDD Workflow
 - First test to write: Failing unit test proving one open invite is moved to `revoked` (Contract 7.3).
 - Remaining contract-test inventory:
-  1. Contract 7.3 accepted collaborators untouched
-  2. Contract 7.3 other lists untouched
-  3. Contract 7.1 archive integration (open invites invalidated before success observable)
-  4. Contract 7.1 accepted collaborators survive archive
-  5. Contract 7.1 unrelated lists untouched
-  6. Contract 7.2 token unusable after delete
-  7. Contract 7.2 no post-delete token race
-  8. Contract 7.4 release gate verification
-  9. Contract 7.4 runbook completeness
+  1. Contract 7.3 invalidates only open invitations
+  2. Contract 7.3 accepted collaborators untouched
+  3. Contract 7.3 other lists untouched
+  4. Contract 7.1 archive integration (open invites invalidated before success observable)
+  5. Contract 7.1 accepted collaborators survive archive
+  6. Contract 7.1 unrelated lists untouched
+  7. Contract 7.2 token unusable after delete
+  8. Contract 7.2 no post-delete token race
+  9. Contract 7.4 release gate verification
+  10. Contract 7.4 runbook completeness
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
 - Delete-and-rebuild note: `archiveList` (`app/lists/_actions/list.ts:328`) and `deleteList` (`app/lists/_actions/list.ts:401`) must be rewritten to include invalidation hooks.
 - Commands: `npm run test:unit`, `npm run test:integration`, `npm run verify:all`
@@ -1928,6 +1976,8 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 - [ ] Verifies approve flows remain server-authoritative.
 - [ ] Verifies reject flows remain server-authoritative.
 - [ ] Verifies copy-link flows remain server-authoritative.
+- [ ] Verifies approve performs the allowed `pending_approval -> accepted` transition atomically with collaborator creation.
+- [ ] Verifies reject performs the allowed `pending_approval -> revoked` transition without creating a collaborator row.
 
 ### Specification-Driven TDD Workflow
 - First test to write: Failing unit test proving an unauthorized actor is denied collaborator-management capability (Contract 8.2).
@@ -1937,12 +1987,14 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
   3. Contract 8.3 data loader returns accepted + open + pending_approval
   4. Contract 8.3 excludes unauthorized lists
   5. Contract 8.3 bounded query count
-  6. Contract 8.1 full workflow integration
-  7. Contract 8.5 unauthenticated redirect e2e
-  8. Contract 8.5 authenticated manager sees data e2e
-  9. Contract 8.6 resend e2e
-  10. Contract 8.6 approve e2e
-  11. Contract 8.6 revoke, reject, copy-link e2e (one at a time)
+  6. Contract 8.6 approve transition integration
+  7. Contract 8.6 reject transition integration
+  8. Contract 8.1 full workflow integration
+  9. Contract 8.5 unauthenticated redirect e2e
+  10. Contract 8.5 authenticated manager sees data e2e
+  11. Contract 8.6 resend e2e
+  12. Contract 8.6 approve e2e
+  13. Contract 8.6 revoke, reject, copy-link e2e (one at a time)
 - Execution rule: Complete each test through RED, GREEN, REFACTOR before adding the next.
 - Delete-and-rebuild note: `app/lists/_components/manage-collaborators.tsx` must be extended (not rewritten) to include pending invites and management actions.
 - Commands: `npm run test:unit`, `npm run test:integration`, `npm run test:e2e:smoke`, `npm run typecheck`, `npm run lint`
@@ -2000,10 +2052,66 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 - Archive and delete invalidation of `invitations` rows (Phase 7).
 - Whole collaborator-management data workflow merging `list_collaborators` and `invitations` with bounded-query requirement (Phase 8).
 
+### State Transition Contracts
+- Phase 4: issue and resend preserve the single-open-invite lifecycle shape (`new/open -> sent`, `open -> sent` via rotation only).
+- Phase 6: open invitations can transition to `accepted` or `pending_approval`; non-open invitations are non-reenterable.
+- Phase 7: only open invitations can transition to `revoked` or `expired`; accepted and pending_approval rows remain unchanged.
+- Phase 8: manager approval transitions `pending_approval -> accepted`; manager rejection transitions `pending_approval -> revoked`.
+
 ### E2E Contracts
 - Logged-out invite continuation through sign-in (Phase 6).
-- Invite acceptance outcomes for valid, invalid, expired, revoked, and pending_approval states (Phase 6).
+- Invite acceptance outcomes for valid, invalid, expired, revoked, already_resolved, and pending_approval states (Phase 6).
 - Invitation management actions for allowed managers (Phase 8).
+
+## E2E Scenario Matrix
+
+All invitation e2e scenarios use Playwright plus the Phase 4 test-stub `EmailService` unless a scenario explicitly exercises the production Resend adapter outside CI. The dependency list below is strict: a scenario should not be implemented before its prerequisite phases land.
+
+1. Harness smoke scenario
+   - Depends on: Phase 2
+   - Purpose: prove browser harness operability only
+2. Invite creation reaches the email stub and captures an acceptance URL
+   - Depends on: Phases 2, 4
+   - Purpose: prove end-to-end issuance without live third-party delivery
+3. Logged-out recipient follows invite, signs in, and accepts on matching email
+   - Depends on: Phases 2, 4, 6
+   - Purpose: happy-path invite continuation and acceptance
+4. Already-signed-in recipient accepts immediately on matching email
+   - Depends on: Phases 2, 4, 6
+   - Purpose: acceptance without redirect
+5. Recipient with mismatched email reaches `pending_approval`
+   - Depends on: Phases 2, 4, 6
+   - Purpose: verify mismatch handling does not create collaborator access
+6. Invalid invite token renders explicit invalid state
+   - Depends on: Phases 2, 4, 6
+   - Purpose: explicit terminal rendering with no mutation
+7. Expired invite token renders explicit expired state
+   - Depends on: Phases 2, 4, 6
+   - Purpose: expiry enforcement at acceptance time
+8. Reused resolved token renders explicit already_resolved state
+   - Depends on: Phases 2, 4, 6
+   - Purpose: prevent replay after acceptance or prior resolution
+9. Archived list invalidates an open invite link
+   - Depends on: Phases 2, 4, 6, 7
+   - Purpose: prove archive-time invalidation closes prior links
+10. Deleted list invalidates an open invite link
+   - Depends on: Phases 2, 4, 6, 7
+   - Purpose: prove delete-time invalidation closes prior links with no post-success race
+11. Manager approves a `pending_approval` invite
+   - Depends on: Phases 2, 4, 6, 8
+   - Purpose: prove `pending_approval -> accepted` plus collaborator creation
+12. Manager rejects a `pending_approval` invite
+   - Depends on: Phases 2, 4, 6, 8
+   - Purpose: prove `pending_approval -> revoked` without collaborator creation
+13. Manager resends an open invite and only the latest link remains valid
+   - Depends on: Phases 2, 4, 8
+   - Purpose: prove rotation through the management UI
+14. Manager revokes an open invite
+   - Depends on: Phases 2, 4, 8
+   - Purpose: prove revoke action closes the link immediately
+15. Unauthorized user cannot access collaborator-management data or actions
+   - Depends on: Phases 2, 4, 6, 8
+   - Purpose: prove server-authoritative authorization in the browser flow
 
 ## Migration Notes
 - Apply the `invitations` table migration (Phase 3) before shipping any invitation UI or acceptance route.
@@ -2016,7 +2124,7 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 ## Security Review
 
 **Status:** Concerns Noted
-**Reviewed:** 2026-03-10
+**Reviewed:** 2026-03-11
 
 ### Findings
 
@@ -2045,6 +2153,11 @@ getAvailableInvitationActions<TInvitation extends InvitationSummary>(input: {
 **Permission Model (Low Priority)**
 - Capability-based authorization is correct for this use case.
 - Ensure that `assertCanInviteCollaborators` and `assertCanManageCollaborators` check the database state at call time, not cached state, to prevent TOCTOU issues.
+
+**Test Email Adapter Boundary (Low Priority)**
+- The test-stub `EmailService` must be enabled only in test environments.
+- Any mailbox or invite-capture helper used by Playwright must not be reachable in production.
+- Production email adapters must not log raw acceptance URLs or tokens while sharing the same interface as the test stub.
 
 ### Checklist Coverage
 - [x] Authentication & Authorization: Capability-based checks, permission assertions
