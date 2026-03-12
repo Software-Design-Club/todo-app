@@ -38,14 +38,14 @@ Add public/private visibility setting to lists with proper authorization.
 Generate shareable links for public lists.
 
 **Related Tickets:**
-- [ ] ~~Creator/Collaborator can share a link to a list if its public~~
+- [x] ~~Creator/Collaborator can share a link to a list if its public~~
   - Note: Roadmap marked as completed but ticket pending - needs verification
 
 ### 4. List Archival and Deletion ✅
 Allow list owners to archive or delete lists.
 
 **Related Tickets:**
-- [ ] User can delete/archive a list
+- [x]  User can delete/archive a list
 
 ---
 
@@ -55,9 +55,8 @@ Allow list owners to archive or delete lists.
 Send email invitations when users are added as collaborators.
 
 **Related Tickets:**
-- [ ] User can invite someone who is not signed up to the app to a list - Send email to invitee
+- [x] User can invite someone who is not signed up to the app to a list - Send email to invitee
 - [ ] Unify invite flow: searching for an existing app user should send them an email invitation link rather than adding them directly as a collaborator — the email invite flow works regardless of whether the invitee has an account, so the user-search-and-add path should route through the same invitation workflow
-- [ ] On branches deployed to Vercel, sign in does not work because the redirect_uri does not match up with the redirect_ui registered in
 
 ### 6. Task Assignment [~]
 Enable list owners and collaborators to assign specific tasks to collaborators.
