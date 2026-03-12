@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import type { User, List, ListUser } from "@/lib/types";
+import type { InvitationSummary, List, ListUser, User } from "@/lib/types";
 import { CollaboratorListItem } from "./collaborator-list-item";
+import { PendingInvitationsList } from "./pending-invitations-list";
+import { InviteByEmailForm } from "./invite-by-email-form";
 import {
   searchUsers,
   addCollaborator,
@@ -14,11 +16,13 @@ import {
 interface ManageCollaboratorsProps {
   listId: List["id"];
   initialCollaborators: ListUser[];
+  initialInvitations: InvitationSummary[];
 }
 
 export default function ManageCollaborators({
   listId,
   initialCollaborators,
+  initialInvitations,
 }: ManageCollaboratorsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -197,6 +201,8 @@ export default function ManageCollaborators({
         )}
       </div>
 
+      <PendingInvitationsList invitations={initialInvitations} />
+
       <div>
         <h3 className="text-md font-semibold mb-2">Add New Collaborator</h3>
         <div className="flex gap-2 mb-3">
@@ -306,6 +312,18 @@ export default function ManageCollaborators({
           </div>
         )}
       </div>
+
+      <div>
+        <h3 className="text-md font-semibold mb-2">Invite by Email</h3>
+        <InviteByEmailForm listId={listId} />
+      </div>
+
+      <a
+        href={`/lists/collaborators#list-${listId}`}
+        className="block text-sm text-blue-600 hover:underline dark:text-blue-400"
+      >
+        Manage all →
+      </a>
     </div>
   );
 }

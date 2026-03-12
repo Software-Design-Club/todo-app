@@ -36,12 +36,13 @@ export function InviteByEmailForm({
             `Invitation saved but email delivery failed: ${result.emailServiceResponse.errorMessage}`,
           );
         }
-        router.refresh();
         formRef.current?.reset();
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Failed to send invitation.",
         );
+      } finally {
+        router.refresh();
       }
     });
   }

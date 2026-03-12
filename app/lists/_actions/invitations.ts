@@ -1,7 +1,7 @@
 "use server";
 
 import { sql } from "@vercel/postgres";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 
 import { auth } from "@/auth";
@@ -16,7 +16,19 @@ import { assertCanManageCollaborators } from "@/app/lists/_actions/permissions";
 import { verifyInvitationEnv } from "@/lib/invitations/env";
 import { sendInvitationEmail } from "@/lib/email/service";
 import { createInvitationSecret, hashInvitationSecret } from "@/lib/invitations/token";
-import type { EmailAddress, InvitationId, List, User, UserId } from "@/lib/types";
+import type {
+  EmailAddress,
+  InvitationId,
+  InvitationExpiry,
+  InvitationSummary,
+  List,
+  ListId,
+  NormalizedEmailAddress,
+  PendingApprovalInvitationSummary,
+  SentInvitationSummary,
+  User,
+  UserId,
+} from "@/lib/types";
 
 async function requireInvitationActionActorId(fallbackActorId?: UserId) {
   const session = await auth();
@@ -53,6 +65,65 @@ export async function inviteCollaborator(input: {
     inviterId,
     invitedEmail: input.invitedEmail,
     now: input.now ?? new Date(),
+  });
+}
+
+/**
+ * @contract getInvitations
+ *
+ * Returns open invitations (status `sent` or `pending_approval`) for a given list.
+ * Only callable by list owners; enforces collaborator-management permission.
+ *
+ * @throws CollaboratorManagementPermissionDeniedError if actorId is not an owner of the list.
+ */
+export async function getInvitations(
+  listId: List["id"],
+  actorId?: UserId,
+): Promise<InvitationSummary[]> {
+  const db = drizzle(sql);
+  const resolvedActorId = await requireInvitationActionActorId(actorId);
+
+  await assertCanManageCollaborators({ listId, actorId: resolvedActorId });
+
+  const rows = await db
+    .select({
+      id: InvitationsTable.id,
+      listId: InvitationsTable.listId,
+      invitedEmailNormalized: InvitationsTable.invitedEmailNormalized,
+      status: InvitationsTable.status,
+      expiresAt: InvitationsTable.expiresAt,
+      acceptedByUserId: InvitationsTable.acceptedByUserId,
+      acceptedByEmail: InvitationsTable.acceptedByEmail,
+    })
+    .from(InvitationsTable)
+    .where(
+      and(
+        eq(InvitationsTable.listId, listId),
+        inArray(InvitationsTable.status, ["sent", "pending_approval"]),
+      ),
+    );
+
+  return rows.map((row): InvitationSummary => {
+    if (row.status === "sent") {
+      return {
+        kind: "sent",
+        invitationId: row.id as SentInvitationSummary["invitationId"],
+        listId: row.listId as ListId,
+        invitedEmailNormalized: row.invitedEmailNormalized as NormalizedEmailAddress,
+        expiresAt: row.expiresAt as InvitationExpiry,
+      };
+    }
+
+    // pending_approval
+    return {
+      kind: "pending_approval",
+      invitationId: row.id as PendingApprovalInvitationSummary["invitationId"],
+      listId: row.listId as ListId,
+      invitedEmailNormalized: row.invitedEmailNormalized as NormalizedEmailAddress,
+      expiresAt: row.expiresAt as InvitationExpiry,
+      acceptedByUserId: row.acceptedByUserId as UserId,
+      acceptedByEmail: row.acceptedByEmail as NormalizedEmailAddress | null,
+    };
   });
 }
 

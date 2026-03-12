@@ -17,13 +17,19 @@ import {
   DropdownMenuSeparator,
 } from "@/ui/dropdown-menu";
 import { getCollaborators } from "@/app/lists/_actions/collaborators";
+import { getInvitations } from "@/app/lists/_actions/invitations";
 import {
   isAuthorizedToEditCollaborators,
   userCanEditList,
   isAuthorizedToChangeVisibility,
 } from "@/app/lists/_actions/permissions";
 import { RoleBadge } from "@/components/ui/role-badge";
-import { type DisplayUserRole, VIEWER_ROLE, toDisplayUserRole } from "@/lib/types";
+import {
+  type DisplayUserRole,
+  type InvitationSummary,
+  VIEWER_ROLE,
+  toDisplayUserRole,
+} from "@/lib/types";
 import { Lock, Globe } from "lucide-react";
 
 interface ListProps {
@@ -62,6 +68,15 @@ const List: React.FC<ListProps> = async ({ listId }) => {
       userRole = toDisplayUserRole(currentUserCollaborator.Role);
     } else if (list.visibility === "public" && list.state === "active") {
       userRole = VIEWER_ROLE;
+    }
+  }
+
+  let initialInvitations: InvitationSummary[] = [];
+  if (editableCollaborators) {
+    try {
+      initialInvitations = await getInvitations(list.id);
+    } catch {
+      // graceful fallback — section will be absent
     }
   }
 
@@ -114,6 +129,7 @@ const List: React.FC<ListProps> = async ({ listId }) => {
                 <ManageCollaborators
                   listId={list.id}
                   initialCollaborators={collaborators}
+                  initialInvitations={initialInvitations}
                 />
               </DropdownMenuContent>
             </DropdownMenu>

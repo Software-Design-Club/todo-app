@@ -150,7 +150,7 @@ function ListManagementCard({
   );
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
+    <div id={`list-${view.list.id}`} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
       <h2 className="text-lg font-bold">{view.list.title}</h2>
 
       <AcceptedCollaboratorsList view={view} />

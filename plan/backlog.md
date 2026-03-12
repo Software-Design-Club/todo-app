@@ -56,6 +56,7 @@ Send email invitations when users are added as collaborators.
 
 **Related Tickets:**
 - [ ] User can invite someone who is not signed up to the app to a list - Send email to invitee
+- [ ] Unify invite flow: searching for an existing app user should send them an email invitation link rather than adding them directly as a collaborator — the email invite flow works regardless of whether the invitee has an account, so the user-search-and-add path should route through the same invitation workflow
 - [ ] On branches deployed to Vercel, sign in does not work because the redirect_uri does not match up with the redirect_ui registered in
 
 ### 6. Task Assignment [~]
