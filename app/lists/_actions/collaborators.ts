@@ -1,8 +1,8 @@
 "use server";
 import { sql } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
-import { eq, or, ilike, and } from "drizzle-orm";
-import { ListCollaboratorsTable, UsersTable } from "@/drizzle/schema";
+import { eq, or, ilike, and, notInArray } from "drizzle-orm";
+import { ListCollaboratorsTable, UsersTable, InvitationsTable } from "@/drizzle/schema";
 import { revalidatePath } from "next/cache";
 import type { List, User, ListUser } from "@/lib/types";
 import { createTaggedUser, createTaggedListUser } from "@/lib/types";
@@ -44,6 +44,63 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
     // Optionally, throw a more specific error or return an empty array
     // throw new Error("Failed to search users due to a database error.");
     return []; // Return empty array on error to prevent breaking the client
+  }
+}
+
+export async function searchInvitableUsers(
+  searchTerm: string,
+  listId: List["id"]
+): Promise<User[]> {
+  console.log("[Server Action] Searching invitable users for:", searchTerm);
+  if (!searchTerm.trim()) {
+    return [];
+  }
+
+  const lowerSearchTerm = `%${searchTerm.toLowerCase()}%`;
+
+  try {
+    const acceptedCollaboratorIds = db
+      .select({ userId: ListCollaboratorsTable.userId })
+      .from(ListCollaboratorsTable)
+      .where(eq(ListCollaboratorsTable.listId, listId));
+
+    const openInvitationEmails = db
+      .select({ email: InvitationsTable.invitedEmailNormalized })
+      .from(InvitationsTable)
+      .where(
+        and(
+          eq(InvitationsTable.listId, listId),
+          or(
+            eq(InvitationsTable.status, "sent"),
+            eq(InvitationsTable.status, "pending")
+          )
+        )
+      );
+
+    const usersFromDb = await db
+      .select({
+        id: UsersTable.id,
+        name: UsersTable.name,
+        email: UsersTable.email,
+      })
+      .from(UsersTable)
+      .where(
+        and(
+          or(
+            ilike(UsersTable.name, lowerSearchTerm),
+            ilike(UsersTable.email, lowerSearchTerm)
+          ),
+          notInArray(UsersTable.id, acceptedCollaboratorIds),
+          // invitedEmailNormalized is non-null for pending/sent per DB check constraint
+          notInArray(UsersTable.email, openInvitationEmails)
+        )
+      )
+      .limit(10);
+
+    return usersFromDb.map(createTaggedUser);
+  } catch (error) {
+    console.error("Database error while searching invitable users:", error);
+    return [];
   }
 }
 
