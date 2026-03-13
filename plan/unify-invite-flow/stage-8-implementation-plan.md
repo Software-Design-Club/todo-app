@@ -541,9 +541,8 @@ In `ManageCollaborators`, the confirmation button label reads `"Invite {selected
 - [ ] `npm run lint` passes
 
 #### Manual Verification
-- [ ] Confirmation button reads "Invite {name}" in the browser
-- [ ] Error toast appears and panel stays open when email delivery is simulated to fail
-- [ ] No `list_collaborators` row visible in DB after invite (check DB directly or via existing collaborators query)
+
+None — all manual checks consolidated at Phase 3 gate.
 
 ---
 
@@ -685,6 +684,9 @@ where `invitation` is `SentInvitationSummary`. The pending list reflects the new
 - [ ] `npm run test:integration` passes (full suite regression)
 
 #### Manual Verification
+- [ ] Confirmation button reads "Invite {name}" in the browser
+- [ ] Error toast appears and panel stays open when email delivery is simulated to fail
+- [ ] No `list_collaborators` row visible in DB after invite (check DB directly or via existing collaborators query)
 - [ ] Invite via search-select → pending list updates immediately, dropdown stays open, search panel clears
 - [ ] Invite via email form inside dropdown → pending list updates immediately, dropdown stays open
 - [ ] Invite via email form on `/lists/collaborators` → `router.refresh()` fires (page updates), no regression
