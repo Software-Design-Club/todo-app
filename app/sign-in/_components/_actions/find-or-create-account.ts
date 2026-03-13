@@ -24,7 +24,7 @@ export async function findOrCreateAccount(
     const [newUser] = await db
       .insert(UsersTable)
       .values({
-        email: credentials.email,
+        email: credentials.email.trim().toLowerCase(),
         name: credentials.name || credentials.email,
         status: "active",
       })
