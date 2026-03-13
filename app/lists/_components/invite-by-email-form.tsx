@@ -5,12 +5,14 @@ import { useRef, useTransition } from "react";
 import { toast } from "sonner";
 
 import { inviteCollaborator } from "@/app/lists/_actions/invitations";
-import type { EmailAddress, List } from "@/lib/types";
+import type { EmailAddress, List, SentInvitationSummary } from "@/lib/types";
 
 export function InviteByEmailForm({
   listId,
+  onSuccess,
 }: {
   listId: List["id"];
+  onSuccess?: (invitation: SentInvitationSummary) => void;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -31,6 +33,11 @@ export function InviteByEmailForm({
 
         if (result.kind === "success") {
           toast.success(`Invitation sent to ${email}`);
+          if (onSuccess) {
+            onSuccess(result.invitation);
+          } else {
+            router.refresh();
+          }
         } else {
           toast.error(result.errorMessage);
         }
@@ -39,8 +46,6 @@ export function InviteByEmailForm({
         toast.error(
           err instanceof Error ? err.message : "Failed to send invitation.",
         );
-      } finally {
-        router.refresh();
       }
     });
   }

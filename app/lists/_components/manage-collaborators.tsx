@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import type { EmailAddress, InvitationSummary, List, ListUser, User } from "@/lib/types";
+import type { EmailAddress, InvitationSummary, List, ListUser, SentInvitationSummary, User } from "@/lib/types";
 import { CollaboratorListItem } from "./collaborator-list-item";
 import { PendingInvitationsList } from "./pending-invitations-list";
 import { InviteByEmailForm } from "./invite-by-email-form";
@@ -32,6 +32,7 @@ export default function ManageCollaborators({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentCollaborators, setCurrentCollaborators] =
     useState<ListUser[]>(initialCollaborators);
+  const [invitations, setInvitations] = useState<InvitationSummary[]>(initialInvitations);
 
   useEffect(() => {
     setCurrentCollaborators(initialCollaborators);
@@ -61,6 +62,7 @@ export default function ManageCollaborators({
       }),
     onSuccess: (result, user: User) => {
       if (result.kind === "success") {
+        setInvitations((prev) => [...prev, result.invitation as SentInvitationSummary]);
         setSuccessMessage(`Invitation sent to ${user.name}.`);
         setSelectedUserToAdd(null);
         setSearchTerm("");
@@ -72,11 +74,7 @@ export default function ManageCollaborators({
       }
     },
     onError: (err: Error) => {
-      setError(
-        `Failed to invite ${selectedUserToAdd?.name || "user"}. ${
-          err.message || "Please try again."
-        }`
-      );
+      setError(err.message || "Failed to send invitation.");
       setSuccessMessage(null);
     },
   });
@@ -192,10 +190,10 @@ export default function ManageCollaborators({
         )}
       </div>
 
-      <PendingInvitationsList invitations={initialInvitations} />
+      <PendingInvitationsList invitations={invitations} />
 
       <div>
-        <h3 className="text-md font-semibold mb-2">Add New Collaborator</h3>
+        <h3 className="text-md font-semibold mb-2">Invite New Collaborators</h3>
         <div className="flex gap-2 mb-3">
           <input
             type="text"
@@ -306,7 +304,10 @@ export default function ManageCollaborators({
 
       <div>
         <h3 className="text-md font-semibold mb-2">Invite by Email</h3>
-        <InviteByEmailForm listId={listId} />
+        <InviteByEmailForm
+          listId={listId}
+          onSuccess={(invitation) => setInvitations((prev) => [...prev, invitation])}
+        />
       </div>
 
       <a

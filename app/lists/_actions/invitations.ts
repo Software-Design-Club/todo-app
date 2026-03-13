@@ -15,7 +15,10 @@ import {
 import { assertCanManageCollaborators } from "@/app/lists/_actions/permissions";
 import { verifyInvitationEnv } from "@/lib/invitations/env";
 import { sendInvitationEmail } from "@/lib/email/service";
-import { createInvitationSecret, hashInvitationSecret } from "@/lib/invitations/token";
+import {
+  createInvitationSecret,
+  hashInvitationSecret,
+} from "@/lib/invitations/token";
 import type {
   EmailAddress,
   InvitationId,
@@ -65,7 +68,10 @@ export async function inviteCollaborator(input: {
   const inviterId = await requireInvitationActionActorId(input.inviterId);
 
   // Permission check BEFORE try-catch — throws CollaboratorManagementPermissionDeniedError if not owner
-  await assertCanManageCollaborators({ listId: input.listId, actorId: inviterId });
+  await assertCanManageCollaborators({
+    listId: input.listId,
+    actorId: inviterId,
+  });
 
   try {
     const result = await inviteCollaboratorWorkflow({
@@ -88,7 +94,9 @@ export async function inviteCollaborator(input: {
         kind: "sent",
         invitationId: result.invitationId,
         listId: input.listId,
-        invitedEmailNormalized: input.invitedEmail.trim().toLowerCase() as NormalizedEmailAddress,
+        invitedEmailNormalized: input.invitedEmail
+          .trim()
+          .toLowerCase() as NormalizedEmailAddress,
         expiresAt: result.expiresAt,
       },
     };
@@ -98,7 +106,10 @@ export async function inviteCollaborator(input: {
     }
     return {
       kind: "failure",
-      errorMessage: error instanceof Error && error.message ? error.message : "Failed to send invitation.",
+      errorMessage:
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to send invitation.",
     };
   }
 }
@@ -144,7 +155,8 @@ export async function getInvitations(
         kind: "sent",
         invitationId: row.id as SentInvitationSummary["invitationId"],
         listId: row.listId as ListId,
-        invitedEmailNormalized: row.invitedEmailNormalized as NormalizedEmailAddress,
+        invitedEmailNormalized:
+          row.invitedEmailNormalized as NormalizedEmailAddress,
         expiresAt: row.expiresAt as InvitationExpiry,
       };
     }
@@ -154,7 +166,8 @@ export async function getInvitations(
       kind: "pending_approval",
       invitationId: row.id as PendingApprovalInvitationSummary["invitationId"],
       listId: row.listId as ListId,
-      invitedEmailNormalized: row.invitedEmailNormalized as NormalizedEmailAddress,
+      invitedEmailNormalized:
+        row.invitedEmailNormalized as NormalizedEmailAddress,
       expiresAt: row.expiresAt as InvitationExpiry,
       acceptedByUserId: row.acceptedByUserId as UserId,
       acceptedByEmail: row.acceptedByEmail as NormalizedEmailAddress | null,
