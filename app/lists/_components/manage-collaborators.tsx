@@ -3,15 +3,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/ui/button";
 import { useMutation } from "@tanstack/react-query";
-import type { InvitationSummary, List, ListUser, User } from "@/lib/types";
+import type { EmailAddress, InvitationSummary, List, ListUser, User } from "@/lib/types";
 import { CollaboratorListItem } from "./collaborator-list-item";
 import { PendingInvitationsList } from "./pending-invitations-list";
 import { InviteByEmailForm } from "./invite-by-email-form";
 import {
-  searchUsers,
-  addCollaborator,
+  searchInvitableUsers,
   removeCollaborator,
 } from "@/app/lists/_actions/collaborators";
+import { inviteCollaborator } from "@/app/lists/_actions/invitations";
 
 interface ManageCollaboratorsProps {
   listId: List["id"];
@@ -53,28 +53,28 @@ export default function ManageCollaborators({
     );
   }, []);
 
-  const addCollaboratorMutation = useMutation({
-    mutationFn: (user: User) => addCollaborator(user, listId),
-    onSuccess: (addedUser: ListUser, user: User) => {
-      setSuccessMessage(`${user.name} added as a collaborator.`);
-
-      setCurrentCollaborators((prev) => {
-        if (!prev.find((c) => c.User.id === addedUser.User.id)) {
-          return [...prev, addedUser];
-        }
-        return prev;
-      });
-
-      setSelectedUserToAdd(null);
-      setSearchTerm("");
-      setSearchResults([]);
-      setError(null);
-      // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] }); // Example if you fetch collaborators separately
+  const inviteCollaboratorMutation = useMutation({
+    mutationFn: (user: User) =>
+      inviteCollaborator({
+        listId,
+        invitedEmail: user.email as unknown as EmailAddress,
+      }),
+    onSuccess: (result, user: User) => {
+      if (result.kind === "success") {
+        setSuccessMessage(`Invitation sent to ${user.name}.`);
+        setSelectedUserToAdd(null);
+        setSearchTerm("");
+        setSearchResults([]);
+        setError(null);
+      } else {
+        setError(result.errorMessage);
+        setSuccessMessage(null);
+      }
     },
-    onError: (error: Error) => {
+    onError: (err: Error) => {
       setError(
-        `Failed to add ${selectedUserToAdd?.name || "user"}. ${
-          error.message || "Please try again."
+        `Failed to invite ${selectedUserToAdd?.name || "user"}. ${
+          err.message || "Please try again."
         }`
       );
       setSuccessMessage(null);
@@ -94,15 +94,14 @@ export default function ManageCollaborators({
         prev.filter((user) => user.User.id !== listUser.User.id)
       );
       setError(null);
-      // queryClient.invalidateQueries({ queryKey: ["list", listId, "collaborators"] });
     },
-    onError: (error: Error, listUser: ListUser) => {
+    onError: (err: Error, listUser: ListUser) => {
       const user = currentCollaborators.find(
         (c) => c.User.id === listUser.User.id
       );
       setError(
         `Failed to remove ${user?.User.name || "user"}. ${
-          error.message || "Please try again."
+          err.message || "Please try again."
         }`
       );
       setSuccessMessage(null);
@@ -122,17 +121,9 @@ export default function ManageCollaborators({
     setSearchResults([]);
 
     try {
-      const users = await searchUsers(searchTerm);
-      // Filter out users who are already collaborators
-      const newResults = users.filter(
-        (user) => !currentCollaborators.some((c) => c.User.id === user.id)
-      );
-      setSearchResults(newResults);
-      if (newResults.length === 0 && users.length > 0) {
-        setError(
-          "All found users are already collaborators or user not found."
-        );
-      } else if (users.length === 0) {
+      const users = await searchInvitableUsers(searchTerm, listId);
+      setSearchResults(users);
+      if (users.length === 0) {
         setError("No users found.");
       }
     } catch (err: unknown) {
@@ -147,10 +138,10 @@ export default function ManageCollaborators({
     }
   };
 
-  const handleAddCollaborator = () => {
+  const handleInviteCollaborator = () => {
     if (selectedUserToAdd) {
       clearMessages();
-      addCollaboratorMutation.mutate(selectedUserToAdd);
+      inviteCollaboratorMutation.mutate(selectedUserToAdd);
     }
   };
 
@@ -221,7 +212,7 @@ export default function ManageCollaborators({
             onKeyDown={(e) => {
               if (
                 e.key === "Enter" &&
-                !addCollaboratorMutation.isPending &&
+                !inviteCollaboratorMutation.isPending &&
                 !searchLoading
               ) {
                 handleSearch();
@@ -230,7 +221,7 @@ export default function ManageCollaborators({
             placeholder="Search by name or email"
             className="border border-gray-300 p-2 rounded-md text-sm flex-grow focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             disabled={
-              addCollaboratorMutation.isPending ||
+              inviteCollaboratorMutation.isPending ||
               searchLoading ||
               removeCollaboratorMutation.isPending
             }
@@ -240,7 +231,7 @@ export default function ManageCollaborators({
             disabled={
               searchLoading ||
               !searchTerm.trim() ||
-              addCollaboratorMutation.isPending ||
+              inviteCollaboratorMutation.isPending ||
               removeCollaboratorMutation.isPending
             }
             variant="outline"
@@ -259,7 +250,7 @@ export default function ManageCollaborators({
                   onClick={() => {
                     setSelectedUserToAdd(user);
                     clearMessages();
-                    addCollaboratorMutation.reset();
+                    inviteCollaboratorMutation.reset();
                   }}
                   className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
                 >
@@ -275,32 +266,32 @@ export default function ManageCollaborators({
 
         {selectedUserToAdd && (
           <div className="p-2 bg-blue-50 dark:bg-gray-700 border border-blue-200 dark:border-gray-600 rounded-md">
-            <p className="text-sm font-medium mb-1">Add this user?</p>
+            <p className="text-sm font-medium mb-1">Invite this user?</p>
             <p className="font-semibold text-sm">{selectedUserToAdd.name}</p>
             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
               {selectedUserToAdd.email}
             </p>
             <Button
-              onClick={handleAddCollaborator}
+              onClick={handleInviteCollaborator}
               disabled={
-                addCollaboratorMutation.isPending ||
+                inviteCollaboratorMutation.isPending ||
                 removeCollaboratorMutation.isPending
               }
               className="w-full mb-1"
               size="sm"
             >
-              {addCollaboratorMutation.isPending
-                ? "Adding..."
-                : `Add ${selectedUserToAdd.name}`}
+              {inviteCollaboratorMutation.isPending
+                ? "Inviting..."
+                : `Invite ${selectedUserToAdd.name}`}
             </Button>
             <Button
               onClick={() => {
                 setSelectedUserToAdd(null);
                 clearMessages();
-                addCollaboratorMutation.reset();
+                inviteCollaboratorMutation.reset();
               }}
               disabled={
-                addCollaboratorMutation.isPending ||
+                inviteCollaboratorMutation.isPending ||
                 removeCollaboratorMutation.isPending
               }
               variant="ghost"

@@ -59,6 +59,7 @@ export type InviteCollaboratorWorkflowResult = {
   invitationId: InvitationId;
   acceptanceUrl: AbsoluteInvitationUrl;
   emailServiceResponse: EmailServiceSendResponse;
+  expiresAt: InvitationExpiry;
 };
 
 function normalizeInvitedEmailAddress(
@@ -305,6 +306,7 @@ export async function inviteCollaboratorWorkflow(input: {
     invitationId: persistedInvitation.invitationId,
     acceptanceUrl,
     emailServiceResponse,
+    expiresAt: persistedInvitation.expiresAt,
   };
 }
 

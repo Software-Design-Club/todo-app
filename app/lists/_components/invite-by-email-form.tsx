@@ -29,12 +29,10 @@ export function InviteByEmailForm({
           invitedEmail: email as EmailAddress,
         });
 
-        if (result.emailServiceResponse.kind === "accepted") {
+        if (result.kind === "success") {
           toast.success(`Invitation sent to ${email}`);
         } else {
-          toast.error(
-            `Invitation saved but email delivery failed: ${result.emailServiceResponse.errorMessage}`,
-          );
+          toast.error(result.errorMessage);
         }
         formRef.current?.reset();
       } catch (err) {

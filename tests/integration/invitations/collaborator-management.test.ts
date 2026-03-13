@@ -982,3 +982,224 @@ describe("Phase 8: approveInvitation / rejectInvitation (Contract 8.6)", () => {
     expect(invitation?.providerMessageId).toBeNull();
   });
 });
+
+// ─── Phase 2: Invite Routing (Contracts 2.3–2.7) ───────────────────────────
+
+async function importInvitationActionsWithEmailHelper() {
+  const client = getIntegrationSqlClient();
+
+  vi.resetModules();
+  vi.doMock("@/auth", () => ({
+    auth: vi.fn().mockResolvedValue(null),
+  }));
+  vi.doMock("@vercel/postgres", async () => {
+    const actual =
+      await vi.importActual<typeof import("@vercel/postgres")>(
+        "@vercel/postgres",
+      );
+
+    return {
+      ...actual,
+      sql: client,
+    };
+  });
+
+  const invitationActions = await import(
+    "../../../app/lists/_actions/invitations"
+  );
+  const emailService = await import("../../../lib/email/service");
+
+  return {
+    ...invitationActions,
+    ...emailService,
+  };
+}
+
+async function countListCollaboratorRows(listId: number) {
+  const client = getIntegrationSqlClient();
+  const result = await client.sql<{ count: string }>`
+    select count(*)::text as count
+    from list_collaborators
+    where "listId" = ${listId}
+  `;
+  return Number(result.rows[0]!.count);
+}
+
+describe("Phase 2: inviteCollaborator server action (Contracts 2.3–2.7)", () => {
+  it("T2: Contract 2.3 — success path returns tagged union { kind: 'success', invitation: SentInvitationSummary }", async () => {
+    const emailSuffix = Date.now();
+    const ownerId = await insertUser(
+      "Phase2 Success Owner",
+      `phase2-success-owner-${emailSuffix}@example.com`,
+    );
+    const listId = await insertList("Phase2 Success List", ownerId);
+    await addCollaboratorRow({ listId, userId: ownerId, role: "owner" });
+
+    const { inviteCollaborator, setEmailServiceForTesting } =
+      await importInvitationActionsWithEmailHelper();
+
+    setEmailServiceForTesting({
+      sendInvitationEmail: vi.fn().mockResolvedValue({
+        kind: "accepted" as const,
+        providerMessageId: "provider-phase2-success" as never,
+      }),
+    });
+    vi.stubEnv("RESEND_API_KEY", "resend-key");
+    vi.stubEnv("EMAIL_FROM", "owner@example.com");
+    vi.stubEnv("APP_BASE_URL", "https://example.com");
+
+    const now = new Date("2026-03-13T10:00:00.000Z");
+    const result = await inviteCollaborator({
+      listId: listId as never,
+      inviterId: ownerId,
+      invitedEmail: "Phase2Invitee@example.com" as never,
+      now,
+    });
+
+    expect(result.kind).toBe("success");
+    if (result.kind === "success") {
+      expect(result.invitation.kind).toBe("sent");
+      expect(result.invitation.invitedEmailNormalized).toBe("phase2invitee@example.com");
+      expect(Number(result.invitation.listId)).toBe(listId);
+      expect(result.invitation.expiresAt).toBeInstanceOf(Date);
+      expect(result.invitation.invitationId).toBeTruthy();
+    }
+  });
+
+  it("T3: Contract 2.4 — delivery failure folds into { kind: 'failure', errorMessage }", async () => {
+    const emailSuffix = Date.now();
+    const ownerId = await insertUser(
+      "Phase2 Delivery Fail Owner",
+      `phase2-delfail-owner-${emailSuffix}@example.com`,
+    );
+    const listId = await insertList("Phase2 Delivery Fail List", ownerId);
+    await addCollaboratorRow({ listId, userId: ownerId, role: "owner" });
+
+    const { inviteCollaborator, setEmailServiceForTesting } =
+      await importInvitationActionsWithEmailHelper();
+
+    setEmailServiceForTesting({
+      sendInvitationEmail: vi.fn().mockResolvedValue({
+        kind: "rejected" as const,
+        errorMessage: "smtp timeout" as never,
+      }),
+    });
+    vi.stubEnv("RESEND_API_KEY", "resend-key");
+    vi.stubEnv("EMAIL_FROM", "owner@example.com");
+    vi.stubEnv("APP_BASE_URL", "https://example.com");
+
+    const result = await inviteCollaborator({
+      listId: listId as never,
+      inviterId: ownerId,
+      invitedEmail: "phase2delfail@example.com" as never,
+      now: new Date(),
+    });
+
+    expect(result.kind).toBe("failure");
+    if (result.kind === "failure") {
+      expect(result.errorMessage).toContain("Invitation saved but email delivery failed:");
+      expect(result.errorMessage).toContain("smtp timeout");
+    }
+  });
+
+  it("T4: Contract 2.5 — workflow errors fold into { kind: 'failure' }", async () => {
+    const emailSuffix = Date.now();
+    const ownerId = await insertUser(
+      "Phase2 Workflow Err Owner",
+      `phase2-wferr-owner-${emailSuffix}@example.com`,
+    );
+    const listId = await insertList("Phase2 Workflow Err List", ownerId);
+    await addCollaboratorRow({ listId, userId: ownerId, role: "owner" });
+
+    const { inviteCollaborator, setEmailServiceForTesting } =
+      await importInvitationActionsWithEmailHelper();
+
+    setEmailServiceForTesting({
+      sendInvitationEmail: vi.fn().mockRejectedValue(new Error("network error")),
+    });
+    vi.stubEnv("RESEND_API_KEY", "resend-key");
+    vi.stubEnv("EMAIL_FROM", "owner@example.com");
+    vi.stubEnv("APP_BASE_URL", "https://example.com");
+
+    const result = await inviteCollaborator({
+      listId: listId as never,
+      inviterId: ownerId,
+      invitedEmail: "phase2wferr@example.com" as never,
+      now: new Date(),
+    });
+
+    expect(result.kind).toBe("failure");
+    if (result.kind === "failure") {
+      expect(result.errorMessage).toBeTruthy();
+    }
+  });
+
+  it("T5: Contract 2.6 — non-owner throws CollaboratorManagementPermissionDeniedError (not folded)", async () => {
+    const emailSuffix = Date.now();
+    const ownerId = await insertUser(
+      "Phase2 Perm Owner",
+      `phase2-perm-owner-${emailSuffix}@example.com`,
+    );
+    const nonOwnerId = await insertUser(
+      "Phase2 Perm NonOwner",
+      `phase2-perm-nonowner-${emailSuffix}@example.com`,
+    );
+    const listId = await insertList("Phase2 Perm List", ownerId);
+    await addCollaboratorRow({ listId, userId: ownerId, role: "owner" });
+    await addCollaboratorRow({ listId, userId: nonOwnerId, role: "collaborator" });
+
+    const { inviteCollaborator } =
+      await importInvitationActionsWithEmailHelper();
+
+    vi.stubEnv("RESEND_API_KEY", "resend-key");
+    vi.stubEnv("EMAIL_FROM", "owner@example.com");
+    vi.stubEnv("APP_BASE_URL", "https://example.com");
+
+    await expect(
+      inviteCollaborator({
+        listId: listId as never,
+        inviterId: nonOwnerId,
+        invitedEmail: "phase2perm@example.com" as never,
+        now: new Date(),
+      }),
+    ).rejects.toMatchObject({
+      name: "CollaboratorManagementPermissionDeniedError",
+    });
+  });
+
+  it("T6: Contract 2.3/2.7 — success does not insert list_collaborators row", async () => {
+    const emailSuffix = Date.now();
+    const ownerId = await insertUser(
+      "Phase2 No Row Owner",
+      `phase2-norow-owner-${emailSuffix}@example.com`,
+    );
+    const listId = await insertList("Phase2 No Row List", ownerId);
+    await addCollaboratorRow({ listId, userId: ownerId, role: "owner" });
+
+    const collaboratorsBefore = await countListCollaboratorRows(listId);
+
+    const { inviteCollaborator, setEmailServiceForTesting } =
+      await importInvitationActionsWithEmailHelper();
+
+    setEmailServiceForTesting({
+      sendInvitationEmail: vi.fn().mockResolvedValue({
+        kind: "accepted" as const,
+        providerMessageId: "provider-norow" as never,
+      }),
+    });
+    vi.stubEnv("RESEND_API_KEY", "resend-key");
+    vi.stubEnv("EMAIL_FROM", "owner@example.com");
+    vi.stubEnv("APP_BASE_URL", "https://example.com");
+
+    const result = await inviteCollaborator({
+      listId: listId as never,
+      inviterId: ownerId,
+      invitedEmail: "phase2norow@example.com" as never,
+      now: new Date(),
+    });
+
+    expect(result.kind).toBe("success");
+    const collaboratorsAfter = await countListCollaboratorRows(listId);
+    expect(collaboratorsAfter).toBe(collaboratorsBefore);
+  });
+});

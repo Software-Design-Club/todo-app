@@ -156,6 +156,10 @@ export type InvitePageOutcome = Exclude<ResolveInviteAcceptanceResult, AcceptedI
 
 // ─── Phase 8: Collaborator Management Types ────────────────────────────────
 
+export type InviteCollaboratorResult =
+  | { kind: "success"; invitation: SentInvitationSummary }
+  | { kind: "failure"; errorMessage: string };
+
 export type SentInvitationSummary = {
   kind: "sent";
   invitationId: InvitationId;

@@ -20,6 +20,7 @@ import type {
   EmailAddress,
   InvitationId,
   InvitationExpiry,
+  InviteCollaboratorResult,
   InvitationSummary,
   List,
   ListId,
@@ -29,6 +30,7 @@ import type {
   User,
   UserId,
 } from "@/lib/types";
+import { CollaboratorManagementPermissionDeniedError } from "@/lib/invitations/errors";
 
 async function requireInvitationActionActorId(fallbackActorId?: UserId) {
   const session = await auth();
@@ -48,24 +50,57 @@ async function requireInvitationActionActorId(fallbackActorId?: UserId) {
 }
 
 /**
- * @contract inviteCollaborator
+ * @contract inviteCollaborator (Contracts 2.3–2.6)
  *
  * Server-action wrapper around the invitation issuing workflow.
+ * Returns InviteCollaboratorResult tagged union on success/delivery failure.
+ * Propagates CollaboratorManagementPermissionDeniedError without folding.
  */
 export async function inviteCollaborator(input: {
   listId: List["id"];
   inviterId?: User["id"];
   invitedEmail: EmailAddress;
   now?: Date;
-}) {
+}): Promise<InviteCollaboratorResult> {
   const inviterId = await requireInvitationActionActorId(input.inviterId);
 
-  return inviteCollaboratorWorkflow({
-    listId: input.listId,
-    inviterId,
-    invitedEmail: input.invitedEmail,
-    now: input.now ?? new Date(),
-  });
+  // Permission check BEFORE try-catch — throws CollaboratorManagementPermissionDeniedError if not owner
+  await assertCanManageCollaborators({ listId: input.listId, actorId: inviterId });
+
+  try {
+    const result = await inviteCollaboratorWorkflow({
+      listId: input.listId,
+      inviterId,
+      invitedEmail: input.invitedEmail,
+      now: input.now ?? new Date(),
+    });
+
+    if (result.emailServiceResponse.kind === "rejected") {
+      return {
+        kind: "failure",
+        errorMessage: `Invitation saved but email delivery failed: ${result.emailServiceResponse.errorMessage}`,
+      };
+    }
+
+    return {
+      kind: "success",
+      invitation: {
+        kind: "sent",
+        invitationId: result.invitationId,
+        listId: input.listId,
+        invitedEmailNormalized: input.invitedEmail.trim().toLowerCase() as NormalizedEmailAddress,
+        expiresAt: result.expiresAt,
+      },
+    };
+  } catch (error) {
+    if (error instanceof CollaboratorManagementPermissionDeniedError) {
+      throw error;
+    }
+    return {
+      kind: "failure",
+      errorMessage: error instanceof Error && error.message ? error.message : "Failed to send invitation.",
+    };
+  }
 }
 
 /**

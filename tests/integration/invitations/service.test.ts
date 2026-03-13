@@ -456,6 +456,47 @@ describe("Phase 4 invitation issuing", () => {
     );
   });
 
+  it("Contract 2.2: inviteCollaboratorWorkflow result includes expiresAt sourced from persistedInvitation", async () => {
+    const emailSuffix = Date.now();
+    const ownerId = await insertUser(
+      "ExpiresAt Owner",
+      `phase2-expiresat-owner-${emailSuffix}@example.com`,
+    );
+    const listId = await insertList("ExpiresAt list", ownerId);
+
+    await addCollaboratorRow({
+      listId,
+      userId: ownerId,
+      role: "owner",
+    });
+
+    const { inviteCollaboratorWorkflow, setEmailServiceForTesting } =
+      await importInvitationServices();
+
+    setEmailServiceForTesting({
+      sendInvitationEmail: vi.fn().mockResolvedValue({
+        kind: "accepted" as const,
+        providerMessageId: "provider-expiresat" as never,
+      }),
+    });
+    vi.stubEnv("RESEND_API_KEY", "resend-key");
+    vi.stubEnv("EMAIL_FROM", "owner@example.com");
+    vi.stubEnv("APP_BASE_URL", "https://example.com");
+
+    const now = new Date("2026-03-13T10:00:00.000Z");
+    const result = await inviteCollaboratorWorkflow({
+      listId: listId as never,
+      inviterId: ownerId,
+      invitedEmail: "expiresat@example.com" as never,
+      now,
+    });
+
+    expect(result.expiresAt).toBeInstanceOf(Date);
+    // 7 days after now
+    const expectedExpiry = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7);
+    expect((result.expiresAt as Date).getTime()).toBe(expectedExpiry.getTime());
+  });
+
   it("raises ListNotFoundError when the workflow targets a missing list", async () => {
     const emailSuffix = Date.now();
     const ownerId = await insertUser(
