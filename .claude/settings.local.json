@@ -20,7 +20,6 @@
       "Bash(ls /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1b/.env* 2>/dev/null; ls /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.env* 2>/dev/null)",
       "Bash(cat /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1a/vitest.config.ts 2>/dev/null || cat /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1a/vitest.config.*.ts 2>/dev/null || ls /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1a/vitest* 2>/dev/null)",
       "Bash(ls -la /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1b/.env* 2>/dev/null)",
-      "Bash(cd /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1b && POSTGRES_URL=\"postgres://default:QkstVyYDM35S@ep-mute-snowflake-a40it0nd-pooler.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require\" npm run test:integration -- --reporter=verbose tests/integration/invitations/search-invitable-users.test.ts 2>&1)",
       "Bash(ln -s /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.env.local /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1a/.env.local && echo \"symlink created\")",
       "Bash(ln -s /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.env /Users/emmanuelgenard/Workspace/NextJS-Todo-app/todo-app/.workspaces/phase-1a/.env && echo \"symlink created\")"
     ]
