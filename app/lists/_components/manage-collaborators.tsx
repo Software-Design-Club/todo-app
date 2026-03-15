@@ -306,7 +306,11 @@ export default function ManageCollaborators({
         <h3 className="text-md font-semibold mb-2">Invite by Email</h3>
         <InviteByEmailForm
           listId={listId}
-          onSuccess={(invitation) => setInvitations((prev) => [...prev, invitation])}
+          onSuccess={(invitation) => {
+            setInvitations((prev) => [...prev, invitation]);
+            setSuccessMessage(`Invitation sent.`);
+          }}
+          onError={(msg) => setError(msg)}
         />
       </div>
 

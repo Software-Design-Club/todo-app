@@ -6,6 +6,7 @@ export const verificationCommands = [
   "npm run typecheck",
   "npm run lint",
   "npm run test:unit",
+  "npm run test:component",
   "npm run test:integration",
   "npm run test:e2e:smoke",
 ];

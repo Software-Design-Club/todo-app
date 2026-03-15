@@ -16,6 +16,22 @@ export default defineWorkspace([
     },
   },
   {
+    esbuild: {
+      jsx: "automatic",
+      jsxImportSource: "react",
+    },
+    resolve: {
+      alias: {
+        "@": workspaceRoot,
+      },
+    },
+    test: {
+      name: "component",
+      include: ["tests/component/**/*.test.tsx"],
+      environment: "happy-dom",
+    },
+  },
+  {
     resolve: {
       alias: {
         "@": workspaceRoot,

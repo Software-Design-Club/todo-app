@@ -7,12 +7,28 @@ import { toast } from "sonner";
 import { inviteCollaborator } from "@/app/lists/_actions/invitations";
 import type { EmailAddress, List, SentInvitationSummary } from "@/lib/types";
 
+/**
+ * InviteByEmailForm — feedback routing (Contract C.1)
+ *
+ * Used in two contexts:
+ *  - Dropdown (ManageCollaborators): parent owns all feedback via banners/state.
+ *  - Standalone (collaborators page): component owns feedback via toasts.
+ *
+ * @param onSuccess - When provided, called with the SentInvitationSummary on
+ *   success instead of firing toast.success (C.1.1). When omitted, fires
+ *   toast.success and calls router.refresh() (C.1.2).
+ * @param onError - When provided, called with the server error message on
+ *   failure instead of firing toast.error (C.1.3). When omitted, fires
+ *   toast.error (C.1.4).
+ */
 export function InviteByEmailForm({
   listId,
   onSuccess,
+  onError,
 }: {
   listId: List["id"];
   onSuccess?: (invitation: SentInvitationSummary) => void;
+  onError?: (message: string) => void;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -32,20 +48,28 @@ export function InviteByEmailForm({
         });
 
         if (result.kind === "success") {
-          toast.success(`Invitation sent to ${email}`);
-          if (onSuccess) {
-            onSuccess(result.invitation);
-          } else {
+          if (!onSuccess) {
+            toast.success(`Invitation sent to ${email}`);
             router.refresh();
+          } else {
+            onSuccess(result.invitation);
           }
         } else {
-          toast.error(result.errorMessage);
+          if (onError) {
+            onError(result.errorMessage);
+          } else {
+            toast.error(result.errorMessage);
+          }
         }
         formRef.current?.reset();
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Failed to send invitation.",
-        );
+        const message =
+          err instanceof Error ? err.message : "Failed to send invitation.";
+        if (onError) {
+          onError(message);
+        } else {
+          toast.error(message);
+        }
       }
     });
   }
